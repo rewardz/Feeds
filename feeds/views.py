@@ -1,0 +1,279 @@
+from __future__ import division, print_function, unicode_literals
+
+from django.db.models import Q
+from django.utils.translation import ugettext as _
+
+from rest_framework import permissions, viewsets, serializers, status, views
+from rest_framework.decorators import detail_route
+from rest_framework.exceptions import ValidationError
+from rest_framework.parsers import MultiPartParser, FormParser, FileUploadParser, JSONParser
+from rest_framework.response import Response
+
+from .constants import SHARED_WITH
+from .models import (
+    Comment, Clap, Post, PostLiked, PollsAnswer, Images,
+)
+from .serializers import (
+    CommentDetailSerializer, CommentSerializer, CommentCreateSerializer, ClapSerializer, 
+    PostLikedSerializer, PostSerializer, PostDetailSerializer,
+    PollsAnswerSerializer, ImagesSerializer, VideosSerializer,
+)
+from .utils import accessible_posts_by_user
+
+
+class PostViewSet(viewsets.ModelViewSet):
+    parser_classes = (MultiPartParser, JSONParser, FormParser, )
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def _create_or_update(self, request):
+        data = request.data
+        created_by = self.request.user
+        if not created_by:
+            raise serializers.ValidationError({'created_by': _('Created by is required!')})
+        data['created_by'] = created_by.id
+        data['organization'] = created_by.organization_id
+        return data
+    
+    def _upload_images_and_videos(self, request, post_id):
+        images = dict((request.FILES).lists()).get('images', None)
+        if images:
+            for img in images:
+                data = {'post': post_id}
+                data['image'] = img
+                image_serializer = ImagesSerializer(data=data)
+                if image_serializer.is_valid():
+                    image_serializer.save()
+                else:
+                    return Response({'message': 'Image not uploaded'},
+                                      status=status.HTTP_400_BAD_REQUEST)
+
+        videos = dict((request.FILES).lists()).get('videos', None)
+        if videos:
+            for video in videos:
+                data = {'post': post_id}
+                data['video'] = video
+                video_serializer = VideosSerializer(data=data)
+                if video_serializer.is_valid():
+                    video_serializer.save()
+                else:
+                    return Response({'message': 'Video not uploaded'},
+                                      status=status.HTTP_400_BAD_REQUEST)
+
+    def create(self, request, *args, **kwargs):
+        data = self._create_or_update(request)
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        post_id = serializer.data.get('id')
+
+        if request.FILES:
+            self._upload_images_and_videos(request, post_id)
+        return Response(serializer.data)
+    
+    def update(self, request, pk=None):
+        instance = self.get_object()
+        if instance.created_by.id != request.user.id:
+            raise serializers.ValidationError({"created_by": _("""A post can be updated only by its creator""")})
+        data = self._create_or_update(request)
+        serializer = self.get_serializer(instance, data=data)
+        serializer.is_valid(raise_exception=True)
+        if request.FILES:
+            self._upload_images_and_videos(request, instance.pk)
+        self.perform_update(serializer)
+        return Response(serializer.data)
+
+    def get_serializer(self, *args, **kwargs):
+        if "pk" in self.kwargs:
+            serializer_class = PostDetailSerializer
+        else:
+            serializer_class = PostSerializer
+        kwargs["context"] = {"request": self.request}
+        return serializer_class(*args, **kwargs)
+
+    def get_queryset(self):
+        user = self.request.user
+        org = self.request.user.organization
+        result = accessible_posts_by_user(user, org)
+        result = result.order_by('-priority', '-created_date')
+        return result
+    
+    @detail_route(methods=["GET", "POST"], permission_classes=(permissions.IsAuthenticated,))
+    def comment(self, request, *args, **kwargs):
+        """
+        List of all the comments related to the post
+        """
+        # serializer_class = CommentSerializer
+        user = self.request.user
+        organization = user.organization
+        post_id = self.kwargs.get("pk", None)
+        if not post_id:
+            raise ValidationError(_('Post ID required to retrieve all the related comments'))
+        post_id = int(post_id)
+        accessible_posts = accessible_posts_by_user(user, organization).values_list('id', flat=True)
+        if post_id not in accessible_posts:
+            raise ValidationError(_('You do not have access to comment on this post'))
+        if self.request.method == "GET":
+            comments = Comment.objects.filter(post_id=post_id, parent=None)
+            serializer = CommentSerializer(comments, many=True, read_only=True)
+            return Response(serializer.data)
+        elif self.request.method == "POST":
+            data = self.request.data
+            data['post'] = post_id
+            data['commented_by'] = self.request.user.id
+            serializer = CommentCreateSerializer(data=data)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response(serializer.data)
+    
+    @detail_route(methods=["POST"], permission_classes=(permissions.IsAuthenticated,))
+    def appreciate(self, request, *args, **kwargs):
+        user = self.request.user
+        organization = user.organization
+        post_id = self.kwargs.get("pk", None)
+        if not post_id:
+            raise ValidationError(_('Post ID required to appreciate a post'))
+        post_id = int(post_id)
+        accessible_posts = accessible_posts_by_user(user, organization).values_list('id', flat=True)
+        if post_id not in accessible_posts:
+            raise ValidationError(_('You do not have access to comment on this post'))
+        apreciation_type = self.request.query_params.get("type", "like")
+        message = None
+        response_status = status.HTTP_304_NOT_MODIFIED
+        if apreciation_type.lower() == "clap":
+            if Clap.objects.filter(post_id=post_id, clapped_by=user).exists():
+                Clap.objects.filter(post_id=post_id, clapped_by=user).delete()
+                message = "Successfully Unclapped"
+                response_status = status.HTTP_200_OK
+            else:
+                data = Clap.objects.create(post_id=post_id, clapped_by=user)
+                message = "Successfully Clapped"
+                response_status = status.HTTP_201_CREATED
+        elif apreciation_type.lower() == "like":
+            if PostLiked.objects.filter(post_id=post_id, liked_by=user).exists():
+                PostLiked.objects.filter(post_id=post_id, liked_by=user).delete()
+                message = "Successfully unliked"
+                response_status = status.HTTP_200_OK
+            else:
+                data = PostLiked.objects.create(post_id=post_id, liked_by=user)
+                message = "Successfully Liked"
+                response_status = status.HTTP_201_CREATED
+        return Response({"message": message}, status=response_status)
+    
+    @detail_route(methods=["GET", "POST"], permission_classes=(permissions.IsAuthenticated,))
+    def answers(self, request, *args, **kwargs):
+        user = self.request.user
+        organization = user.organization
+        post_id = self.kwargs.get("pk", None)
+        if not post_id:
+            raise ValidationError(_('Post ID required to retrieve all the related comments'))
+        post_id = int(post_id)
+        accessible_posts = accessible_posts_by_user(user, organization).values_list('id', flat=True)
+        accessible_polls = accessible_posts.filter(poll=True)
+        if post_id not in accessible_polls:
+            raise ValidationError(_('This is not a poll question'))
+        if post_id not in accessible_posts:
+            raise ValidationError(_('You do not have access to check the answers to this poll'))
+        if request.method == 'GET':
+            answers = PollsAnswer.objects.filter(question=post_id)
+            serializer = PollsAnswerSerializer(answers, many=True, read_only=True)
+            return Response(serializer.data)
+        if request.method == 'POST':
+            data = self.request.data
+            data['question'] = post_id
+            serializer = PollsAnswerSerializer(data=data)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response(serializer.data)
+    
+    @detail_route(methods=["POST"], permission_classes=(permissions.IsAuthenticated,))
+    def vote(self, request, *args, **kwargs):
+        user = self.request.user
+        organization = user.organization
+        post_id = self.kwargs.get("pk", None)
+        data = self.request.data
+        answer_id = data.get('answer_id', None)
+        if 'answer_id' not in data:
+            raise ValidationError(_('answer_id is a required parameter.'))
+        if not post_id:
+            raise ValidationError(_('Post ID required to retrieve all the related comments'))
+        post_id = int(post_id)
+        accessible_posts = accessible_posts_by_user(user, organization).values_list('id', flat=True)
+        accessible_polls = accessible_posts.filter(poll=True)
+        if post_id not in accessible_polls:
+            raise ValidationError(_('This is not a poll question'))
+        if post_id not in accessible_posts:
+            raise ValidationError(_('You do not have access to vote on this poll'))
+        poll = None
+        try:
+            poll = Post.objects.get(id=post_id)
+            poll.vote(user, answer_id)
+        except Post.DoesNotExist as exp:
+            raise ValidationError(_('Poll with id %d does not exist.' % post_id))
+        except PollsAnswer.DoesNotExist as exp:
+            raise ValidationError(_('Poll Answer with id %d does not exist.' % answer_id))
+        serializer = self.get_serializer(poll)
+        return Response(serializer.data)
+
+
+class ImagesView(views.APIView):
+    parser_classes = (MultiPartParser,)
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def post(self, request, *args, **kwargs):
+        post_id = request.data['post_id']
+        images = dict((request.data).lists())['images']
+        flag = 1
+        arr = []
+        for img in images:
+            data = {'post': post_id}
+            data['image'] = img
+            image_serializer = ImagesSerializer(data=data)
+            if image_serializer.is_valid():
+                image_serializer.save()
+                arr.append(image_serializer.data)
+            else:
+                flag = 0
+        if flag == 1:
+            return Response(arr, status=status.HTTP_201_CREATED)
+        else:
+            return Response(arr, status=status.HTTP_400_BAD_REQUEST)
+
+
+class VideosView(views.APIView):
+    parser_classes = (MultiPartParser,)
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def post(self, request, *args, **kwargs):
+        post_id = request.data['post_id']
+        videos = dict((request.data).lists())['videos']
+        flag = 1
+        arr = []
+        for video in videos:
+            data = {'post': post_id}
+            data['video'] = video
+            video_serializer = VideosSerializer(data=data)
+            if video_serializer.is_valid():
+                video_serializer.save()
+                arr.append(video_serializer.data)
+            else:
+                flag = 0
+        if flag == 1:
+            return Response(arr, status=status.HTTP_201_CREATED)
+        else:
+            return Response(arr, status=status.HTTP_400_BAD_REQUEST)
+
+
+class CommentViewset(viewsets.ModelViewSet):
+    permission_classes = (permissions.IsAuthenticated,)
+    queryset = Comment.objects.none()
+
+    def get_serializer(self, *args, **kwargs):
+        if "pk" in self.kwargs:
+            serializer_class = CommentDetailSerializer
+        else:
+            serializer_class = CommentSerializer
+        kwargs["context"] = {"request": self.request}
+        return serializer_class(*args, **kwargs)
+
+    def get_queryset(self):
+        user = self.request.user

@@ -1,0 +1,6 @@
+*.vscode
+news_env/
+*\.pyc
+*.sqlite*
+*\.log
+news_feed/media/
