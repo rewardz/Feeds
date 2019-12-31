@@ -1,4 +1,4 @@
-Django==1.8.14
+Django==1.11.23
 pytz==2015.4
 wsgiref==0.1.2
 djangorestframework==3.1.3
