@@ -28,6 +28,11 @@ def accessible_posts_by_user(user, organization):
 
 
 def validate_priority(data):
+    """
+    This function checks if there are no other post accessible to the user which
+    has priority set to True.
+    At a single time only one post can be set as priority
+    """
     user = data.get('created_by', None)
     organization = data.get('organization', None)
     priority = data.get('priority', None)

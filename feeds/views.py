@@ -11,7 +11,7 @@ from rest_framework.response import Response
 
 from .constants import SHARED_WITH
 from .models import (
-    Comment, Clap, Post, PostLiked, PollsAnswer, Images,
+    Comment, Clap, Post, PostLiked, PollsAnswer, Images, CommentLiked,
 )
 from .serializers import (
     CommentDetailSerializer, CommentSerializer, CommentCreateSerializer, ClapSerializer, 
@@ -98,7 +98,7 @@ class PostViewSet(viewsets.ModelViewSet):
         return result
     
     @detail_route(methods=["GET", "POST"], permission_classes=(permissions.IsAuthenticated,))
-    def comment(self, request, *args, **kwargs):
+    def comments(self, request, *args, **kwargs):
         """
         List of all the comments related to the post
         """
@@ -135,29 +135,34 @@ class PostViewSet(viewsets.ModelViewSet):
         post_id = int(post_id)
         accessible_posts = accessible_posts_by_user(user, organization).values_list('id', flat=True)
         if post_id not in accessible_posts:
-            raise ValidationError(_('You do not have access to comment on this post'))
+            raise ValidationError(_('You do not have access to this post'))
         apreciation_type = self.request.query_params.get("type", "like")
         message = None
+        liked = False
         response_status = status.HTTP_304_NOT_MODIFIED
         if apreciation_type.lower() == "clap":
             if Clap.objects.filter(post_id=post_id, clapped_by=user).exists():
                 Clap.objects.filter(post_id=post_id, clapped_by=user).delete()
                 message = "Successfully Unclapped"
+                liked = False
                 response_status = status.HTTP_200_OK
             else:
                 data = Clap.objects.create(post_id=post_id, clapped_by=user)
                 message = "Successfully Clapped"
+                liked = True
                 response_status = status.HTTP_201_CREATED
         elif apreciation_type.lower() == "like":
             if PostLiked.objects.filter(post_id=post_id, liked_by=user).exists():
                 PostLiked.objects.filter(post_id=post_id, liked_by=user).delete()
                 message = "Successfully unliked"
+                liked = False
                 response_status = status.HTTP_200_OK
             else:
                 data = PostLiked.objects.create(post_id=post_id, liked_by=user)
                 message = "Successfully Liked"
+                liked = True
                 response_status = status.HTTP_201_CREATED
-        return Response({"message": message}, status=response_status)
+        return Response({"message": message, "liked": liked}, status=response_status)
     
     @detail_route(methods=["GET", "POST"], permission_classes=(permissions.IsAuthenticated,))
     def answers(self, request, *args, **kwargs):
@@ -165,7 +170,7 @@ class PostViewSet(viewsets.ModelViewSet):
         organization = user.organization
         post_id = self.kwargs.get("pk", None)
         if not post_id:
-            raise ValidationError(_('Post ID required to retrieve all the related comments'))
+            raise ValidationError(_('Post ID required to retrieve all the related answers'))
         post_id = int(post_id)
         accessible_posts = accessible_posts_by_user(user, organization).values_list('id', flat=True)
         accessible_polls = accessible_posts.filter(poll=True)
@@ -195,7 +200,7 @@ class PostViewSet(viewsets.ModelViewSet):
         if 'answer_id' not in data:
             raise ValidationError(_('answer_id is a required parameter.'))
         if not post_id:
-            raise ValidationError(_('Post ID required to retrieve all the related comments'))
+            raise ValidationError(_('Post ID required to vote'))
         post_id = int(post_id)
         accessible_posts = accessible_posts_by_user(user, organization).values_list('id', flat=True)
         accessible_polls = accessible_posts.filter(poll=True)
@@ -277,3 +282,26 @@ class CommentViewset(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
+    
+    @detail_route(methods=["POST"], permission_classes=(permissions.IsAuthenticated,))
+    def like(self, request, *args, **kwargs):
+        user = self.request.user
+        organization = user.organization
+        comment_id = self.kwargs.get("pk", None)
+        if not comment_id:
+            raise ValidationError(_('Comment ID is required'))
+        comment_id = int(comment_id)
+        message = None
+        liked = False
+        response_status = status.HTTP_304_NOT_MODIFIED
+        
+        if CommentLiked.objects.filter(comment_id=comment_id, liked_by=user).exists():
+            CommentLiked.objects.filter(comment_id=comment_id, liked_by=user).delete()
+            message = "Successfully UnLiked"
+            liked = False
+            response_status = status.HTTP_200_OK
+        else:
+            data = CommentLiked.objects.create(comment_id=comment_id, liked_by=user)
+            message = "Successfully Liked"
+            liked = True
+        return Response({"message": message, "liked": liked}, status=response_status)

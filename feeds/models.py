@@ -40,6 +40,13 @@ class Post(models.Model):
     def related_answers(self):
         return PollsAnswer.objects.filter(question=self)
 
+    def total_votes(self):
+        total_votes = 0
+        answers = self.related_answers()
+        for answer in answers:
+            total_votes += answer.vote
+        return total_votes
+
     def __unicode__(self):
         return "%s published by %s" % (self.title, self.created_by)
     
@@ -76,6 +83,7 @@ class Clap(models.Model):
     def __unicode__(self):
         return "%s clapped on %s" % (self.clapped_by, self.post)
 
+
 class PostLiked(models.Model):
     liked_by = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     liked_on = models.DateTimeField(auto_now_add=True)
@@ -85,11 +93,27 @@ class PostLiked(models.Model):
         return "%s like post %s" % (self.liked_by, self.post)
 
 
+class CommentLiked(models.Model):
+    liked_by = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    liked_on = models.DateTimeField(auto_now_add=True)
+    post = models.ForeignKey(Comment, on_delete=models.CASCADE)
+
+    def __unicode__(self):
+        return "%s like comment %s" % (self.liked_by, self.post)
+
+
 class PollsAnswer(models.Model):
     question = models.ForeignKey(Post, on_delete=models.CASCADE)
     answer_text = models.CharField(max_length=200)
     votes = models.IntegerField(default=0)
     voters = models.ManyToManyField(CustomUser, through='Voter', blank=True)
+
+    @property
+    def percentage(self):
+        question = self.question
+        total_votes = question.total_votes()
+        if total_votes > 0:
+            return (self.votes * 100) / total_votes
 
     def get_voters(self):
         # return ",".join([str(p) for p in self.voters.all()])

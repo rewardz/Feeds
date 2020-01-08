@@ -61,15 +61,22 @@ class PostSerializer(serializers.ModelSerializer):
 
 
 class PostDetailSerializer(PostSerializer):
+
+    comments = serializers.SerializerMethodField()
     
     class Meta:
         model = Post
         fields = (
             "id", "created_by", "organization", "title", "description",
             "created_date", "published_date", "priority", "prior_till",
-            "shared_with", "images", "videos", "answers", "poll",
+            "shared_with", "images", "videos", "answers", "poll", "comments",
         )
     
+    def get_comments(self, instance):
+        post_id = instance.id
+        comments = Comment.objects.filter(post=post_id)
+        return CommentSerializer(comments, many=True, read_only=True).data
+
     def update(self, instance, validated_data):
         validate_priority(validated_data)
         instance.title = validated_data.get('title', instance.title)
@@ -168,5 +175,5 @@ class PollsAnswerSerializer(serializers.ModelSerializer):
     class Meta:
         model = PollsAnswer
         fields = (
-            "id", "question", "answer_text", "votes", "get_voters",
+            "id", "question", "answer_text", "votes", "get_voters", "percentage",
         )
