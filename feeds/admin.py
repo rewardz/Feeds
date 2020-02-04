@@ -1,32 +1,26 @@
 from django.contrib import admin
 
-from feeds.models import Post, Comment, PostLiked, Clap, PollsAnswer
+from feeds.models import Post, Comment, PostLiked, PollsAnswer
 
-# Register your models here.
+
 @admin.register(Post)
 class PostAdmin(admin.ModelAdmin):
-    list_display = ('created_by', 'title', 'description', 'created_date', 'published_date', 'priority',
-                    'prior_till', 'shared_with', 'poll',)
+    list_display = (
+        'title', 'organization', 'priority', 'prior_till', 'shared_with', 
+        'post_type', 'created_by', 'created_on',
+    )
+    list_filter = ('organization', 'priority')
+    search_fields = ('organization__name',)
 
 
 @admin.register(Comment)
 class CommentAdmin(admin.ModelAdmin):
-    list_display = ('content', 'parent', 'commented_by', 'commented_on', 'post')
+    list_display = ('content', 'parent', 'created_by', 'created_on', 'post')
 
 
 @admin.register(PostLiked)
 class PostLikedAdmin(admin.ModelAdmin):
-    list_display = ('liked_by', 'liked_on', 'post',)
-
-
-@admin.register(Clap)
-class ClapAdmin(admin.ModelAdmin):
-    list_display = ('clapped_by', 'clapped_on', 'post',)
-
-
-# @admin.register(PollsQuestion)
-# class PollsQuestionAdmin(admin.ModelAdmin):
-#     list_display = ('question_text', 'organization', 'created_by', 'created_on', 'shared_with')
+    list_display = ('created_by', 'created_on', 'post',)
 
 
 @admin.register(PollsAnswer)
