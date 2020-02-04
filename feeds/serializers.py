@@ -5,7 +5,7 @@ from django.utils.translation import ugettext as _
 from rest_framework import exceptions, serializers
 
 from .models import (
-    Comment, Clap, Post, PostLiked, PollsAnswer, Images, Videos,
+    Comment, Post, PostLiked, PollsAnswer, Images, Videos,
 )
 from .utils import validate_priority
 
@@ -15,7 +15,8 @@ class ImagesSerializer(serializers.ModelSerializer):
     class Meta:
         model = Images
         fields = (
-            "post", "image",
+            'id', 'image', 'thumbnail_img_url', 'display_img_url',
+            'large_img_url'
         )
 
 
@@ -24,7 +25,7 @@ class VideosSerializer(serializers.ModelSerializer):
     class Meta:
         model = Videos
         fields = (
-            "post", "video",
+            'post', 'video',
         )
 
 
@@ -37,8 +38,8 @@ class PostSerializer(serializers.ModelSerializer):
         model = Post
         fields = (
             "id", "created_by", "organization", "title", "description",
-            "created_date", "published_date", "priority", "prior_till",
-            "shared_with", "images", "videos", "answers", "poll",
+            "created_on", "published_date", "priority", "prior_till",
+            "shared_with", "images", "videos", "answers", "post_type"
         )
 
     def get_images(self, instance):
@@ -68,8 +69,8 @@ class PostDetailSerializer(PostSerializer):
         model = Post
         fields = (
             "id", "created_by", "organization", "title", "description",
-            "created_date", "published_date", "priority", "prior_till",
-            "shared_with", "images", "videos", "answers", "poll", "comments",
+            "created_on", "published_date", "priority", "prior_till",
+            "shared_with", "images", "videos", "answers", "post_type", "comments",
         )
     
     def get_comments(self, instance):
@@ -97,7 +98,7 @@ class CommentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Comment
-        fields = ("id", "content", "commented_by", "commented_on",
+        fields = ("id", "content", "created_by", "created_on",
                   "post", "comment_response", "parent",)
 
 
@@ -105,7 +106,7 @@ class CommentCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Comment
-        fields = ("id", "content", "commented_by", "commented_on",
+        fields = ("id", "content", "created_by", "created_on",
                   "post", "parent",)
     
     def create(self, validated_data):
@@ -118,33 +119,10 @@ class CommentDetailSerializer(CommentSerializer):
         model = Comment
         fields = (
             "content",
-            "commented_by",
-            "commented_on",
+            "created_by",
+            "created_on",
             "post",
         )
-
-
-class ClapSerializer(serializers.ModelSerializer):
-
-    class Meta:
-        model = Clap
-        fields = (
-            "id", "clapped_by", "clapped_on", "post",
-        )
-
-    def validate(self, data):
-        """
-        Check if user has already liked the post. 
-        Do not allow the user to like the post again.
-        """
-        user = data['clapped_by']
-        post = data['post']
-        
-        if Clap.objects.filter(post=post, clapped_by=user).exists():
-            Clap.objects.filter(post=post, clapped_by=user).delete()
-    
-    def create(self, validated_data):
-        return super(ClapSerializer, self).create(validated_data)
 
 
 class PostLikedSerializer(serializers.ModelSerializer):
@@ -152,7 +130,7 @@ class PostLikedSerializer(serializers.ModelSerializer):
     class Meta:
         model = PostLiked
         fields = (
-            "id", "liked_by", "liked_on", "post",
+            "id", "created_by", "created_on", "post",
         )
     
     def validate(self, data):
@@ -160,10 +138,10 @@ class PostLikedSerializer(serializers.ModelSerializer):
         Check if user has already liked the post. 
         Do not allow the user to like the post again.
         """
-        user = data['liked_by']
+        user = data['created_by']
         post = data['post']
         
-        if PostLiked.objects.filter(post=post, liked_by=user).exists():
+        if PostLiked.objects.filter(post=post, created_by=user).exists():
             raise serializers.ValidationError(_("You cannot like the post again!"))
     
     def create(self, validated_data):

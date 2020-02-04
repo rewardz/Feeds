@@ -4,17 +4,17 @@ from django.db.models import Q
 from django.utils.translation import ugettext as _
 
 from rest_framework import permissions, viewsets, serializers, status, views
-from rest_framework.decorators import detail_route
+from rest_framework.decorators import detail_route, list_route
 from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import MultiPartParser, FormParser, FileUploadParser, JSONParser
 from rest_framework.response import Response
 
-from .constants import SHARED_WITH
+from .constants import POST_TYPE, SHARED_WITH
 from .models import (
-    Comment, Clap, Post, PostLiked, PollsAnswer, Images, CommentLiked,
+    Comment, Post, PostLiked, PollsAnswer, Images, CommentLiked,
 )
 from .serializers import (
-    CommentDetailSerializer, CommentSerializer, CommentCreateSerializer, ClapSerializer, 
+    CommentDetailSerializer, CommentSerializer, CommentCreateSerializer, 
     PostLikedSerializer, PostSerializer, PostDetailSerializer,
     PollsAnswerSerializer, ImagesSerializer, VideosSerializer,
 )
@@ -94,15 +94,40 @@ class PostViewSet(viewsets.ModelViewSet):
         user = self.request.user
         org = self.request.user.organization
         result = accessible_posts_by_user(user, org)
-        result = result.order_by('-priority', '-created_date')
+        result = result.order_by('-priority', '-created_on')
         return result
+
+    @list_route(methods=["POST"], permission_classes=(permissions.IsAuthenticated,))
+    def create_poll(self, request, *args, **kwargs):
+        user = self.request.user
+        organization = user.organization
+        data = self.request.data
+        question = data['title']
+        if not question:
+            raise ValidationError(_('Question is required to create a poll'))
+        answers = data.get('answers', [])
+        if not answers:
+            raise ValidationError(_('Answers are required to create a poll'))
+        data['post_type'] = POST_TYPE.USER_CREATED_POLL
+        data['created_by'] = user.pk
+        data['organization'] = organization.pk
+        question_serializer = PostSerializer(data=data)
+        question_serializer.is_valid(raise_exception=True)
+        poll = question_serializer.save()
+        for answer in answers:
+            data['question'] = poll.pk
+            data['answer_text'] = answer
+            answer_serializer = PollsAnswerSerializer(data=data)
+            answer_serializer.is_valid(raise_exception=True)
+            answer_serializer.save()
+        result = PostSerializer(poll)
+        return Response(result.data)
     
     @detail_route(methods=["GET", "POST"], permission_classes=(permissions.IsAuthenticated,))
     def comments(self, request, *args, **kwargs):
         """
         List of all the comments related to the post
         """
-        # serializer_class = CommentSerializer
         user = self.request.user
         organization = user.organization
         post_id = self.kwargs.get("pk", None)
@@ -119,7 +144,7 @@ class PostViewSet(viewsets.ModelViewSet):
         elif self.request.method == "POST":
             data = self.request.data
             data['post'] = post_id
-            data['commented_by'] = self.request.user.id
+            data['created_by'] = self.request.user.id
             serializer = CommentCreateSerializer(data=data)
             serializer.is_valid(raise_exception=True)
             serializer.save()
@@ -140,25 +165,14 @@ class PostViewSet(viewsets.ModelViewSet):
         message = None
         liked = False
         response_status = status.HTTP_304_NOT_MODIFIED
-        if apreciation_type.lower() == "clap":
-            if Clap.objects.filter(post_id=post_id, clapped_by=user).exists():
-                Clap.objects.filter(post_id=post_id, clapped_by=user).delete()
-                message = "Successfully Unclapped"
-                liked = False
-                response_status = status.HTTP_200_OK
-            else:
-                data = Clap.objects.create(post_id=post_id, clapped_by=user)
-                message = "Successfully Clapped"
-                liked = True
-                response_status = status.HTTP_201_CREATED
-        elif apreciation_type.lower() == "like":
-            if PostLiked.objects.filter(post_id=post_id, liked_by=user).exists():
-                PostLiked.objects.filter(post_id=post_id, liked_by=user).delete()
+        if apreciation_type.lower() == "like":
+            if PostLiked.objects.filter(post_id=post_id, created_by=user).exists():
+                PostLiked.objects.filter(post_id=post_id, created_by=user).delete()
                 message = "Successfully unliked"
                 liked = False
                 response_status = status.HTTP_200_OK
             else:
-                data = PostLiked.objects.create(post_id=post_id, liked_by=user)
+                data = PostLiked.objects.create(post_id=post_id, created_by=user)
                 message = "Successfully Liked"
                 liked = True
                 response_status = status.HTTP_201_CREATED
@@ -203,11 +217,13 @@ class PostViewSet(viewsets.ModelViewSet):
             raise ValidationError(_('Post ID required to vote'))
         post_id = int(post_id)
         accessible_posts = accessible_posts_by_user(user, organization).values_list('id', flat=True)
-        accessible_polls = accessible_posts.filter(poll=True)
+        if post_id not in accessible_posts:
+            raise ValidationError(_('You do not have access'))
+        accessible_polls = accessible_posts.filter(
+            post_type=POST_TYPE.USER_CREATED_POLL
+        )
         if post_id not in accessible_polls:
             raise ValidationError(_('This is not a poll question'))
-        if post_id not in accessible_posts:
-            raise ValidationError(_('You do not have access to vote on this poll'))
         poll = None
         try:
             poll = Post.objects.get(id=post_id)
@@ -295,13 +311,13 @@ class CommentViewset(viewsets.ModelViewSet):
         liked = False
         response_status = status.HTTP_304_NOT_MODIFIED
         
-        if CommentLiked.objects.filter(comment_id=comment_id, liked_by=user).exists():
-            CommentLiked.objects.filter(comment_id=comment_id, liked_by=user).delete()
+        if CommentLiked.objects.filter(comment_id=comment_id, created_by=user).exists():
+            CommentLiked.objects.filter(comment_id=comment_id, created_by=user).delete()
             message = "Successfully UnLiked"
             liked = False
             response_status = status.HTTP_200_OK
         else:
-            data = CommentLiked.objects.create(comment_id=comment_id, liked_by=user)
+            data = CommentLiked.objects.create(comment_id=comment_id, created_by=user)
             message = "Successfully Liked"
             liked = True
         return Response({"message": message, "liked": liked}, status=response_status)
