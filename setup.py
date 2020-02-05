@@ -64,6 +64,6 @@ setup(
         'dev': dev_requires,
     },
     dependency_links=[
-        "git+ssh://git@github.com/rewardz/shared_code.git@1.3.3#egg=rewardz_utils-1.3.3"
+        "git+https://github.com/rewardz/cropimg-django.git@0f705fa0259dd2ab4e0c3c070ab92e50c8e9ba06#egg=cropimg-django"
     ],
 )
