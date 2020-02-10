@@ -1,19 +1,22 @@
 from __future__ import division, print_function, unicode_literals
 
+from django.conf import settings
 from django.db.models import Q
 from django.utils.translation import ugettext as _
+from django.utils.module_loading import import_string
+
 
 from rest_framework import exceptions
 
 from .constants import SHARED_WITH
 from .models import Post
 
-
+DEPARTMENT_MODEL = import_string(settings.DEPARTMENTS_NAME)
 ERROR_MESSAGE = "Priority post already exists for user. Set priority to false."
 
 def accessible_posts_by_user(user, organization):
     dept_users = []
-    for dept in user.departments.all():
+    for dept in DEPARTMENT_MODEL.objects.filter(users=user):
         for usr in dept.users.all():
             dept_users.append(usr.id)
     if not dept_users:
