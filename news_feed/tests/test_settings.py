@@ -61,4 +61,4 @@ REST_FRAMEWORK = {
 AUTH_USER_MODEL = 'profiles.CustomUser'
 # CUSTOM_USER_MODEL = 'news_feed.tests.profiles.models.CustomUser'
 ORGANIZATION_MODEL = 'news_feed.tests.profiles.models.Organization'
-DEPARTMENTS_NAME = 'news_feed.tests.profiles.models.Department'
+DEPARTMENT_MODEL = 'news_feed.tests.profiles.models.Department'

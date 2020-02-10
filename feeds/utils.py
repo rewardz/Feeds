@@ -11,7 +11,7 @@ from rest_framework import exceptions
 from .constants import SHARED_WITH
 from .models import Post
 
-DEPARTMENT_MODEL = import_string(settings.DEPARTMENTS_NAME)
+DEPARTMENT_MODEL = import_string(settings.DEPARTMENT_MODEL)
 ERROR_MESSAGE = "Priority post already exists for user. Set priority to false."
 
 def accessible_posts_by_user(user, organization):
