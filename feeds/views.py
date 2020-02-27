@@ -26,10 +26,11 @@ class PostViewSet(viewsets.ModelViewSet):
     permission_classes = (permissions.IsAuthenticated,)
 
     def _create_or_update(self, request):
-        data = request.data
+        payload = request.data
         created_by = self.request.user
         if not created_by:
             raise serializers.ValidationError({'created_by': _('Created by is required!')})
+        data = {k: v for k, v in payload.items()}
         data['created_by'] = created_by.id
         data['organization'] = created_by.organization_id
         return data
@@ -63,8 +64,8 @@ class PostViewSet(viewsets.ModelViewSet):
         data = self._create_or_update(request)
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
-        serializer.save()
-        post_id = serializer.data.get('id')
+        instance = serializer.save()
+        post_id = instance.id
 
         if request.FILES:
             self._upload_images_and_videos(request, post_id)
@@ -101,13 +102,14 @@ class PostViewSet(viewsets.ModelViewSet):
     def create_poll(self, request, *args, **kwargs):
         user = self.request.user
         organization = user.organization
-        data = self.request.data
-        question = data['title']
+        payload = self.request.data
+        data = {k: v for k, v in payload.items()}
+        question = data.get('title', None)
         if not question:
-            raise ValidationError(_('Question is required to create a poll'))
+            raise ValidationError(_('Question(title) is required to create a poll'))
         answers = data.get('answers', [])
-        if not answers:
-            raise ValidationError(_('Answers are required to create a poll'))
+        if not answers or len(answers) < 2:
+            raise ValidationError(_('Minimum two answers are required to create a poll.'))
         data['post_type'] = POST_TYPE.USER_CREATED_POLL
         data['created_by'] = user.pk
         data['organization'] = organization.pk
@@ -142,7 +144,8 @@ class PostViewSet(viewsets.ModelViewSet):
             serializer = CommentSerializer(comments, many=True, read_only=True)
             return Response(serializer.data)
         elif self.request.method == "POST":
-            data = self.request.data
+            payload = self.request.data
+            data = {k: v for k, v in payload.items()}
             data['post'] = post_id
             data['created_by'] = self.request.user.id
             serializer = CommentCreateSerializer(data=data)
@@ -187,9 +190,9 @@ class PostViewSet(viewsets.ModelViewSet):
             raise ValidationError(_('Post ID required to retrieve all the related answers'))
         post_id = int(post_id)
         accessible_posts = accessible_posts_by_user(user, organization).values_list('id', flat=True)
-        accessible_polls = accessible_posts.filter(poll=True)
+        accessible_polls = accessible_posts.filter(post_type=POST_TYPE.USER_CREATED_POLL)
         if post_id not in accessible_polls:
-            raise ValidationError(_('This is not a poll question'))
+            raise ValidationError(_('This is not a poll.'))
         if post_id not in accessible_posts:
             raise ValidationError(_('You do not have access to check the answers to this poll'))
         if request.method == 'GET':
@@ -197,7 +200,8 @@ class PostViewSet(viewsets.ModelViewSet):
             serializer = PollsAnswerSerializer(answers, many=True, read_only=True)
             return Response(serializer.data)
         if request.method == 'POST':
-            data = self.request.data
+            payload = self.request.data
+            data = {k: v for k, v in payload.items()}
             data['question'] = post_id
             serializer = PollsAnswerSerializer(data=data)
             serializer.is_valid(raise_exception=True)
@@ -229,9 +233,9 @@ class PostViewSet(viewsets.ModelViewSet):
             poll = Post.objects.get(id=post_id)
             poll.vote(user, answer_id)
         except Post.DoesNotExist as exp:
-            raise ValidationError(_('Poll with id %d does not exist.' % post_id))
+            raise ValidationError(_('Poll does not exist.'))
         except PollsAnswer.DoesNotExist as exp:
-            raise ValidationError(_('Poll Answer with id %d does not exist.' % answer_id))
+            raise ValidationError(_('Poll answer is not associated to the question.'))
         serializer = self.get_serializer(poll)
         return Response(serializer.data)
 

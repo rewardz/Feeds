@@ -45,7 +45,7 @@ class Post(UserInfo):
     )
 
     def vote(self, user, answer_id):
-        answer = PollsAnswer.objects.get(pk=answer_id)
+        answer = PollsAnswer.objects.get(pk=answer_id, question=self)
         if Voter.objects.filter(user=user, question=self).exists():
             raise ValidationError(_('You have already voted for this question'))
         Voter.objects.create(answer=answer, user=user, question=self)

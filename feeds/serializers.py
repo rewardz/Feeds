@@ -15,7 +15,7 @@ class ImagesSerializer(serializers.ModelSerializer):
     class Meta:
         model = Images
         fields = (
-            'id', 'image', 'thumbnail_img_url', 'display_img_url',
+            'id', 'post', 'image', 'thumbnail_img_url', 'display_img_url',
             'large_img_url'
         )
 

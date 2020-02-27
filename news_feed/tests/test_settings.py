@@ -9,6 +9,8 @@ EXTERNAL_APPS = (
     'django.contrib.staticfiles',
     'rest_framework',
     'rest_framework.authtoken',
+    'easy_thumbnails',
+    'image_cropping',
 )
 
 INTERNAL_APPS = (
