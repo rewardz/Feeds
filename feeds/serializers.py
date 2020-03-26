@@ -125,6 +125,8 @@ class PostDetailSerializer(PostSerializer):
 
     comments = serializers.SerializerMethodField()
     user_info = serializers.SerializerMethodField()
+    is_owner = serializers.SerializerMethodField()
+    has_appreciated = serializers.SerializerMethodField()
     
     class Meta:
         model = Post
@@ -132,8 +134,9 @@ class PostDetailSerializer(PostSerializer):
             "id", "created_by", "user_info", "organization", "title", "description",
             "created_on", "published_date", "priority", "prior_till",
             "shared_with", "images", "videos", "answers", "post_type", "comments",
+            "is_owner", "has_appreciated",
         )
-    
+
     def get_comments(self, instance):
         post_id = instance.id
         comments = Comment.objects.filter(post=post_id)
@@ -143,6 +146,15 @@ class PostDetailSerializer(PostSerializer):
         created_by = instance.created_by
         user_detail = UserModel.objects.get(pk=created_by.id)
         return UserInfoSerializer(user_detail).data
+
+    def get_is_owner(self, instance):
+        request = self.context['request']
+        return instance.created_by.pk == request.user.pk
+
+    def get_has_appreciated(self, instance):
+        request = self.context['request']
+        user = request.user
+        return PostLiked.objects.filter(post=instance, created_by=user).exists()
 
     def update(self, instance, validated_data):
         validate_priority(validated_data)
