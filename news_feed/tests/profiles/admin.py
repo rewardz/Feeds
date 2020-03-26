@@ -7,7 +7,7 @@ from news_feed.tests.profiles.models import CustomUser, Department, Organization
 
 @admin.register(CustomUser)
 class CustomUserAdmin(admin.ModelAdmin):
-    list_display = ('email', 'first_name', 'last_name', 'is_active', 'is_staff', 
+    list_display = ('email', 'img', 'first_name', 'last_name', 'is_active', 'is_staff',
                     'organization', 'get_departments')
 
 

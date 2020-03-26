@@ -44,3 +44,18 @@ def validate_priority(data):
         priority_posts = accessible_posts.filter(priority=True)
         if priority_posts:
             raise exceptions.ValidationError({"priority": _(ERROR_MESSAGE)})
+
+
+def get_departments(user):
+    """
+    This function returns the department list of a user
+    """
+    return DEPARTMENT_MODEL.objects.filter(users=user)
+
+
+def get_profile_image(user):
+    """
+    This function returns the profile image of the user or none
+    """
+    profile_image = settings.PROFILE_IMAGE_PROPERTY
+    return getattr(user, profile_image, settings.NO_PROFILE_IMAGE)
