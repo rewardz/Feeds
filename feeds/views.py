@@ -16,7 +16,7 @@ from .models import (
 from .serializers import (
     CommentDetailSerializer, CommentSerializer, CommentCreateSerializer, 
     PostLikedSerializer, PostSerializer, PostDetailSerializer,
-    PollsAnswerSerializer, ImagesSerializer, VideosSerializer,
+    PollsAnswerSerializer, ImagesSerializer, UserInfoSerializer, VideosSerializer,
 )
 from .utils import accessible_posts_by_user
 
@@ -180,7 +180,22 @@ class PostViewSet(viewsets.ModelViewSet):
                 liked = True
                 response_status = status.HTTP_201_CREATED
         return Response({"message": message, "liked": liked}, status=response_status)
-    
+
+    @detail_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
+    def appreciated_by(self, request, *args, **kwargs):
+        user = self.request.user
+        organization = user.organization
+        post_id = self.kwargs.get("pk", None)
+        if not post_id:
+            raise ValidationError(_('Post ID required to appreciate a post'))
+        post_id = int(post_id)
+        accessible_posts = accessible_posts_by_user(user, organization).values_list('id', flat=True)
+        if post_id not in accessible_posts:
+            raise ValidationError(_('You do not have access to this post'))
+        posts_liked = PostLiked.objects.filter(post_id=post_id)
+        serializer = PostLikedSerializer(posts_liked, many=True, read_only=True)
+        return Response(serializer.data)
+
     @detail_route(methods=["GET", "POST"], permission_classes=(permissions.IsAuthenticated,))
     def answers(self, request, *args, **kwargs):
         user = self.request.user

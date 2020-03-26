@@ -6,6 +6,12 @@ from django.db import models
 from django.template.defaultfilters import slugify
 from django.utils.translation import ugettext_lazy as _
 
+from cropimg.fields import CIImageField, CIThumbnailField
+from easy_thumbnails.exceptions import InvalidImageFormatError
+from easy_thumbnails.files import get_thumbnailer
+from model_helpers import upload_to
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -97,14 +103,37 @@ class DefaultCustomUserManager(BaseUserManager):
 
 
 class CustomUser(CustomUserBase):
+    IMAGE_SIZES = {
+        "display": (500, 500),
+        "thumbnail": (150, 150)
+    }
+
     organization = models.ForeignKey(Organization, related_name="users")
     employee_id = models.TextField(default="", editable=True, unique=True)
     is_p2p_staff = models.BooleanField(default=False, help_text="p2p staff is not limited by p2p_points_limit, but can "
                                        "recognize users in the same org only")
+    img = models.ImageField(upload_to="user/images", blank=True, null=True)
+    # img_large = CIThumbnailField('image', (1, 1), blank=True, null=True)
+    # img_display = CIThumbnailField('image', (1, 1), blank=True, null=True)
+    # img_thumbnail = CIThumbnailField('image', (1, 1), blank=True, null=True)
 
     objects = DefaultCustomUserManager()
 
     USERNAME_FIELD = 'email'
+
+    def get_thumbnail(self, size_name, default_url=""):
+        if not self.img:
+            return default_url
+        return get_thumbnailer(self.img).get_thumbnail({
+            'size': self.IMAGE_SIZES[size_name],
+            'crop': False, 'detail': True
+        }).url
+
+    @property
+    def thumbnail_img_url(self):
+        if self.img:
+            return self.get_thumbnail("thumbnail")
+        return settings.DEFAULT_PROFILE_PICTURE
 
     def get_departments(self):
         return ",".join([str(p) for p in self.departments.all()])

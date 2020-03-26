@@ -61,6 +61,8 @@ REST_FRAMEWORK = {
 }
 
 AUTH_USER_MODEL = 'profiles.CustomUser'
-# CUSTOM_USER_MODEL = 'news_feed.tests.profiles.models.CustomUser'
+CUSTOM_USER_MODEL = 'news_feed.tests.profiles.models.CustomUser'
 ORGANIZATION_MODEL = 'news_feed.tests.profiles.models.Organization'
 DEPARTMENT_MODEL = 'news_feed.tests.profiles.models.Department'
+PROFILE_IMAGE_PROPERTY = 'thumbnail_img_url'
+NO_PROFILE_IMAGE = ''
