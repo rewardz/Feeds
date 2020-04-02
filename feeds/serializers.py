@@ -7,7 +7,7 @@ from django.utils.translation import ugettext as _
 from rest_framework import exceptions, serializers
 
 from .models import (
-    Comment, Post, PostLiked, PollsAnswer, Images, Videos,
+    Comment, Post, PostLiked, PollsAnswer, Images, Videos, Voter,
 )
 from .utils import get_departments, get_profile_image, validate_priority
 
@@ -45,13 +45,17 @@ class UserInfoSerializer(serializers.ModelSerializer):
 
 
 class ImagesSerializer(serializers.ModelSerializer):
+    name = serializers.SerializerMethodField()
 
     class Meta:
         model = Images
         fields = (
-            'id', 'post', 'image', 'thumbnail_img_url', 'display_img_url',
+            'id', 'post', 'name', 'image', 'thumbnail_img_url', 'display_img_url',
             'large_img_url'
         )
+
+    def get_name(self, instance):
+        return instance.image.name
 
 
 class VideosSerializer(serializers.ModelSerializer):
@@ -72,13 +76,14 @@ class PostSerializer(serializers.ModelSerializer):
     has_appreciated = serializers.SerializerMethodField()
     appreciation_count = serializers.SerializerMethodField()
     comments_count = serializers.SerializerMethodField()
+    total_votes = serializers.SerializerMethodField()
 
     class Meta:
         model = Post
         fields = (
             "id", "created_by", "organization", "user_info", "title", "description",
             "created_on", "published_date", "priority", "prior_till",
-            "shared_with", "images", "videos", "answers", "post_type",
+            "shared_with", "images", "videos", "answers", "post_type", "total_votes",
             "is_owner", "has_appreciated", "appreciation_count", "comments_count",
         )
 
@@ -93,8 +98,17 @@ class PostSerializer(serializers.ModelSerializer):
         return VideosSerializer(videos, many=True, read_only=True).data
     
     def get_answers(self, instance):
+        request = self.context.get('request')
+        serializer_context = {'request': request }
+        user = request.user
         result = instance.related_answers()
-        return PollsAnswerSerializer(result, many=True, read_only=True).data
+        if Voter.objects.filter(user=user, question=instance).exists():
+            serializer = SubmittedPollsAnswerSerializer(
+                result, many=True, read_only=True, context=serializer_context)
+        else:
+            serializer = PollsAnswerSerializer(
+                result, many=True, read_only=True, context=serializer_context)
+        return serializer.data
 
     def get_user_info(self, instance):
         created_by = instance.created_by
@@ -115,6 +129,9 @@ class PostSerializer(serializers.ModelSerializer):
 
     def get_comments_count(self, instance):
         return Comment.objects.filter(post=instance).count()
+
+    def get_total_votes(self, instance):
+        return instance.total_votes()
 
     def create(self, validated_data):
         validate_priority(validated_data)
@@ -230,5 +247,23 @@ class PollsAnswerSerializer(serializers.ModelSerializer):
     class Meta:
         model = PollsAnswer
         fields = (
-            "id", "question", "answer_text", "votes", "get_voters", "percentage",
+            "id", "question", "answer_text", "votes", "get_voters",
         )
+
+
+class SubmittedPollsAnswerSerializer(serializers.ModelSerializer):
+    has_voted = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PollsAnswer
+        fields = (
+            "id", "question", "answer_text", "votes", "get_voters", "has_voted",
+            "percentage",
+        )
+
+    def get_has_voted(self, instance):
+        request = self.context.get('request')
+        user = request.user if request else None
+        if user:
+            return Voter.objects.filter(answer=instance, user=user).exists()
+        return False

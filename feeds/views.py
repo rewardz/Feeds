@@ -1,6 +1,7 @@
 from __future__ import division, print_function, unicode_literals
 
 from django.db.models import Q
+from django.http import Http404
 from django.utils.translation import ugettext as _
 
 from rest_framework import permissions, viewsets, serializers, status, views
@@ -27,10 +28,19 @@ class PostViewSet(viewsets.ModelViewSet):
 
     def _create_or_update(self, request):
         payload = request.data
+        # print(payload.getlist('delete_image_ids', 'Nothing'))
         created_by = self.request.user
         if not created_by:
             raise serializers.ValidationError({'created_by': _('Created by is required!')})
         data = {k: v for k, v in payload.items()}
+        delete_image_ids = data.get('delete_image_ids', [])
+        if delete_image_ids:
+            for img_id in delete_image_ids:
+                try:
+                    img = Images.objects.get(id=img_id)
+                    img.delete()
+                except Images.DoesNotExist:
+                    continue
         data['created_by'] = created_by.id
         data['organization'] = created_by.organization_id
         return data
@@ -74,7 +84,13 @@ class PostViewSet(viewsets.ModelViewSet):
     def update(self, request, pk=None):
         instance = self.get_object()
         if instance.created_by.id != request.user.id:
-            raise serializers.ValidationError({"created_by": _("""A post can be updated only by its creator""")})
+            raise serializers.ValidationError(
+                {"created_by": _("A post can be updated only by its creator")})
+        if instance.post_type in (
+            POST_TYPE.USER_CREATED_POLL, POST_TYPE.SYSTEM_CREATED_POST):
+            raise serializers.ValidationError(
+                {"post_type": _("You do not have permission to perform the action.")}
+        )
         data = self._create_or_update(request)
         serializer = self.get_serializer(instance, data=data)
         serializer.is_valid(raise_exception=True)
@@ -122,7 +138,7 @@ class PostViewSet(viewsets.ModelViewSet):
             answer_serializer = PollsAnswerSerializer(data=data)
             answer_serializer.is_valid(raise_exception=True)
             answer_serializer.save()
-        result = PostSerializer(poll)
+        result = self.get_serializer(poll)
         return Response(result.data)
     
     @detail_route(methods=["GET", "POST"], permission_classes=(permissions.IsAuthenticated,))
@@ -250,7 +266,7 @@ class PostViewSet(viewsets.ModelViewSet):
         except Post.DoesNotExist as exp:
             raise ValidationError(_('Poll does not exist.'))
         except PollsAnswer.DoesNotExist as exp:
-            raise ValidationError(_('Poll answer is not associated to the question.'))
+            raise ValidationError(_('This is not a correct answer.'))
         serializer = self.get_serializer(poll)
         return Response(serializer.data)
 
@@ -277,6 +293,23 @@ class ImagesView(views.APIView):
             return Response(arr, status=status.HTTP_201_CREATED)
         else:
             return Response(arr, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ImagesDetailView(views.APIView):
+    """
+    delete an image instance
+    """
+
+    def get_object(self, pk):
+        try:
+            return Images.objects.get(pk=pk)
+        except Images.DoesNotExist:
+            raise Http404(_("Image does not exist"))
+
+    def delete(self, request, pk, format=None):
+        img = self.get_object(pk)
+        img.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class VideosView(views.APIView):
