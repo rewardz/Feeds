@@ -4,6 +4,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.contrib.auth import get_user_model
 from django.db import models
+from django.db.models import Sum
 from django.utils.module_loading import import_string
 from django.utils.translation import ugettext as _
 
@@ -56,11 +57,9 @@ class Post(UserInfo):
         return PollsAnswer.objects.filter(question=self)
 
     def total_votes(self):
-        total_votes = 0
-        answers = self.related_answers()
-        for answer in answers:
-            total_votes += answer.vote
-        return total_votes
+        total_votes = self.related_answers().aggregate(
+            total=Sum('votes')).get('total')
+        return total_votes if total_votes else 0
 
     def __unicode__(self):
         return self.title if self.title else self.pk
@@ -77,7 +76,7 @@ class Images(models.Model):
         "large": (1024, 2048)
     }
     post = models.ForeignKey(Post, on_delete=models.CASCADE)
-    image = CIImageField(upload_to="post/images", blank=True, null=True)
+    image = CIImageField(upload_to="post/images/%Y/%m/%d", blank=True, null=True)
     img_large = CIThumbnailField('image', (1, 1), blank=True, null=True)
     img_display = CIThumbnailField('image', (1, 1), blank=True, null=True)
     img_thumbnail = CIThumbnailField('image', (1, 1), blank=True, null=True)
