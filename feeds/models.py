@@ -72,7 +72,7 @@ class Images(models.Model):
     
     IMAGE_SIZES = {
         "thumbnail": (150, 150),
-        "display": (800, 400),
+        "display": (960, 720),
         "large": (1024, 2048)
     }
     post = models.ForeignKey(Post, on_delete=models.CASCADE)
@@ -174,6 +174,9 @@ class PollsAnswer(models.Model):
 
     def __unicode__(self):
         return self.answer_text
+
+    class Meta:
+        ordering = ('pk',)
 
 
 class Voter(models.Model):
