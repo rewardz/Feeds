@@ -2,9 +2,11 @@ import logging
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.contrib.auth import get_user_model
 from django.db import models
 from django.db.models import Sum
+from django.utils import timezone
 from django.utils.module_loading import import_string
 from django.utils.translation import ugettext as _
 
@@ -44,6 +46,37 @@ class Post(UserInfo):
         choices=POST_TYPE(),
         default=POST_TYPE.USER_CREATED_POST
     )
+    active_days = models.SmallIntegerField(
+        default=1, validators=[MinValueValidator(1), MaxValueValidator(30)]
+    )
+
+    @property
+    def is_poll(self):
+        return self.post_type == POST_TYPE.USER_CREATED_POLL
+
+    @property
+    def is_poll_active(self):
+        if not self.is_poll:
+            return False
+        active_till = self.created_on + timezone.timedelta(days=self.active_days)
+        return active_till > timezone.now()
+
+    @property
+    def poll_remaining_time(self):
+        if not self.is_poll_active:
+            return None
+        active_till = self.created_on + timezone.timedelta(days=self.active_days)
+        remaining_time = active_till - timezone.now()
+        remaining_days = remaining_time.days
+        if remaining_days > 1:
+            return "{days} days".format(days=remaining_days)
+        remaining_time_sec = remaining_time.total_seconds()
+        hours = remaining_time_sec // 3600
+        if hours > 1:
+            return "{hours} hours".format(hours=int(hours))
+        minutes = (remaining_time_sec % 3600) // 60
+        return "{minutes} minutes".format(minutes=int(minutes))
+
 
     def vote(self, user, answer_id):
         answer = PollsAnswer.objects.get(pk=answer_id, question=self)

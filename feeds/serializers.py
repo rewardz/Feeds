@@ -6,6 +6,7 @@ from django.utils.translation import ugettext as _
 
 from rest_framework import exceptions, serializers
 
+from .constants import POST_TYPE
 from .models import (
     Comment, Post, PostLiked, PollsAnswer, Images, Videos, Voter,
 )
@@ -67,6 +68,31 @@ class VideosSerializer(serializers.ModelSerializer):
         )
 
 
+class PollSerializer(serializers.ModelSerializer):
+    question = serializers.SerializerMethodField()
+    answers = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Post
+        fields = ('question', 'answers',)
+
+    def get_question(self, instance):
+        return instance.title
+
+    def get_answers(self, instance):
+        request = self.context.get('request')
+        serializer_context = {'request': request }
+        user = request.user
+        result = instance.related_answers()
+        if Voter.objects.filter(user=user, question=instance).exists():
+            serializer = SubmittedPollsAnswerSerializer(
+                result, many=True, read_only=True, context=serializer_context)
+        else:
+            serializer = PollsAnswerSerializer(
+                result, many=True, read_only=True, context=serializer_context)
+        return serializer.data
+
+
 class PostSerializer(serializers.ModelSerializer):
     images = serializers.SerializerMethodField()
     videos = serializers.SerializerMethodField()
@@ -77,6 +103,7 @@ class PostSerializer(serializers.ModelSerializer):
     appreciation_count = serializers.SerializerMethodField()
     comments_count = serializers.SerializerMethodField()
     total_votes = serializers.SerializerMethodField()
+    poll_info = serializers.SerializerMethodField()
 
     class Meta:
         model = Post
@@ -85,7 +112,17 @@ class PostSerializer(serializers.ModelSerializer):
             "created_on", "published_date", "priority", "prior_till",
             "shared_with", "images", "videos", "answers", "post_type", "total_votes",
             "is_owner", "has_appreciated", "appreciation_count", "comments_count",
+            "poll_info",
         )
+
+    def get_poll_info(self, instance):
+        if not instance.post_type == POST_TYPE.USER_CREATED_POLL:
+            return None
+        request = self.context.get('request')
+        serializer_context = {'request': request }
+        return PollSerializer(
+            instance, read_only=True, context=serializer_context
+        ).data
 
     def get_images(self, instance):
         post_id = instance.id
