@@ -14,6 +14,7 @@ from .constants import POST_TYPE, SHARED_WITH
 from .models import (
     Comment, Post, PostLiked, PollsAnswer, Images, CommentLiked,
 )
+from .paginator import FeedsResultsSetPagination
 from .serializers import (
     CommentDetailSerializer, CommentSerializer, CommentCreateSerializer, 
     PostLikedSerializer, PostSerializer, PostDetailSerializer,
@@ -25,6 +26,7 @@ from .utils import accessible_posts_by_user
 class PostViewSet(viewsets.ModelViewSet):
     parser_classes = (MultiPartParser, JSONParser, FormParser, )
     permission_classes = (permissions.IsAuthenticated,)
+    pagination_class = FeedsResultsSetPagination
 
     def _create_or_update(self, request):
         payload = request.data
