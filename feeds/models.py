@@ -77,10 +77,16 @@ class Post(UserInfo):
         minutes = (remaining_time_sec % 3600) // 60
         return "{minutes} minutes".format(minutes=int(minutes))
 
+    def user_has_voted(self, user):
+        if not self.is_poll:
+            return False
+        return Voter.objects.filter(user=user, question=self).exists()
 
     def vote(self, user, answer_id):
+        if not self.is_poll_active:
+            return
         answer = PollsAnswer.objects.get(pk=answer_id, question=self)
-        if Voter.objects.filter(user=user, question=self).exists():
+        if self.user_has_voted(user):
             raise ValidationError(_('You have already voted for this question'))
         Voter.objects.create(answer=answer, user=user, question=self)
         answer.votes = answer.votes + 1
@@ -90,8 +96,10 @@ class Post(UserInfo):
         return PollsAnswer.objects.filter(question=self)
 
     def total_votes(self):
-        total_votes = self.related_answers().aggregate(
-            total=Sum('votes')).get('total')
+        total_votes = None
+        if self.is_poll:
+            total_votes = self.related_answers().aggregate(
+                total=Sum('votes')).get('total')
         return total_votes if total_votes else 0
 
     def __unicode__(self):
@@ -203,7 +211,7 @@ class PollsAnswer(models.Model):
 
     def get_voters(self):
         # return ",".join([str(p) for p in self.voters.all()])
-        return [str(p) for p in self.voters.all()]
+        return self.voters.all().values_list('id', flat=True)
 
     def __unicode__(self):
         return self.answer_text
