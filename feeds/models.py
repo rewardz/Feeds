@@ -23,6 +23,17 @@ CustomUser = settings.AUTH_USER_MODEL
 Organization = import_string(settings.ORGANIZATION_MODEL)
 
 
+def post_upload_to_path(instance, filename):
+    now = timezone.now()
+    fmt = '%Y/%m/%d'
+    dc = now.strftime(fmt)
+    inst_verbose = instance._meta.verbose_name
+    inst_id = str(instance.post.pk)
+    return 'post/{inst_name}/{dc}/{id}/{name}'.format(
+        inst_name=inst_verbose, dc=dc, id=inst_id, name=filename
+    )
+
+
 class UserInfo(models.Model):
     created_by = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     created_on = models.DateTimeField(auto_now_add=True)
@@ -117,7 +128,7 @@ class Images(models.Model):
         "large": (1024, 2048)
     }
     post = models.ForeignKey(Post, on_delete=models.CASCADE)
-    image = CIImageField(upload_to="post/images/%Y/%m/%d", blank=True, null=True)
+    image = CIImageField(upload_to=post_upload_to_path, blank=True, null=True)
     img_large = CIThumbnailField('image', (1, 1), blank=True, null=True)
     img_display = CIThumbnailField('image', (1, 1), blank=True, null=True)
     img_thumbnail = CIThumbnailField('image', (1, 1), blank=True, null=True)
@@ -170,7 +181,14 @@ class Images(models.Model):
 
 class Videos(models.Model):
     post = models.ForeignKey(Post, on_delete=models.CASCADE)
-    video = models.FileField(upload_to="post/videos")
+    video = models.FileField(upload_to=post_upload_to_path)
+
+
+class Documents(models.Model):
+    post = models.ForeignKey(Post, on_delete=models.CASCADE)
+    document = models.FileField(
+        upload_to=post_upload_to_path, blank=True, null=True
+    )
 
 
 class Comment(UserInfo):

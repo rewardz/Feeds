@@ -8,7 +8,7 @@ from rest_framework import exceptions, serializers
 
 from .constants import POST_TYPE
 from .models import (
-    Comment, Post, PostLiked, PollsAnswer, Images, Videos, Voter,
+    Comment, Documents, Post, PostLiked, PollsAnswer, Images, Videos, Voter,
 )
 from .utils import get_departments, get_profile_image, validate_priority
 
@@ -57,6 +57,19 @@ class ImagesSerializer(serializers.ModelSerializer):
 
     def get_name(self, instance):
         return instance.image.name
+
+
+class DocumentsSerializer(serializers.ModelSerializer):
+    name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Documents
+        fields = (
+            'id', 'post', 'name', 'document'
+        )
+
+    def get_name(self, instance):
+        return instance.document.name
 
 
 class VideosSerializer(serializers.ModelSerializer):
@@ -111,6 +124,7 @@ class PollSerializer(serializers.ModelSerializer):
 
 class PostSerializer(serializers.ModelSerializer):
     images = serializers.SerializerMethodField()
+    documents = serializers.SerializerMethodField()
     videos = serializers.SerializerMethodField()
     created_by_user_info = serializers.SerializerMethodField()
     is_owner = serializers.SerializerMethodField()
@@ -125,7 +139,7 @@ class PostSerializer(serializers.ModelSerializer):
             "id", "created_by", "created_on", "organization", "created_by_user_info",
             "title", "description", "post_type", "poll_info", "active_days",
             "priority", "prior_till",
-            "shared_with", "images", "videos",
+            "shared_with", "images", "documents", "videos",
             "is_owner", "has_appreciated", "appreciation_count", "comments_count",
         )
 
@@ -144,6 +158,13 @@ class PostSerializer(serializers.ModelSerializer):
         post_id = instance.id
         images = Images.objects.filter(post=post_id)
         return ImagesSerializer(images, many=True, read_only=True).data
+
+    def get_documents(self, instance):
+        if instance.post_type == POST_TYPE.USER_CREATED_POLL:
+            return None
+        post_id = instance.id
+        documents = Documents.objects.filter(post=post_id)
+        return DocumentsSerializer(documents, many=True, read_only=True).data
 
     def get_videos(self, instance):
         if instance.post_type == POST_TYPE.USER_CREATED_POLL:
@@ -188,7 +209,7 @@ class PostDetailSerializer(PostSerializer):
         fields = (
             "id", "created_by", "created_on", "organization", "created_by_user_info",
             "title", "description", "post_type", "poll_info", "active_days",
-            "priority", "prior_till", "shared_with", "images", "videos",
+            "priority", "prior_till", "shared_with", "images", "documents", "videos",
             "is_owner", "has_appreciated", "appreciation_count",
             "comments_count", "comments",
         )
