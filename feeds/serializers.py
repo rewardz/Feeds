@@ -254,12 +254,12 @@ class CommentSerializer(serializers.ModelSerializer):
         return UserInfoSerializer(user_detail).data
 
 
-class CommentCreateSerializer(serializers.ModelSerializer):
+class CommentCreateSerializer(CommentSerializer):
 
     class Meta:
         model = Comment
         fields = ("id", "content", "created_by", "created_on",
-                  "post", "parent",)
+                  "post", "commented_by_user_info",)
     
     def create(self, validated_data):
         return super(CommentCreateSerializer, self).create(validated_data)
