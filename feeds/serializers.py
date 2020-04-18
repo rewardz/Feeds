@@ -137,7 +137,7 @@ class PostSerializer(serializers.ModelSerializer):
         model = Post
         fields = (
             "id", "created_by", "created_on", "organization", "created_by_user_info",
-            "title", "description", "post_type", "poll_info", "active_days",
+            "title", "description", "post_type", "poll_info",
             "priority", "prior_till",
             "shared_with", "images", "documents", "videos",
             "is_owner", "has_appreciated", "appreciation_count", "comments_count",
@@ -201,16 +201,15 @@ class PostSerializer(serializers.ModelSerializer):
 class PostDetailSerializer(PostSerializer):
 
     comments = serializers.SerializerMethodField()
-    is_owner = serializers.SerializerMethodField()
-    has_appreciated = serializers.SerializerMethodField()
+    appreciated_by = serializers.SerializerMethodField()
     
     class Meta:
         model = Post
         fields = (
             "id", "created_by", "created_on", "organization", "created_by_user_info",
-            "title", "description", "post_type", "poll_info", "active_days",
+            "title", "description", "post_type", "poll_info",
             "priority", "prior_till", "shared_with", "images", "documents", "videos",
-            "is_owner", "has_appreciated", "appreciation_count",
+            "is_owner", "has_appreciated", "appreciation_count", "appreciated_by",
             "comments_count", "comments",
         )
 
@@ -219,14 +218,10 @@ class PostDetailSerializer(PostSerializer):
         comments = Comment.objects.filter(post=post_id)
         return CommentSerializer(comments, many=True, read_only=True).data
 
-    def get_is_owner(self, instance):
-        request = self.context['request']
-        return instance.created_by.pk == request.user.pk
-
-    def get_has_appreciated(self, instance):
-        request = self.context['request']
-        user = request.user
-        return PostLiked.objects.filter(post=instance, created_by=user).exists()
+    def get_appreciated_by(self, instance):
+        post_id = instance.id
+        posts_liked = PostLiked.objects.filter(post_id=post_id)
+        return PostLikedSerializer(posts_liked, many=True, read_only=True).data
 
     def update(self, instance, validated_data):
         validate_priority(validated_data)
