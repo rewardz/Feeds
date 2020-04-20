@@ -108,14 +108,16 @@ class PostViewSet(viewsets.ModelViewSet):
     
     def update(self, request, pk=None):
         instance = self.get_object()
-        if instance.created_by.id != request.user.id:
-            raise serializers.ValidationError(
-                {"created_by": _("A post can be updated only by its creator")})
-        if instance.post_type in (
-            POST_TYPE.USER_CREATED_POLL, POST_TYPE.SYSTEM_CREATED_POST):
-            raise serializers.ValidationError(
-                {"post_type": _("You do not have permission to perform the action.")}
-        )
+        user = request.user
+        if not user.is_superuser:
+            if instance.created_by.id != request.user.id:
+                raise serializers.ValidationError(
+                    {"created_by": _("A post can be updated only by its creator")})
+            if instance.post_type in (
+                POST_TYPE.USER_CREATED_POLL, POST_TYPE.SYSTEM_CREATED_POST):
+                raise serializers.ValidationError(
+                    {"post_type": _("You do not have permission to perform the action.")}
+            )
         data = self._create_or_update(request)
         serializer = self.get_serializer(instance, data=data)
         serializer.is_valid(raise_exception=True)
@@ -123,6 +125,21 @@ class PostViewSet(viewsets.ModelViewSet):
             self._upload_files(request, instance.pk)
         self.perform_update(serializer)
         return Response(serializer.data)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        user = request.user
+        if not user.is_superuser:
+            if instance.created_by.id != request.user.id:
+                raise serializers.ValidationError(
+                    {"created_by": _("A post can be deleted only by its creator")})
+            if instance.post_type in (
+                POST_TYPE.USER_CREATED_POLL, POST_TYPE.SYSTEM_CREATED_POST):
+                raise serializers.ValidationError(
+                    {"post_type": _("You do not have permission to perform the action.")}
+            )
+        self.perform_destroy(instance)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     def get_serializer(self, *args, **kwargs):
         if "pk" in self.kwargs:

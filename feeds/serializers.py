@@ -197,6 +197,11 @@ class PostSerializer(serializers.ModelSerializer):
         validate_priority(validated_data)
         return super(PostSerializer, self).create(validated_data)
 
+    def to_representation(self, instance):
+        representation = super(PostSerializer, self).to_representation(instance)
+        representation["created_on"] = instance.created_on.strftime("%Y-%m-%d")
+        return representation
+
 
 class PostDetailSerializer(PostSerializer):
 
@@ -253,6 +258,11 @@ class CommentSerializer(serializers.ModelSerializer):
         user_detail = UserModel.objects.get(pk=created_by.id)
         return UserInfoSerializer(user_detail).data
 
+    def to_representation(self, instance):
+        representation = super(CommentSerializer, self).to_representation(instance)
+        representation["created_on"] = instance.created_on.strftime("%Y-%m-%d")
+        return representation
+
 
 class CommentCreateSerializer(CommentSerializer):
 
@@ -270,10 +280,8 @@ class CommentDetailSerializer(CommentSerializer):
     class Meta:
         model = Comment
         fields = (
-            "content",
-            "created_by",
-            "created_on",
-            "post",
+            "content", "created_by", "created_on",
+            "post", "commented_by_user_info",
         )
 
 
@@ -290,6 +298,11 @@ class PostLikedSerializer(serializers.ModelSerializer):
         created_by = instance.created_by
         user_detail = UserModel.objects.get(pk=created_by.id)
         return UserInfoSerializer(user_detail).data
+
+    def to_representation(self, instance):
+        representation = super(PostLikedSerializer, self).to_representation(instance)
+        representation["created_on"] = instance.created_on.strftime("%Y-%m-%d")
+        return representation
 
 
 class PollsAnswerSerializer(serializers.ModelSerializer):
