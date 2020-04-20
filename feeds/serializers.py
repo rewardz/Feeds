@@ -137,7 +137,7 @@ class PostSerializer(serializers.ModelSerializer):
         model = Post
         fields = (
             "id", "created_by", "created_on", "organization", "created_by_user_info",
-            "title", "description", "post_type", "poll_info",
+            "title", "description", "post_type", "poll_info", "active_days",
             "priority", "prior_till",
             "shared_with", "images", "documents", "videos",
             "is_owner", "has_appreciated", "appreciation_count", "comments_count",
@@ -212,7 +212,7 @@ class PostDetailSerializer(PostSerializer):
         model = Post
         fields = (
             "id", "created_by", "created_on", "organization", "created_by_user_info",
-            "title", "description", "post_type", "poll_info",
+            "title", "description", "post_type", "poll_info", "active_days",
             "priority", "prior_till", "shared_with", "images", "documents", "videos",
             "is_owner", "has_appreciated", "appreciation_count", "appreciated_by",
             "comments_count", "comments",
