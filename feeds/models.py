@@ -2,9 +2,11 @@ import logging
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.contrib.auth import get_user_model
 from django.db import models
 from django.db.models import Sum
+from django.utils import timezone
 from django.utils.module_loading import import_string
 from django.utils.translation import ugettext as _
 
@@ -19,6 +21,17 @@ logger = logging.getLogger(__name__)
 
 CustomUser = settings.AUTH_USER_MODEL
 Organization = import_string(settings.ORGANIZATION_MODEL)
+
+
+def post_upload_to_path(instance, filename):
+    now = timezone.now()
+    fmt = '%Y/%m/%d'
+    dc = now.strftime(fmt)
+    inst_verbose = instance._meta.verbose_name
+    inst_id = str(instance.post.pk)
+    return 'post/{inst_name}/{dc}/{id}/{name}'.format(
+        inst_name=inst_verbose, dc=dc, id=inst_id, name=filename
+    )
 
 
 class UserInfo(models.Model):
@@ -44,10 +57,47 @@ class Post(UserInfo):
         choices=POST_TYPE(),
         default=POST_TYPE.USER_CREATED_POST
     )
+    active_days = models.SmallIntegerField(
+        default=1, validators=[MinValueValidator(1), MaxValueValidator(30)]
+    )
+
+    @property
+    def is_poll(self):
+        return self.post_type == POST_TYPE.USER_CREATED_POLL
+
+    @property
+    def is_poll_active(self):
+        if not self.is_poll:
+            return False
+        active_till = self.created_on + timezone.timedelta(days=self.active_days)
+        return active_till > timezone.now()
+
+    @property
+    def poll_remaining_time(self):
+        if not self.is_poll_active:
+            return None
+        active_till = self.created_on + timezone.timedelta(days=self.active_days)
+        remaining_time = active_till - timezone.now()
+        remaining_days = remaining_time.days
+        if remaining_days > 1:
+            return "{days} days".format(days=remaining_days)
+        remaining_time_sec = remaining_time.total_seconds()
+        hours = remaining_time_sec // 3600
+        if hours > 1:
+            return "{hours} hours".format(hours=int(hours))
+        minutes = (remaining_time_sec % 3600) // 60
+        return "{minutes} minutes".format(minutes=int(minutes))
+
+    def user_has_voted(self, user):
+        if not self.is_poll:
+            return False
+        return Voter.objects.filter(user=user, question=self).exists()
 
     def vote(self, user, answer_id):
+        if not self.is_poll_active:
+            return
         answer = PollsAnswer.objects.get(pk=answer_id, question=self)
-        if Voter.objects.filter(user=user, question=self).exists():
+        if self.user_has_voted(user):
             raise ValidationError(_('You have already voted for this question'))
         Voter.objects.create(answer=answer, user=user, question=self)
         answer.votes = answer.votes + 1
@@ -57,8 +107,10 @@ class Post(UserInfo):
         return PollsAnswer.objects.filter(question=self)
 
     def total_votes(self):
-        total_votes = self.related_answers().aggregate(
-            total=Sum('votes')).get('total')
+        total_votes = None
+        if self.is_poll:
+            total_votes = self.related_answers().aggregate(
+                total=Sum('votes')).get('total')
         return total_votes if total_votes else 0
 
     def __unicode__(self):
@@ -72,11 +124,11 @@ class Images(models.Model):
     
     IMAGE_SIZES = {
         "thumbnail": (150, 150),
-        "display": (800, 400),
+        "display": (960, 720),
         "large": (1024, 2048)
     }
     post = models.ForeignKey(Post, on_delete=models.CASCADE)
-    image = CIImageField(upload_to="post/images/%Y/%m/%d", blank=True, null=True)
+    image = CIImageField(upload_to=post_upload_to_path, blank=True, null=True)
     img_large = CIThumbnailField('image', (1, 1), blank=True, null=True)
     img_display = CIThumbnailField('image', (1, 1), blank=True, null=True)
     img_thumbnail = CIThumbnailField('image', (1, 1), blank=True, null=True)
@@ -129,7 +181,14 @@ class Images(models.Model):
 
 class Videos(models.Model):
     post = models.ForeignKey(Post, on_delete=models.CASCADE)
-    video = models.FileField(upload_to="post/videos")
+    video = models.FileField(upload_to=post_upload_to_path)
+
+
+class Documents(models.Model):
+    post = models.ForeignKey(Post, on_delete=models.CASCADE)
+    document = models.FileField(
+        upload_to=post_upload_to_path, blank=True, null=True
+    )
 
 
 class Comment(UserInfo):
@@ -170,10 +229,13 @@ class PollsAnswer(models.Model):
 
     def get_voters(self):
         # return ",".join([str(p) for p in self.voters.all()])
-        return [str(p) for p in self.voters.all()]
+        return self.voters.all().values_list('id', flat=True)
 
     def __unicode__(self):
         return self.answer_text
+
+    class Meta:
+        ordering = ('pk',)
 
 
 class Voter(models.Model):

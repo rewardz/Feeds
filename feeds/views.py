@@ -12,11 +12,12 @@ from rest_framework.response import Response
 
 from .constants import POST_TYPE, SHARED_WITH
 from .models import (
-    Comment, Post, PostLiked, PollsAnswer, Images, CommentLiked,
+    Comment, Documents, Post, PostLiked, PollsAnswer, Images, CommentLiked,
 )
+from .paginator import FeedsResultsSetPagination
 from .serializers import (
-    CommentDetailSerializer, CommentSerializer, CommentCreateSerializer, 
-    PostLikedSerializer, PostSerializer, PostDetailSerializer,
+    CommentDetailSerializer, CommentSerializer, CommentCreateSerializer,
+    DocumentsSerializer, PostLikedSerializer, PostSerializer, PostDetailSerializer,
     PollsAnswerSerializer, ImagesSerializer, UserInfoSerializer, VideosSerializer,
 )
 from .utils import accessible_posts_by_user
@@ -25,6 +26,7 @@ from .utils import accessible_posts_by_user
 class PostViewSet(viewsets.ModelViewSet):
     parser_classes = (MultiPartParser, JSONParser, FormParser, )
     permission_classes = (permissions.IsAuthenticated,)
+    pagination_class = FeedsResultsSetPagination
 
     def _create_or_update(self, request):
         payload = request.data
@@ -34,6 +36,8 @@ class PostViewSet(viewsets.ModelViewSet):
             raise serializers.ValidationError({'created_by': _('Created by is required!')})
         data = {k: v for k, v in payload.items()}
         delete_image_ids = data.get('delete_image_ids', [])
+        delete_document_ids = data.get('delete_document_ids', [])
+
         if delete_image_ids:
             for img_id in delete_image_ids:
                 try:
@@ -41,11 +45,20 @@ class PostViewSet(viewsets.ModelViewSet):
                     img.delete()
                 except Images.DoesNotExist:
                     continue
+
+        if delete_document_ids:
+            for doc_id in delete_document_ids:
+                try:
+                    doc = Documents.objects.get(id=img_id)
+                    doc.delete()
+                except Documents.DoesNotExist:
+                    continue
+
         data['created_by'] = created_by.id
         data['organization'] = created_by.organization_id
         return data
     
-    def _upload_images_and_videos(self, request, post_id):
+    def _upload_files(self, request, post_id):
         images = dict((request.FILES).lists()).get('images', None)
         if images:
             for img in images:
@@ -56,6 +69,18 @@ class PostViewSet(viewsets.ModelViewSet):
                     image_serializer.save()
                 else:
                     return Response({'message': 'Image not uploaded'},
+                                      status=status.HTTP_400_BAD_REQUEST)
+
+        documents = dict((request.FILES).lists()).get('documents', None)
+        if documents:
+            for doc in documents:
+                data = {'post': post_id}
+                data['document'] = doc
+                document_serializer = DocumentsSerializer(data=data)
+                if document_serializer.is_valid():
+                    document_serializer.save()
+                else:
+                    return Response({'message': 'Document not uploaded'},
                                       status=status.HTTP_400_BAD_REQUEST)
 
         videos = dict((request.FILES).lists()).get('videos', None)
@@ -78,26 +103,43 @@ class PostViewSet(viewsets.ModelViewSet):
         post_id = instance.id
 
         if request.FILES:
-            self._upload_images_and_videos(request, post_id)
+            self._upload_files(request, post_id)
         return Response(serializer.data)
     
     def update(self, request, pk=None):
         instance = self.get_object()
-        if instance.created_by.id != request.user.id:
-            raise serializers.ValidationError(
-                {"created_by": _("A post can be updated only by its creator")})
-        if instance.post_type in (
-            POST_TYPE.USER_CREATED_POLL, POST_TYPE.SYSTEM_CREATED_POST):
-            raise serializers.ValidationError(
-                {"post_type": _("You do not have permission to perform the action.")}
-        )
+        user = request.user
+        if not user.is_superuser:
+            if instance.created_by.id != request.user.id:
+                raise serializers.ValidationError(
+                    {"created_by": _("A post can be updated only by its creator")})
+            if instance.post_type in (
+                POST_TYPE.USER_CREATED_POLL, POST_TYPE.SYSTEM_CREATED_POST):
+                raise serializers.ValidationError(
+                    {"post_type": _("You do not have permission to perform the action.")}
+            )
         data = self._create_or_update(request)
         serializer = self.get_serializer(instance, data=data)
         serializer.is_valid(raise_exception=True)
         if request.FILES:
-            self._upload_images_and_videos(request, instance.pk)
+            self._upload_files(request, instance.pk)
         self.perform_update(serializer)
         return Response(serializer.data)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        user = request.user
+        if not user.is_superuser:
+            if instance.created_by.id != request.user.id:
+                raise serializers.ValidationError(
+                    {"created_by": _("A post can be deleted only by its creator")})
+            if instance.post_type in (
+                POST_TYPE.USER_CREATED_POLL, POST_TYPE.SYSTEM_CREATED_POST):
+                raise serializers.ValidationError(
+                    {"post_type": _("You do not have permission to perform the action.")}
+            )
+        self.perform_destroy(instance)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     def get_serializer(self, *args, **kwargs):
         if "pk" in self.kwargs:
