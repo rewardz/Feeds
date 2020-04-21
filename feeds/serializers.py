@@ -220,12 +220,12 @@ class PostDetailSerializer(PostSerializer):
 
     def get_comments(self, instance):
         post_id = instance.id
-        comments = Comment.objects.filter(post=post_id)
+        comments = Comment.objects.filter(post=post_id).order_by('-created_on')
         return CommentSerializer(comments, many=True, read_only=True).data
 
     def get_appreciated_by(self, instance):
         post_id = instance.id
-        posts_liked = PostLiked.objects.filter(post_id=post_id)
+        posts_liked = PostLiked.objects.filter(post_id=post_id).order_by('-created_on')
         return PostLikedSerializer(posts_liked, many=True, read_only=True).data
 
     def update(self, instance, validated_data):
