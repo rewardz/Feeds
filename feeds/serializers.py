@@ -265,12 +265,16 @@ class CommentSerializer(serializers.ModelSerializer):
 
 
 class CommentCreateSerializer(CommentSerializer):
+    count = serializers.SerializerMethodField()
 
     class Meta:
         model = Comment
-        fields = ("id", "content", "created_by", "created_on",
+        fields = ("id", "count", "content", "created_by", "created_on",
                   "post", "commented_by_user_info",)
     
+    def get_count(self, instance):
+        return Comment.objects.filter(post=instance.post).count()
+
     def create(self, validated_data):
         return super(CommentCreateSerializer, self).create(validated_data)
 
