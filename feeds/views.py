@@ -194,11 +194,13 @@ class PostViewSet(viewsets.ModelViewSet):
         if not post_id:
             raise ValidationError(_('Post ID required to retrieve all the related comments'))
         post_id = int(post_id)
-        accessible_posts = accessible_posts_by_user(user, organization).values_list('id', flat=True)
+        accessible_posts = accessible_posts_by_user(user, organization).\
+            values_list('id', flat=True)
         if post_id not in accessible_posts:
             raise ValidationError(_('You do not have access to comment on this post'))
         if self.request.method == "GET":
-            comments = Comment.objects.filter(post_id=post_id, parent=None)
+            comments = Comment.objects.filter(post_id=post_id, parent=None).\
+                order_by('-created_on')
             serializer = CommentSerializer(comments, many=True, read_only=True)
             return Response(serializer.data)
         elif self.request.method == "POST":
@@ -251,14 +253,20 @@ class PostViewSet(viewsets.ModelViewSet):
         if not post_id:
             raise ValidationError(_('Post ID required to appreciate a post'))
         post_id = int(post_id)
-        accessible_posts = accessible_posts_by_user(user, organization).values_list('id', flat=True)
+        accessible_posts = accessible_posts_by_user(user, organization).\
+            values_list('id', flat=True)
         if post_id not in accessible_posts:
             raise ValidationError(_('You do not have access to this post'))
         posts_liked = PostLiked.objects.filter(post_id=post_id)
+        page = self.paginate_queryset(posts_liked)
+        if page is not None:
+            serializer = PostLikedSerializer(page, many=True, read_only=True)
+            return self.get_paginated_response(serializer.data)
         serializer = PostLikedSerializer(posts_liked, many=True, read_only=True)
         return Response(serializer.data)
 
-    @detail_route(methods=["GET", "POST"], permission_classes=(permissions.IsAuthenticated,))
+    @detail_route(methods=["GET", "POST"],
+                  permission_classes=(permissions.IsAuthenticated,))
     def answers(self, request, *args, **kwargs):
         user = self.request.user
         organization = user.organization
