@@ -201,6 +201,10 @@ class PostViewSet(viewsets.ModelViewSet):
         if self.request.method == "GET":
             comments = Comment.objects.filter(post_id=post_id, parent=None).\
                 order_by('-created_on')
+            page = self.paginate_queryset(comments)
+            if page is not None:
+                serializer = CommentSerializer(page, many=True, read_only=True)
+                return self.get_paginated_response(serializer.data)
             serializer = CommentSerializer(comments, many=True, read_only=True)
             return Response(serializer.data)
         elif self.request.method == "POST":
