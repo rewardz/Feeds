@@ -237,7 +237,11 @@ class PostViewSet(viewsets.ModelViewSet):
                 message = "Successfully Liked"
                 liked = True
                 response_status = status.HTTP_201_CREATED
-        return Response({"message": message, "liked": liked}, status=response_status)
+        count = PostLiked.objects.filter(post_id=post_id).count()
+        user_info = UserInfoSerializer(user).data
+        return Response({
+            "message": message, "liked": liked, "count": count, "user_info":user_info},
+            status=response_status)
 
     @detail_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
     def appreciated_by(self, request, *args, **kwargs):
