@@ -79,10 +79,13 @@ class Post(UserInfo):
         active_till = self.created_on + timezone.timedelta(days=self.active_days)
         remaining_time = active_till - timezone.now()
         remaining_days = remaining_time.days
-        if remaining_days > 1:
-            return "{days} days".format(days=remaining_days)
         remaining_time_sec = remaining_time.total_seconds()
         hours = remaining_time_sec // 3600
+        if remaining_days >= 1:
+            if remaining_days == 1:
+                return "{days} day and {hours} hour(s)".\
+                    format(days=remaining_days, hours=hours)
+            return "{days} days".format(days=remaining_days)
         if hours > 1:
             return "{hours} hours".format(hours=int(hours))
         minutes = (remaining_time_sec % 3600) // 60
@@ -95,7 +98,7 @@ class Post(UserInfo):
 
     def vote(self, user, answer_id):
         if not self.is_poll_active:
-            return
+            raise ValidationError(_('Sorry! the poll is no longer active.'))
         answer = PollsAnswer.objects.get(pk=answer_id, question=self)
         if self.user_has_voted(user):
             raise ValidationError(_('You have already voted for this question'))
