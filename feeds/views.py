@@ -35,10 +35,16 @@ class PostViewSet(viewsets.ModelViewSet):
         if not created_by:
             raise serializers.ValidationError({'created_by': _('Created by is required!')})
         data = {k: v for k, v in payload.items()}
-        delete_image_ids = data.get('delete_image_ids', [])
-        delete_document_ids = data.get('delete_document_ids', [])
+        delete_image_ids = data.get('delete_image_ids', None)
+        delete_document_ids = data.get('delete_document_ids', None)
 
         if delete_image_ids:
+            delete_image_ids = delete_image_ids.split(",")
+            try:
+                delete_image_ids = list(map(int, delete_image_ids))
+            except ValueError:
+                raise serializers.ValidationError(
+                    _("Improper values submitted for delete image ids"))
             for img_id in delete_image_ids:
                 try:
                     img = Images.objects.get(id=img_id)
@@ -47,6 +53,12 @@ class PostViewSet(viewsets.ModelViewSet):
                     continue
 
         if delete_document_ids:
+            delete_document_ids = delete_document_ids.split(",")
+            try:
+                delete_document_ids = list(map(int, delete_document_ids))
+            except ValueError:
+                raise serializers.ValidationError(
+                    _("Improper values submitted for delete document ids"))
             for doc_id in delete_document_ids:
                 try:
                     doc = Documents.objects.get(id=img_id)
