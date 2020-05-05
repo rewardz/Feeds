@@ -35,10 +35,16 @@ class PostViewSet(viewsets.ModelViewSet):
         if not created_by:
             raise serializers.ValidationError({'created_by': _('Created by is required!')})
         data = {k: v for k, v in payload.items()}
-        delete_image_ids = data.get('delete_image_ids', [])
-        delete_document_ids = data.get('delete_document_ids', [])
+        delete_image_ids = data.get('delete_image_ids', None)
+        delete_document_ids = data.get('delete_document_ids', None)
 
         if delete_image_ids:
+            delete_image_ids = delete_image_ids.split(",")
+            try:
+                delete_image_ids = list(map(int, delete_image_ids))
+            except ValueError:
+                raise serializers.ValidationError(
+                    _("Improper values submitted for delete image ids"))
             for img_id in delete_image_ids:
                 try:
                     img = Images.objects.get(id=img_id)
@@ -47,6 +53,12 @@ class PostViewSet(viewsets.ModelViewSet):
                     continue
 
         if delete_document_ids:
+            delete_document_ids = delete_document_ids.split(",")
+            try:
+                delete_document_ids = list(map(int, delete_document_ids))
+            except ValueError:
+                raise serializers.ValidationError(
+                    _("Improper values submitted for delete document ids"))
             for doc_id in delete_document_ids:
                 try:
                     doc = Documents.objects.get(id=img_id)
@@ -194,11 +206,17 @@ class PostViewSet(viewsets.ModelViewSet):
         if not post_id:
             raise ValidationError(_('Post ID required to retrieve all the related comments'))
         post_id = int(post_id)
-        accessible_posts = accessible_posts_by_user(user, organization).values_list('id', flat=True)
+        accessible_posts = accessible_posts_by_user(user, organization).\
+            values_list('id', flat=True)
         if post_id not in accessible_posts:
             raise ValidationError(_('You do not have access to comment on this post'))
         if self.request.method == "GET":
-            comments = Comment.objects.filter(post_id=post_id, parent=None)
+            comments = Comment.objects.filter(post_id=post_id, parent=None).\
+                order_by('-created_on')
+            page = self.paginate_queryset(comments)
+            if page is not None:
+                serializer = CommentSerializer(page, many=True, read_only=True)
+                return self.get_paginated_response(serializer.data)
             serializer = CommentSerializer(comments, many=True, read_only=True)
             return Response(serializer.data)
         elif self.request.method == "POST":
@@ -237,7 +255,11 @@ class PostViewSet(viewsets.ModelViewSet):
                 message = "Successfully Liked"
                 liked = True
                 response_status = status.HTTP_201_CREATED
-        return Response({"message": message, "liked": liked}, status=response_status)
+        count = PostLiked.objects.filter(post_id=post_id).count()
+        user_info = UserInfoSerializer(user).data
+        return Response({
+            "message": message, "liked": liked, "count": count, "user_info":user_info},
+            status=response_status)
 
     @detail_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
     def appreciated_by(self, request, *args, **kwargs):
@@ -247,14 +269,20 @@ class PostViewSet(viewsets.ModelViewSet):
         if not post_id:
             raise ValidationError(_('Post ID required to appreciate a post'))
         post_id = int(post_id)
-        accessible_posts = accessible_posts_by_user(user, organization).values_list('id', flat=True)
+        accessible_posts = accessible_posts_by_user(user, organization).\
+            values_list('id', flat=True)
         if post_id not in accessible_posts:
             raise ValidationError(_('You do not have access to this post'))
         posts_liked = PostLiked.objects.filter(post_id=post_id)
+        page = self.paginate_queryset(posts_liked)
+        if page is not None:
+            serializer = PostLikedSerializer(page, many=True, read_only=True)
+            return self.get_paginated_response(serializer.data)
         serializer = PostLikedSerializer(posts_liked, many=True, read_only=True)
         return Response(serializer.data)
 
-    @detail_route(methods=["GET", "POST"], permission_classes=(permissions.IsAuthenticated,))
+    @detail_route(methods=["GET", "POST"],
+                  permission_classes=(permissions.IsAuthenticated,))
     def answers(self, request, *args, **kwargs):
         user = self.request.user
         organization = user.organization
