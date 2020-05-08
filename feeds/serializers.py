@@ -102,7 +102,7 @@ class PollSerializer(serializers.ModelSerializer):
         user = request.user
         result = instance.related_answers()
         if not instance.is_poll_active:
-            return SubmittedPollsAnswerSerializer(
+            return FinalPollsAnswerSerializer(
                 result, many=True, read_only=True,
                 context=serializer_context).data
         if instance.user_has_voted(user):
@@ -340,3 +340,13 @@ class SubmittedPollsAnswerSerializer(PollsAnswerSerializer):
         if user:
             return Voter.objects.filter(answer=instance, user=user).exists()
         return False
+
+
+class FinalPollsAnswerSerializer(SubmittedPollsAnswerSerializer):
+
+    class Meta:
+        model = PollsAnswer
+        fields = (
+            "id", "question", "answer_text", "votes", "has_voted",
+            "percentage", "voters_info",  "is_winner",
+        )

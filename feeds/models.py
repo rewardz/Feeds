@@ -230,6 +230,17 @@ class PollsAnswer(models.Model):
         if total_votes > 0:
             return int(round((self.votes * 100.0) / total_votes))
 
+    @property
+    def is_winner(self):
+        question = self.question
+        answers = PollsAnswer.objects.filter(question=question)
+        max_vote = answers.order_by('-votes').first().votes if answers else 0
+        answers = answers.filter(votes=max_vote)
+        if answers.count() > 1:
+            return False
+        else:
+            return self in answers
+
     def get_voters(self):
         # return ",".join([str(p) for p in self.voters.all()])
         return self.voters.all().values_list('id', flat=True)
