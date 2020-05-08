@@ -20,7 +20,7 @@ from .serializers import (
     DocumentsSerializer, PostLikedSerializer, PostSerializer, PostDetailSerializer,
     PollsAnswerSerializer, ImagesSerializer, UserInfoSerializer, VideosSerializer,
 )
-from .utils import accessible_posts_by_user
+from .utils import accessible_posts_by_user, user_can_delete, user_can_edit
 
 
 class PostViewSet(viewsets.ModelViewSet):
@@ -121,15 +121,8 @@ class PostViewSet(viewsets.ModelViewSet):
     def update(self, request, pk=None):
         instance = self.get_object()
         user = request.user
-        if not user.is_superuser:
-            if instance.created_by.id != request.user.id:
-                raise serializers.ValidationError(
-                    {"created_by": _("A post can be updated only by its creator")})
-            if instance.post_type in (
-                POST_TYPE.USER_CREATED_POLL, POST_TYPE.SYSTEM_CREATED_POST):
-                raise serializers.ValidationError(
-                    {"post_type": _("You do not have permission to perform the action.")}
-            )
+        if not user_can_edit(user, instance):
+            raise serializers.ValidationError(_("You do not have permission to edit"))
         data = self._create_or_update(request)
         serializer = self.get_serializer(instance, data=data)
         serializer.is_valid(raise_exception=True)
@@ -141,15 +134,8 @@ class PostViewSet(viewsets.ModelViewSet):
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
         user = request.user
-        if not user.is_superuser:
-            if instance.created_by.id != request.user.id:
-                raise serializers.ValidationError(
-                    {"created_by": _("A post can be deleted only by its creator")})
-            if instance.post_type in (
-                POST_TYPE.USER_CREATED_POLL, POST_TYPE.SYSTEM_CREATED_POST):
-                raise serializers.ValidationError(
-                    {"post_type": _("You do not have permission to perform the action.")}
-            )
+        if not user_can_delete(user, instance):
+            raise serializers.ValidationError(_("You do not have permission to delete"))
         self.perform_destroy(instance)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -282,7 +268,7 @@ class PostViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     @detail_route(methods=["GET", "POST"],
-                  permission_classes=(permissions.IsAuthenticated,))
+    permission_classes=(permissions.IsAuthenticated,))
     def answers(self, request, *args, **kwargs):
         user = self.request.user
         organization = user.organization

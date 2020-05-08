@@ -8,7 +8,7 @@ from django.utils.module_loading import import_string
 
 from rest_framework import exceptions
 
-from .constants import SHARED_WITH
+from .constants import POST_TYPE, SHARED_WITH
 from .models import Post
 
 DEPARTMENT_MODEL = import_string(settings.DEPARTMENT_MODEL)
@@ -61,3 +61,19 @@ def get_profile_image(user):
     """
     profile_image = settings.PROFILE_IMAGE_PROPERTY
     return getattr(user, profile_image, settings.NO_PROFILE_IMAGE)
+
+
+def user_can_edit(user, instance):
+    if not user.is_superuser:
+        if instance.post_type in (POST_TYPE.USER_CREATED_POLL, POST_TYPE.SYSTEM_CREATED_POST):
+            return False
+        return instance.created_by.id == user.id
+    return True
+
+
+def user_can_delete(user, instance):
+    if not user.is_superuser:
+        if instance.post_type in [POST_TYPE.SYSTEM_CREATED_POST]:
+            return False
+        return instance.created_by.id == user.id
+    return True
