@@ -84,7 +84,7 @@ class Post(UserInfo):
         if remaining_days >= 1:
             if remaining_days == 1:
                 return "{days} day and {hours} hour(s)".\
-                    format(days=remaining_days, hours=hours)
+                    format(days=remaining_days, hours=int(hours))
             return "{days} days".format(days=remaining_days)
         if hours > 1:
             return "{hours} hours".format(hours=int(hours))
@@ -228,7 +228,7 @@ class PollsAnswer(models.Model):
         question = self.question
         total_votes = question.total_votes()
         if total_votes > 0:
-            return (self.votes * 100) / total_votes
+            return int(round((self.votes * 100.0) / total_votes))
 
     def get_voters(self):
         # return ",".join([str(p) for p in self.voters.all()])
