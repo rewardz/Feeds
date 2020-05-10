@@ -60,6 +60,8 @@ class Post(UserInfo):
     active_days = models.SmallIntegerField(
         default=1, validators=[MinValueValidator(1), MaxValueValidator(30)]
     )
+    modified_by = models.ForeignKey(CustomUser, related_name="post_modifier", null=True)
+    modified_on = models.DateTimeField(auto_now=True, null=True, blank=True)
 
     @property
     def is_poll(self):
@@ -198,6 +200,8 @@ class Comment(UserInfo):
     content = models.TextField()
     parent = models.ForeignKey('self', blank=True, null=True, related_name="comment_response")
     post = models.ForeignKey(Post, on_delete=models.CASCADE)
+    modified_by = models.ForeignKey(CustomUser, related_name="comment_modifier", null=True)
+    modified_on = models.DateTimeField(auto_now=True, null=True, blank=True)
 
     def __unicode__(self):
         return "%s" % self.content

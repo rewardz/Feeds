@@ -141,7 +141,8 @@ class PostSerializer(serializers.ModelSerializer):
     class Meta:
         model = Post
         fields = (
-            "id", "created_by", "created_on", "organization", "created_by_user_info",
+            "id", "created_by", "created_on", "modified_by", "modified_on",
+            "organization", "created_by_user_info",
             "title", "description", "post_type", "poll_info", "active_days",
             "priority", "prior_till",
             "shared_with", "images", "documents", "videos",
@@ -214,6 +215,7 @@ class PostSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         representation = super(PostSerializer, self).to_representation(instance)
         representation["created_on"] = instance.created_on.strftime("%Y-%m-%d")
+        representation["modified_on"] = instance.modified_on.strftime("%Y-%m-%d")
         return representation
 
 
@@ -225,7 +227,8 @@ class PostDetailSerializer(PostSerializer):
     class Meta:
         model = Post
         fields = (
-            "id", "created_by", "created_on", "organization", "created_by_user_info",
+            "id", "created_by", "created_on", "modified_by", "modified_on",
+            "organization", "created_by_user_info",
             "title", "description", "post_type", "poll_info", "active_days",
             "priority", "prior_till", "shared_with", "images", "documents", "videos",
             "is_owner", "can_edit", "can_delete", "has_appreciated",
@@ -248,6 +251,7 @@ class PostDetailSerializer(PostSerializer):
         instance.description = validated_data.get('description', instance.description)
         instance.shared_with = validated_data.get('shared_with', instance.shared_with)
         instance.priority = validated_data.get('priority', instance.priority)
+        instance.modified_by = validated_data.get('modified_by', instance.modified_by)
         instance.save()
         return instance
 
@@ -264,8 +268,8 @@ class CommentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Comment
-        fields = ("id", "content", "created_by", "created_on",
-                  "post", "commented_by_user_info")
+        fields = ("id", "content", "created_by", "created_on", "modified_by",
+                  "modified_on", "post", "commented_by_user_info")
 
     def get_commented_by_user_info(self, instance):
         created_by = instance.created_by
@@ -284,7 +288,7 @@ class CommentCreateSerializer(CommentSerializer):
     class Meta:
         model = Comment
         fields = ("id", "count", "content", "created_by", "created_on",
-                  "post", "commented_by_user_info",)
+                  "modified_by", "post", "commented_by_user_info",)
     
     def get_count(self, instance):
         return Comment.objects.filter(post=instance.post).count()
@@ -298,8 +302,8 @@ class CommentDetailSerializer(CommentSerializer):
     class Meta:
         model = Comment
         fields = (
-            "content", "created_by", "created_on",
-            "post", "commented_by_user_info",
+            "content", "created_by", "created_on", "modified_by",
+            "modified_on", "post", "commented_by_user_info",
         )
 
 

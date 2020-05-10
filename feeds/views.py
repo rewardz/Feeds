@@ -28,11 +28,11 @@ class PostViewSet(viewsets.ModelViewSet):
     permission_classes = (permissions.IsAuthenticated,)
     pagination_class = FeedsResultsSetPagination
 
-    def _create_or_update(self, request):
+    def _create_or_update(self, request, create=False):
         payload = request.data
         # print(payload.getlist('delete_image_ids', 'Nothing'))
-        created_by = self.request.user
-        if not created_by:
+        current_user = self.request.user
+        if not current_user:
             raise serializers.ValidationError({'created_by': _('Created by is required!')})
         data = {k: v for k, v in payload.items()}
         delete_image_ids = data.get('delete_image_ids', None)
@@ -61,13 +61,15 @@ class PostViewSet(viewsets.ModelViewSet):
                     _("Improper values submitted for delete document ids"))
             for doc_id in delete_document_ids:
                 try:
-                    doc = Documents.objects.get(id=img_id)
+                    doc = Documents.objects.get(id=doc_id)
                     doc.delete()
                 except Documents.DoesNotExist:
                     continue
 
-        data['created_by'] = created_by.id
-        data['organization'] = created_by.organization_id
+        if create:
+            data['created_by'] = current_user.id
+        data['modified_by'] = current_user.id
+        data['organization'] = current_user.organization_id
         return data
     
     def _upload_files(self, request, post_id):
@@ -108,7 +110,7 @@ class PostViewSet(viewsets.ModelViewSet):
                                       status=status.HTTP_400_BAD_REQUEST)
 
     def create(self, request, *args, **kwargs):
-        data = self._create_or_update(request)
+        data = self._create_or_update(request, create=True)
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
         instance = serializer.save()
@@ -124,6 +126,7 @@ class PostViewSet(viewsets.ModelViewSet):
         if not user_can_edit(user, instance):
             raise serializers.ValidationError(_("You do not have permission to edit"))
         data = self._create_or_update(request)
+        data["created_by"] = instance.created_by.id
         serializer = self.get_serializer(instance, data=data)
         serializer.is_valid(raise_exception=True)
         if request.FILES:
@@ -210,6 +213,7 @@ class PostViewSet(viewsets.ModelViewSet):
             data = {k: v for k, v in payload.items()}
             data['post'] = post_id
             data['created_by'] = self.request.user.id
+            data['modified_by'] = self.request.user.id
             serializer = CommentCreateSerializer(data=data)
             serializer.is_valid(raise_exception=True)
             serializer.save()
