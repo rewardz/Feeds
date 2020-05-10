@@ -16,7 +16,9 @@ ERROR_MESSAGE = "Priority post already exists for user. Set priority to false."
 
 def accessible_posts_by_user(user, organization):
     if user.is_superuser:
-        return Post.objects.filter(organization=organization)
+        result = Post.objects.filter(organization=organization)
+        result = result.filter(mark_delete=False)
+        return result
     dept_users = []
     for dept in DEPARTMENT_MODEL.objects.filter(users=user):
         for usr in dept.users.all():
@@ -29,6 +31,7 @@ def accessible_posts_by_user(user, organization):
         result = Post.objects.filter(Q(organization=organization, \
                                     shared_with=SHARED_WITH.ALL_DEPARTMENTS) |\
                                  Q(created_by__in=dept_users))
+    result = result.filter(mark_delete=False)
     return result
 
 

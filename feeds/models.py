@@ -62,6 +62,7 @@ class Post(UserInfo):
     )
     modified_by = models.ForeignKey(CustomUser, related_name="post_modifier", null=True)
     modified_on = models.DateTimeField(auto_now=True, null=True, blank=True)
+    mark_delete = models.BooleanField(default=False)
 
     @property
     def is_poll(self):
@@ -117,6 +118,14 @@ class Post(UserInfo):
             total_votes = self.related_answers().aggregate(
                 total=Sum('votes')).get('total')
         return total_votes if total_votes else 0
+
+    def mark_as_delete(self, user):
+        try:
+            self.mark_delete = True
+            self.modified_by = user.id
+            self.save()
+        except Post.DoesNotExist:
+            raise ValidationError(_("Post does not exist"))
 
     def __unicode__(self):
         return self.title if self.title else self.pk

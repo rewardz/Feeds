@@ -139,7 +139,7 @@ class PostViewSet(viewsets.ModelViewSet):
         user = request.user
         if not user_can_delete(user, instance):
             raise serializers.ValidationError(_("You do not have permission to delete"))
-        self.perform_destroy(instance)
+        instance.mark_as_delete(user)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     def get_serializer(self, *args, **kwargs):
@@ -171,6 +171,7 @@ class PostViewSet(viewsets.ModelViewSet):
             raise ValidationError(_('Minimum two answers are required to create a poll.'))
         data['post_type'] = POST_TYPE.USER_CREATED_POLL
         data['created_by'] = user.pk
+        data['modified_by'] = user.pk
         data['organization'] = organization.pk
         question_serializer = PostSerializer(data=data)
         question_serializer.is_valid(raise_exception=True)
