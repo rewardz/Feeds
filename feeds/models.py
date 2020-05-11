@@ -122,7 +122,7 @@ class Post(UserInfo):
     def mark_as_delete(self, user):
         try:
             self.mark_delete = True
-            self.modified_by = user.id
+            self.modified_by = user
             self.save()
         except Post.DoesNotExist:
             raise ValidationError(_("Post does not exist"))
