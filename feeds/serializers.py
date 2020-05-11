@@ -215,7 +215,8 @@ class PostSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         representation = super(PostSerializer, self).to_representation(instance)
         representation["created_on"] = instance.created_on.strftime("%Y-%m-%d")
-        representation["modified_on"] = instance.modified_on.strftime("%Y-%m-%d")
+        representation["modified_on"] = instance.modified_on.\
+            strftime("%Y-%m-%d") if instance.modified_on else None
         return representation
 
 
