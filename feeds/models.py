@@ -60,6 +60,9 @@ class Post(UserInfo):
     active_days = models.SmallIntegerField(
         default=1, validators=[MinValueValidator(1), MaxValueValidator(30)]
     )
+    modified_by = models.ForeignKey(CustomUser, related_name="post_modifier", null=True)
+    modified_on = models.DateTimeField(auto_now=True, null=True, blank=True)
+    mark_delete = models.BooleanField(default=False)
 
     @property
     def is_poll(self):
@@ -84,7 +87,7 @@ class Post(UserInfo):
         if remaining_days >= 1:
             if remaining_days == 1:
                 return "{days} day and {hours} hour(s)".\
-                    format(days=remaining_days, hours=hours)
+                    format(days=remaining_days, hours=int(hours))
             return "{days} days".format(days=remaining_days)
         if hours > 1:
             return "{hours} hours".format(hours=int(hours))
@@ -115,6 +118,14 @@ class Post(UserInfo):
             total_votes = self.related_answers().aggregate(
                 total=Sum('votes')).get('total')
         return total_votes if total_votes else 0
+
+    def mark_as_delete(self, user):
+        try:
+            self.mark_delete = True
+            self.modified_by = user
+            self.save()
+        except Post.DoesNotExist:
+            raise ValidationError(_("Post does not exist"))
 
     def __unicode__(self):
         return self.title if self.title else self.pk
@@ -198,6 +209,8 @@ class Comment(UserInfo):
     content = models.TextField()
     parent = models.ForeignKey('self', blank=True, null=True, related_name="comment_response")
     post = models.ForeignKey(Post, on_delete=models.CASCADE)
+    modified_by = models.ForeignKey(CustomUser, related_name="comment_modifier", null=True)
+    modified_on = models.DateTimeField(auto_now=True, null=True, blank=True)
 
     def __unicode__(self):
         return "%s" % self.content
@@ -228,7 +241,18 @@ class PollsAnswer(models.Model):
         question = self.question
         total_votes = question.total_votes()
         if total_votes > 0:
-            return (self.votes * 100) / total_votes
+            return int(round((self.votes * 100.0) / total_votes))
+
+    @property
+    def is_winner(self):
+        question = self.question
+        answers = PollsAnswer.objects.filter(question=question)
+        max_vote = answers.order_by('-votes').first().votes if answers else 0
+        answers = answers.filter(votes=max_vote)
+        if answers.count() > 1:
+            return False
+        else:
+            return self in answers
 
     def get_voters(self):
         # return ",".join([str(p) for p in self.voters.all()])

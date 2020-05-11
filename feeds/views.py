@@ -20,7 +20,7 @@ from .serializers import (
     DocumentsSerializer, PostLikedSerializer, PostSerializer, PostDetailSerializer,
     PollsAnswerSerializer, ImagesSerializer, UserInfoSerializer, VideosSerializer,
 )
-from .utils import accessible_posts_by_user
+from .utils import accessible_posts_by_user, user_can_delete, user_can_edit
 
 
 class PostViewSet(viewsets.ModelViewSet):
@@ -28,11 +28,11 @@ class PostViewSet(viewsets.ModelViewSet):
     permission_classes = (permissions.IsAuthenticated,)
     pagination_class = FeedsResultsSetPagination
 
-    def _create_or_update(self, request):
+    def _create_or_update(self, request, create=False):
         payload = request.data
         # print(payload.getlist('delete_image_ids', 'Nothing'))
-        created_by = self.request.user
-        if not created_by:
+        current_user = self.request.user
+        if not current_user:
             raise serializers.ValidationError({'created_by': _('Created by is required!')})
         data = {k: v for k, v in payload.items()}
         delete_image_ids = data.get('delete_image_ids', None)
@@ -61,13 +61,15 @@ class PostViewSet(viewsets.ModelViewSet):
                     _("Improper values submitted for delete document ids"))
             for doc_id in delete_document_ids:
                 try:
-                    doc = Documents.objects.get(id=img_id)
+                    doc = Documents.objects.get(id=doc_id)
                     doc.delete()
                 except Documents.DoesNotExist:
                     continue
 
-        data['created_by'] = created_by.id
-        data['organization'] = created_by.organization_id
+        if create:
+            data['created_by'] = current_user.id
+        data['modified_by'] = current_user.id
+        data['organization'] = current_user.organization_id
         return data
     
     def _upload_files(self, request, post_id):
@@ -108,7 +110,7 @@ class PostViewSet(viewsets.ModelViewSet):
                                       status=status.HTTP_400_BAD_REQUEST)
 
     def create(self, request, *args, **kwargs):
-        data = self._create_or_update(request)
+        data = self._create_or_update(request, create=True)
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
         instance = serializer.save()
@@ -121,16 +123,10 @@ class PostViewSet(viewsets.ModelViewSet):
     def update(self, request, pk=None):
         instance = self.get_object()
         user = request.user
-        if not user.is_superuser:
-            if instance.created_by.id != request.user.id:
-                raise serializers.ValidationError(
-                    {"created_by": _("A post can be updated only by its creator")})
-            if instance.post_type in (
-                POST_TYPE.USER_CREATED_POLL, POST_TYPE.SYSTEM_CREATED_POST):
-                raise serializers.ValidationError(
-                    {"post_type": _("You do not have permission to perform the action.")}
-            )
+        if not user_can_edit(user, instance):
+            raise serializers.ValidationError(_("You do not have permission to edit"))
         data = self._create_or_update(request)
+        data["created_by"] = instance.created_by.id
         serializer = self.get_serializer(instance, data=data)
         serializer.is_valid(raise_exception=True)
         if request.FILES:
@@ -141,16 +137,9 @@ class PostViewSet(viewsets.ModelViewSet):
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
         user = request.user
-        if not user.is_superuser:
-            if instance.created_by.id != request.user.id:
-                raise serializers.ValidationError(
-                    {"created_by": _("A post can be deleted only by its creator")})
-            if instance.post_type in (
-                POST_TYPE.USER_CREATED_POLL, POST_TYPE.SYSTEM_CREATED_POST):
-                raise serializers.ValidationError(
-                    {"post_type": _("You do not have permission to perform the action.")}
-            )
-        self.perform_destroy(instance)
+        if not user_can_delete(user, instance):
+            raise serializers.ValidationError(_("You do not have permission to delete"))
+        instance.mark_as_delete(user)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     def get_serializer(self, *args, **kwargs):
@@ -182,6 +171,7 @@ class PostViewSet(viewsets.ModelViewSet):
             raise ValidationError(_('Minimum two answers are required to create a poll.'))
         data['post_type'] = POST_TYPE.USER_CREATED_POLL
         data['created_by'] = user.pk
+        data['modified_by'] = user.pk
         data['organization'] = organization.pk
         question_serializer = PostSerializer(data=data)
         question_serializer.is_valid(raise_exception=True)
@@ -224,6 +214,7 @@ class PostViewSet(viewsets.ModelViewSet):
             data = {k: v for k, v in payload.items()}
             data['post'] = post_id
             data['created_by'] = self.request.user.id
+            data['modified_by'] = self.request.user.id
             serializer = CommentCreateSerializer(data=data)
             serializer.is_valid(raise_exception=True)
             serializer.save()
@@ -282,7 +273,7 @@ class PostViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     @detail_route(methods=["GET", "POST"],
-                  permission_classes=(permissions.IsAuthenticated,))
+    permission_classes=(permissions.IsAuthenticated,))
     def answers(self, request, *args, **kwargs):
         user = self.request.user
         organization = user.organization
