@@ -128,7 +128,7 @@ class Post(UserInfo):
             raise ValidationError(_("Post does not exist"))
 
     def __unicode__(self):
-        return self.title if self.title else self.pk
+        return self.title if self.title else str(self.pk)
     
     class Meta:
         ordering = ("-pk",)
