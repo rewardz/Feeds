@@ -67,8 +67,10 @@ def get_profile_image(user):
 
 
 def user_can_edit(user, instance):
+    if instance.post_type == POST_TYPE.USER_CREATED_POLL:
+        return False
     if not user.is_superuser:
-        if instance.post_type in (POST_TYPE.USER_CREATED_POLL, POST_TYPE.SYSTEM_CREATED_POST):
+        if instance.post_type == POST_TYPE.SYSTEM_CREATED_POST:
             return False
         return instance.created_by.id == user.id
     return True

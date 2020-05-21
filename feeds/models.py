@@ -84,13 +84,16 @@ class Post(UserInfo):
         remaining_days = remaining_time.days
         remaining_time_sec = remaining_time.total_seconds()
         hours = remaining_time_sec // 3600
+        hours = int(hours)
         if remaining_days >= 1:
             if remaining_days == 1:
+                if hours > 24:
+                    hours = hours - 24
                 return "{days} day and {hours} hour(s)".\
-                    format(days=remaining_days, hours=int(hours))
+                    format(days=remaining_days, hours=hours)
             return "{days} days".format(days=remaining_days)
         if hours > 1:
-            return "{hours} hours".format(hours=int(hours))
+            return "{hours} hours".format(hours=hours)
         minutes = (remaining_time_sec % 3600) // 60
         return "{minutes} minutes".format(minutes=int(minutes))
 

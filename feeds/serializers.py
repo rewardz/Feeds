@@ -238,7 +238,7 @@ class PostDetailSerializer(PostSerializer):
 
     def get_comments(self, instance):
         post_id = instance.id
-        comments = Comment.objects.filter(post=post_id).order_by('-created_on')
+        comments = Comment.objects.filter(post=post_id).order_by('-created_on')[:20]
         return CommentSerializer(comments, many=True, read_only=True).data
 
     def get_appreciated_by(self, instance):
@@ -279,7 +279,7 @@ class CommentSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         representation = super(CommentSerializer, self).to_representation(instance)
-        representation["created_on"] = instance.created_on.strftime("%Y-%m-%d")
+        representation["created_on"] = instance.created_on.strftime("%Y-%m-%d %H:%M:%S")
         return representation
 
 
