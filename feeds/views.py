@@ -154,7 +154,7 @@ class PostViewSet(viewsets.ModelViewSet):
         user = self.request.user
         org = self.request.user.organization
         result = accessible_posts_by_user(user, org)
-        result = result.order_by('-priority', '-created_on')
+        result = result.order_by('-priority', '-modified_on', '-created_on')
         return result
 
     @list_route(methods=["POST"], permission_classes=(permissions.IsAuthenticated,))

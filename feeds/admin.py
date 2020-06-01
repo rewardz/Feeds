@@ -6,10 +6,10 @@ from feeds.models import Post, Comment, PostLiked, PollsAnswer
 @admin.register(Post)
 class PostAdmin(admin.ModelAdmin):
     list_display = (
-        'title', 'organization', 'priority', 'prior_till', 'shared_with', 
-        'post_type', 'created_by', 'created_on',
+        'title', 'organization', 'shared_with', 'post_type',
+        'created_by', 'created_on', 'modified_on', 'modified_by', 'mark_delete',
     )
-    list_filter = ('organization', 'priority')
+    list_filter = ('organization', 'priority', 'mark_delete',)
     search_fields = ('organization__name',)
 
 

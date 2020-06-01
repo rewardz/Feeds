@@ -15,7 +15,7 @@ DEPARTMENT_MODEL = import_string(settings.DEPARTMENT_MODEL)
 ERROR_MESSAGE = "Priority post already exists for user. Set priority to false."
 
 def accessible_posts_by_user(user, organization):
-    if user.is_superuser:
+    if user.is_staff:
         result = Post.objects.filter(organization=organization)
         result = result.filter(mark_delete=False)
         return result
