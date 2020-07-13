@@ -227,7 +227,7 @@ class PostLiked(UserInfo):
 
 
 class CommentLiked(UserInfo):
-    post = models.ForeignKey(Comment, on_delete=models.CASCADE)
+    comment = models.ForeignKey(Comment, on_delete=models.CASCADE)
 
     def __unicode__(self):
         return "%s like comment %s" % (self.created_by, self.post)
