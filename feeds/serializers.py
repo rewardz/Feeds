@@ -238,9 +238,12 @@ class PostDetailSerializer(PostSerializer):
         )
 
     def get_comments(self, instance):
+        request = self.context.get('request')
+        serializer_context = {'request': request }
         post_id = instance.id
         comments = Comment.objects.filter(post=post_id).order_by('-created_on')[:20]
-        return CommentSerializer(comments, many=True, read_only=True).data
+        return CommentSerializer(
+            comments, many=True, read_only=True, context=serializer_context).data
 
     def get_appreciated_by(self, instance):
         post_id = instance.id
@@ -263,18 +266,13 @@ class CommentSerializer(serializers.ModelSerializer):
     commented_by_user_info = serializers.SerializerMethodField()
     liked_count = serializers.SerializerMethodField()
     liked_by = serializers.SerializerMethodField()
-
-    # def __init__(self, *args, **kwargs):
-    #     comment_response = kwargs.pop("comment_response", False)
-    #     super(CommentSerializer, self).__init__(*args, **kwargs)
-    #     if not comment_response:
-    #         self.fields["comment_response"] = CommentSerializer(many=True, comment_response=True)
+    has_liked = serializers.SerializerMethodField()
 
     class Meta:
         model = Comment
         fields = ("id", "content", "created_by", "created_on", "modified_by",
                   "modified_on", "post", "commented_by_user_info",
-                  "liked_count", "liked_by")
+                  "liked_count", "liked_by", "has_liked")
 
     def get_commented_by_user_info(self, instance):
         created_by = instance.created_by
@@ -288,6 +286,10 @@ class CommentSerializer(serializers.ModelSerializer):
         result = CommentLiked.objects.filter(comment=instance).order_by('-created_on')
         return CommentsLikedSerializer(result, many=True, read_only=True).data
 
+    def get_has_liked(self, instance):
+        request = self.context['request']
+        user = request.user
+        return CommentLiked.objects.filter(comment=instance, created_by=user).exists()
 
     def to_representation(self, instance):
         representation = super(CommentSerializer, self).to_representation(instance)
@@ -315,8 +317,9 @@ class CommentDetailSerializer(CommentSerializer):
     class Meta:
         model = Comment
         fields = (
-            "content", "created_by", "created_on", "modified_by",
+            "id", "content", "created_by", "created_on", "modified_by",
             "modified_on", "post", "commented_by_user_info",
+            "liked_count", "liked_by", "has_liked"
         )
 
 
