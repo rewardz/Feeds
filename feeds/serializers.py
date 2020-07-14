@@ -8,7 +8,8 @@ from rest_framework import exceptions, serializers
 
 from .constants import POST_TYPE
 from .models import (
-    Comment, Documents, Post, PostLiked, PollsAnswer, Images, Videos, Voter,
+    Comment, CommentLiked, Documents, Post, PostLiked, PollsAnswer,
+    Images, Videos, Voter,
 )
 from .utils import (
     get_departments, get_profile_image, validate_priority,
@@ -260,6 +261,8 @@ class PostDetailSerializer(PostSerializer):
 class CommentSerializer(serializers.ModelSerializer):
 
     commented_by_user_info = serializers.SerializerMethodField()
+    liked_count = serializers.SerializerMethodField()
+    liked_by = serializers.SerializerMethodField()
 
     # def __init__(self, *args, **kwargs):
     #     comment_response = kwargs.pop("comment_response", False)
@@ -270,12 +273,21 @@ class CommentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Comment
         fields = ("id", "content", "created_by", "created_on", "modified_by",
-                  "modified_on", "post", "commented_by_user_info")
+                  "modified_on", "post", "commented_by_user_info",
+                  "liked_count", "liked_by")
 
     def get_commented_by_user_info(self, instance):
         created_by = instance.created_by
         user_detail = UserModel.objects.get(pk=created_by.id)
         return UserInfoSerializer(user_detail).data
+
+    def get_liked_count(self, instance):
+        return CommentLiked.objects.filter(comment=instance).count()
+
+    def get_liked_by(self, instance):
+        result = CommentLiked.objects.filter(comment=instance).order_by('-created_on')
+        return CommentsLikedSerializer(result, many=True, read_only=True).data
+
 
     def to_representation(self, instance):
         representation = super(CommentSerializer, self).to_representation(instance)
@@ -369,3 +381,23 @@ class FinalPollsAnswerSerializer(SubmittedPollsAnswerSerializer):
             "id", "question", "answer_text", "votes", "has_voted",
             "percentage", "voters_info",  "is_winner",
         )
+
+
+class CommentsLikedSerializer(serializers.ModelSerializer):
+    user_info = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CommentLiked
+        fields = (
+            "user_info", "created_on",
+        )
+
+    def get_user_info(self, instance):
+        created_by = instance.created_by
+        user_detail = UserModel.objects.get(pk=created_by.id)
+        return UserInfoSerializer(user_detail).data
+
+    def to_representation(self, instance):
+        representation = super(CommentsLikedSerializer, self).to_representation(instance)
+        representation["created_on"] = instance.created_on.strftime("%Y-%m-%d")
+        return representation

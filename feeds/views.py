@@ -399,7 +399,6 @@ class VideosView(views.APIView):
 
 class CommentViewset(viewsets.ModelViewSet):
     permission_classes = (permissions.IsAuthenticated,)
-    queryset = Comment.objects.none()
 
     def get_serializer(self, *args, **kwargs):
         if "pk" in self.kwargs:
@@ -411,26 +410,40 @@ class CommentViewset(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-    
+        org = self.request.user.organization
+        posts = accessible_posts_by_user(user, org)
+        result = Comment.objects.filter(post__in=posts)
+        return result
+
     @detail_route(methods=["POST"], permission_classes=(permissions.IsAuthenticated,))
     def like(self, request, *args, **kwargs):
         user = self.request.user
         organization = user.organization
+        posts = accessible_posts_by_user(user, organization)
+        accessible_comments = Comment.objects.filter(post__in=posts)\
+            .values_list('id', flat=True)
         comment_id = self.kwargs.get("pk", None)
         if not comment_id:
             raise ValidationError(_('Comment ID is required'))
         comment_id = int(comment_id)
+        if comment_id not in accessible_comments:
+            raise ValidationError(_('Not allowed to like the comment'))
         message = None
         liked = False
         response_status = status.HTTP_304_NOT_MODIFIED
-        
+
         if CommentLiked.objects.filter(comment_id=comment_id, created_by=user).exists():
             CommentLiked.objects.filter(comment_id=comment_id, created_by=user).delete()
             message = "Successfully UnLiked"
             liked = False
             response_status = status.HTTP_200_OK
         else:
-            data = CommentLiked.objects.create(comment_id=comment_id, created_by=user)
+            CommentLiked.objects.create(comment_id=comment_id, created_by=user)
             message = "Successfully Liked"
             liked = True
-        return Response({"message": message, "liked": liked}, status=response_status)
+            response_status = status.HTTP_200_OK
+        count = CommentLiked.objects.filter(comment_id=comment_id).count()
+        user_info = UserInfoSerializer(user).data
+        return Response({
+            "message": message, "liked": liked, "count": count, "user_info":user_info},
+            status=response_status)
