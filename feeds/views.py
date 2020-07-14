@@ -201,13 +201,16 @@ class PostViewSet(viewsets.ModelViewSet):
         if post_id not in accessible_posts:
             raise ValidationError(_('You do not have access to comment on this post'))
         if self.request.method == "GET":
+            serializer_context = {'request': self.request }
             comments = Comment.objects.filter(post_id=post_id, parent=None).\
                 order_by('-created_on')
             page = self.paginate_queryset(comments)
             if page is not None:
-                serializer = CommentSerializer(page, many=True, read_only=True)
+                serializer = CommentSerializer(
+                    page, many=True, read_only=True, context=serializer_context)
                 return self.get_paginated_response(serializer.data)
-            serializer = CommentSerializer(comments, many=True, read_only=True)
+            serializer = CommentSerializer(
+                comments, many=True, read_only=True, context=serializer_context)
             return Response(serializer.data)
         elif self.request.method == "POST":
             payload = self.request.data
