@@ -1,11 +1,13 @@
 from __future__ import division, print_function, unicode_literals
 
+from django.conf import settings
 from django.db.models import Q
 from django.http import Http404
+from django.utils.module_loading import import_string
 from django.utils.translation import ugettext as _
 
 from rest_framework import permissions, viewsets, serializers, status, views
-from rest_framework.decorators import detail_route, list_route
+from rest_framework.decorators import api_view, detail_route, list_route, permission_classes
 from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import MultiPartParser, FormParser, FileUploadParser, JSONParser
 from rest_framework.response import Response
@@ -21,6 +23,9 @@ from .serializers import (
     PollsAnswerSerializer, ImagesSerializer, UserInfoSerializer, VideosSerializer,
 )
 from .utils import accessible_posts_by_user, user_can_delete, user_can_edit
+
+CustomUser = import_string(settings.CUSTOM_USER_MODEL)
+DEPARTMENT_MODEL = import_string(settings.DEPARTMENT_MODEL)
 
 
 class PostViewSet(viewsets.ModelViewSet):
@@ -450,3 +455,30 @@ class CommentViewset(viewsets.ModelViewSet):
         return Response({
             "message": message, "liked": liked, "count": count, "user_info":user_info},
             status=response_status)
+
+
+@api_view(['GET'])
+@permission_classes((permissions.IsAuthenticated,))
+def search_user(request):
+    """
+    Search users based on the search term
+    """
+    search_term = request.GET.get('term', None)
+    query = request.GET.get('q', 'organization')
+    user = request.user
+    result = CustomUser.objects.filter(organization=user.organization)
+
+    dept_users = []
+
+    if query == 'department':
+        for dept in DEPARTMENT_MODEL.objects.filter(users=user):
+            for usr in dept.users.all():
+                dept_users.append(usr.id)
+        result = result.filter(id__in=dept_users)
+    result = result.exclude(id=user.id)
+    if search_term:
+        result = result.filter(
+            Q(email__istartswith=search_term) |
+            Q(first_name__istartswith=search_term))
+    serializer = UserInfoSerializer(result, many=True)
+    return Response(serializer.data)
