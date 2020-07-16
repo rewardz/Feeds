@@ -22,7 +22,9 @@ from .serializers import (
     DocumentsSerializer, PostLikedSerializer, PostSerializer, PostDetailSerializer,
     PollsAnswerSerializer, ImagesSerializer, UserInfoSerializer, VideosSerializer,
 )
-from .utils import accessible_posts_by_user, user_can_delete, user_can_edit
+from .utils import (
+    accessible_posts_by_user, tag_users_to_post, user_can_delete, user_can_edit
+)
 
 CustomUser = import_string(settings.CUSTOM_USER_MODEL)
 DEPARTMENT_MODEL = import_string(settings.DEPARTMENT_MODEL)
@@ -42,6 +44,15 @@ class PostViewSet(viewsets.ModelViewSet):
         data = {k: v for k, v in payload.items()}
         delete_image_ids = data.get('delete_image_ids', None)
         delete_document_ids = data.get('delete_document_ids', None)
+        tag_users = data.get('tag_users', None)
+        if tag_users:
+            tag_users = [u.strip() for u in tag_users.split(',')]
+            try:
+                tag_users = list(map(int, tag_users))
+                data['tag_users'] = tag_users
+            except ValueError:
+                raise serializers.ValidationError(
+                    _("Improper values submitted for user ids to tag"))
 
         if delete_image_ids:
             delete_image_ids = delete_image_ids.split(",")
@@ -116,10 +127,13 @@ class PostViewSet(viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         data = self._create_or_update(request, create=True)
+        tag_users = data.get('tag_users', None)
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
         instance = serializer.save()
         post_id = instance.id
+        if tag_users:
+            tag_users_to_post(instance, tag_users)
 
         if request.FILES:
             self._upload_files(request, post_id)
@@ -131,9 +145,12 @@ class PostViewSet(viewsets.ModelViewSet):
         if not user_can_edit(user, instance):
             raise serializers.ValidationError(_("You do not have permission to edit"))
         data = self._create_or_update(request)
+        tag_users = data.get('tag_users', None)
         data["created_by"] = instance.created_by.id
         serializer = self.get_serializer(instance, data=data)
         serializer.is_valid(raise_exception=True)
+        if tag_users:
+            tag_users_to_post(instance, tag_users)
         if request.FILES:
             self._upload_files(request, instance.pk)
         self.perform_update(serializer)

@@ -37,7 +37,7 @@ class UserInfoSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserModel
         fields = (
-            "email", "first_name", "last_name", "departments", "profile_img",
+            "pk", "email", "first_name", "last_name", "departments", "profile_img",
         )
 
     def get_departments(self, instance):
@@ -138,6 +138,7 @@ class PostSerializer(serializers.ModelSerializer):
     poll_info = serializers.SerializerMethodField()
     can_edit = serializers.SerializerMethodField()
     can_delete = serializers.SerializerMethodField()
+    tagged_users = serializers.SerializerMethodField()
 
     class Meta:
         model = Post
@@ -148,7 +149,7 @@ class PostSerializer(serializers.ModelSerializer):
             "priority", "prior_till",
             "shared_with", "images", "documents", "videos",
             "is_owner", "can_edit", "can_delete", "has_appreciated",
-            "appreciation_count", "comments_count",
+            "appreciation_count", "comments_count", "tagged_users",
         )
 
     def get_poll_info(self, instance):
@@ -209,6 +210,10 @@ class PostSerializer(serializers.ModelSerializer):
         request = self.context['request']
         return user_can_delete(request.user, instance)
 
+    def get_tagged_users(self, instance):
+        result = instance.tagged_users.all()
+        return UserInfoSerializer(result, many=True, read_only=True).data
+
     def create(self, validated_data):
         validate_priority(validated_data)
         return super(PostSerializer, self).create(validated_data)
@@ -235,6 +240,7 @@ class PostDetailSerializer(PostSerializer):
             "priority", "prior_till", "shared_with", "images", "documents", "videos",
             "is_owner", "can_edit", "can_delete", "has_appreciated",
             "appreciation_count", "appreciated_by", "comments_count", "comments",
+            "tagged_users",
         )
 
     def get_comments(self, instance):
