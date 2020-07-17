@@ -1,11 +1,13 @@
 from __future__ import division, print_function, unicode_literals
 
+from django.conf import settings
 from django.db.models import Q
 from django.http import Http404
+from django.utils.module_loading import import_string
 from django.utils.translation import ugettext as _
 
 from rest_framework import permissions, viewsets, serializers, status, views
-from rest_framework.decorators import detail_route, list_route
+from rest_framework.decorators import api_view, detail_route, list_route, permission_classes
 from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import MultiPartParser, FormParser, FileUploadParser, JSONParser
 from rest_framework.response import Response
@@ -20,7 +22,12 @@ from .serializers import (
     DocumentsSerializer, PostLikedSerializer, PostSerializer, PostDetailSerializer,
     PollsAnswerSerializer, ImagesSerializer, UserInfoSerializer, VideosSerializer,
 )
-from .utils import accessible_posts_by_user, user_can_delete, user_can_edit
+from .utils import (
+    accessible_posts_by_user, tag_users_to_post, user_can_delete, user_can_edit
+)
+
+CustomUser = import_string(settings.CUSTOM_USER_MODEL)
+DEPARTMENT_MODEL = import_string(settings.DEPARTMENT_MODEL)
 
 
 class PostViewSet(viewsets.ModelViewSet):
@@ -37,6 +44,15 @@ class PostViewSet(viewsets.ModelViewSet):
         data = {k: v for k, v in payload.items()}
         delete_image_ids = data.get('delete_image_ids', None)
         delete_document_ids = data.get('delete_document_ids', None)
+        tag_users = data.get('tag_users', None)
+        if tag_users:
+            tag_users = [u.strip() for u in tag_users.split(',')]
+            try:
+                tag_users = list(map(int, tag_users))
+                data['tag_users'] = tag_users
+            except ValueError:
+                raise serializers.ValidationError(
+                    _("Improper values submitted for user ids to tag"))
 
         if delete_image_ids:
             delete_image_ids = delete_image_ids.split(",")
@@ -111,10 +127,13 @@ class PostViewSet(viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         data = self._create_or_update(request, create=True)
+        tag_users = data.get('tag_users', None)
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
         instance = serializer.save()
         post_id = instance.id
+        if tag_users:
+            tag_users_to_post(instance, tag_users)
 
         if request.FILES:
             self._upload_files(request, post_id)
@@ -126,9 +145,12 @@ class PostViewSet(viewsets.ModelViewSet):
         if not user_can_edit(user, instance):
             raise serializers.ValidationError(_("You do not have permission to edit"))
         data = self._create_or_update(request)
+        tag_users = data.get('tag_users', None)
         data["created_by"] = instance.created_by.id
         serializer = self.get_serializer(instance, data=data)
         serializer.is_valid(raise_exception=True)
+        if tag_users:
+            tag_users_to_post(instance, tag_users)
         if request.FILES:
             self._upload_files(request, instance.pk)
         self.perform_update(serializer)
@@ -450,3 +472,30 @@ class CommentViewset(viewsets.ModelViewSet):
         return Response({
             "message": message, "liked": liked, "count": count, "user_info":user_info},
             status=response_status)
+
+
+@api_view(['GET'])
+@permission_classes((permissions.IsAuthenticated,))
+def search_user(request):
+    """
+    Search users based on the search term
+    """
+    search_term = request.GET.get('term', None)
+    query = request.GET.get('q', 'organization')
+    user = request.user
+    result = CustomUser.objects.filter(organization=user.organization)
+
+    dept_users = []
+
+    if query == 'department':
+        for dept in DEPARTMENT_MODEL.objects.filter(users=user):
+            for usr in dept.users.all():
+                dept_users.append(usr.id)
+        result = result.filter(id__in=dept_users)
+    result = result.exclude(id=user.id)
+    if search_term:
+        result = result.filter(
+            Q(email__istartswith=search_term) |
+            Q(first_name__istartswith=search_term))
+    serializer = UserInfoSerializer(result, many=True)
+    return Response(serializer.data)

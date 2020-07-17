@@ -63,6 +63,10 @@ class Post(UserInfo):
     modified_by = models.ForeignKey(CustomUser, related_name="post_modifier", null=True)
     modified_on = models.DateTimeField(auto_now=True, null=True, blank=True)
     mark_delete = models.BooleanField(default=False)
+    tagged_users = models.ManyToManyField(
+        CustomUser, related_name="tagged_users",
+        through="PostTaggedUsers", blank=True
+    )
 
     @property
     def is_poll(self):
@@ -111,6 +115,15 @@ class Post(UserInfo):
         Voter.objects.create(answer=answer, user=user, question=self)
         answer.votes = answer.votes + 1
         answer.save()
+
+    def tag_user(self, user):
+        PostTaggedUsers.objects.create(post=self, user=user)
+
+    def untag_user(self, user):
+        ptu = PostTaggedUsers.objects.filter(post=self, user=user)
+        if ptu:
+            for u in ptu:
+                u.delete()
 
     def related_answers(self):
         return PollsAnswer.objects.filter(question=self)
@@ -273,3 +286,9 @@ class Voter(models.Model):
     user = models.ForeignKey(CustomUser)
     question = models.ForeignKey(Post)
     date_voted = models.DateTimeField(auto_now_add=True)
+
+
+class PostTaggedUsers(models.Model):
+    post = models.ForeignKey(Post, on_delete=models.CASCADE)
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    tagged_on = models.DateTimeField(auto_now_add=True)

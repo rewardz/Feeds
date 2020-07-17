@@ -13,6 +13,7 @@ from .models import Post
 
 DEPARTMENT_MODEL = import_string(settings.DEPARTMENT_MODEL)
 ERROR_MESSAGE = "Priority post already exists for user. Set priority to false."
+USERMODEL = import_string(settings.CUSTOM_USER_MODEL)
 
 def accessible_posts_by_user(user, organization):
     if user.is_staff:
@@ -82,3 +83,23 @@ def user_can_delete(user, instance):
             return False
         return instance.created_by.id == user.id
     return True
+
+
+def tag_users_to_post(post, user_list):
+    existing_tagged_users = [u.id for u in post.tagged_users.all()]
+    remove_user_list = list(set(existing_tagged_users).difference(user_list))
+    new_users_tagged = list(set(user_list).difference(existing_tagged_users))
+    if new_users_tagged:
+        for user_id in new_users_tagged:
+            try:
+                user = USERMODEL.objects.get(id=user_id)
+                post.tag_user(user)
+            except Exception:
+                continue
+    if remove_user_list:
+        for user_id in remove_user_list:
+            try:
+                user = USERMODEL.objects.get(id=user_id)
+                post.untag_user(user)
+            except Exception:
+                continue
