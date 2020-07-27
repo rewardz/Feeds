@@ -25,7 +25,7 @@ from .serializers import (
     UserInfoSerializer, VideosSerializer,
 )
 from .utils import (
-    accessible_posts_by_user, push_notification, tag_users_to_post,
+    accessible_posts_by_user, notify_new_comment, push_notification, tag_users_to_post,
     user_can_delete, user_can_edit,
 )
 
@@ -246,6 +246,9 @@ class PostViewSet(viewsets.ModelViewSet):
             serializer = CommentCreateSerializer(data=data)
             serializer.is_valid(raise_exception=True)
             serializer.save()
+            post = Post.objects.filter(id=post_id).first()
+            if post:
+                notify_new_comment(post, self.request.user)
             return Response(serializer.data)
     
     @detail_route(methods=["POST"], permission_classes=(permissions.IsAuthenticated,))

@@ -9,7 +9,7 @@ from django.utils.module_loading import import_string
 from rest_framework import exceptions
 
 from .constants import POST_TYPE, SHARED_WITH
-from .models import Post
+from .models import Comment, Post
 
 DEPARTMENT_MODEL = import_string(settings.DEPARTMENT_MODEL)
 ERROR_MESSAGE = "Priority post already exists for user. Set priority to false."
@@ -108,6 +108,14 @@ def tag_users_to_post(post, user_list):
                 post.untag_user(user)
             except Exception:
                 continue
+
+
+def notify_new_comment(post, creator):
+    commentator_ids = Comment.objects.filter(post=post).values_list('created_by__id', flat=True)
+    commentators = USERMODEL.objects.filter(id__in=commentator_ids).exclude(id=creator.id)
+    for usr in commentators:
+        message = _("%s commented on the post." % str(creator))
+        push_notification(creator, message, usr)
 
 
 def add_email(to, from_user, subject, body, email_type):
