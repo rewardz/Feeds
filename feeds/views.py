@@ -25,7 +25,8 @@ from .serializers import (
     UserInfoSerializer, VideosSerializer,
 )
 from .utils import (
-    accessible_posts_by_user, tag_users_to_post, user_can_delete, user_can_edit
+    accessible_posts_by_user, push_notification, tag_users_to_post,
+    user_can_delete, user_can_edit,
 )
 
 CustomUser = import_string(settings.CUSTOM_USER_MODEL)
@@ -273,6 +274,10 @@ class PostViewSet(viewsets.ModelViewSet):
                 message = "Successfully Liked"
                 liked = True
                 response_status = status.HTTP_201_CREATED
+                post = Post.objects.filter(id=post_id).first()
+                if post:
+                    notif_message = _("%s liked your post" % str(user))
+                    push_notification(user, notif_message, post.created_by)
         count = PostLiked.objects.filter(post_id=post_id).count()
         user_info = UserInfoSerializer(user).data
         return Response({
