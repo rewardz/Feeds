@@ -498,6 +498,10 @@ class CommentViewset(viewsets.ModelViewSet):
             message = "Successfully Liked"
             liked = True
             response_status = status.HTTP_200_OK
+            comment = Comment.objects.filter(id=comment_id).first()
+            if comment:
+                notif_message = _("%s has liked your comment" % str(user))
+                push_notification(user, notif_message, comment.created_by)
         count = CommentLiked.objects.filter(comment_id=comment_id).count()
         user_info = UserInfoSerializer(user).data
         return Response({
