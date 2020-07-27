@@ -26,7 +26,8 @@ from .serializers import (
 )
 from .utils import (
     accessible_posts_by_user, notify_new_comment, notify_new_poll_created,
-    push_notification, tag_users_to_post, user_can_delete, user_can_edit,
+    notify_flagged_post, push_notification, tag_users_to_post,
+    user_can_delete, user_can_edit,
 )
 
 CustomUser = import_string(settings.CUSTOM_USER_MODEL)
@@ -387,6 +388,7 @@ class PostViewSet(viewsets.ModelViewSet):
             serializer = FlagPostSerializer(data=data)
             serializer.is_valid(raise_exception=True)
             serializer.save()
+            notify_flagged_post(post, self.request.user, data["notes"])
             return Response(serializer.data)
         except Post.DoesNotExist:
             raise ValidationError(_('Post does not exist.'))

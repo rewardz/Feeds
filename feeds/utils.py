@@ -133,15 +133,28 @@ def notify_new_poll_created(poll):
         push_notification(creator, message, usr)
 
 
+def notify_flagged_post(post, user, reason):
+    admin_users = USERMODEL.objects.filter(
+        organization=user.organization, is_staff=True
+    )
+    message = _("%s has reported the post %s" % (str(user), str(post.id)))
+    subject = _("Inappropriate post")
+    body = _(
+        "User has marked the post in-appropriate due to the following reason"
+        + "\n" + str(reason)
+    )
+    for usr in admin_users:
+        push_notification(user, message, usr)
+        add_email(usr.email, user.email, subject, body)
 
-def add_email(to, from_user, subject, body, email_type):
+
+def add_email(to, from_user, subject, body):
     try:
         PENDING_EMAIL_MODEL.objects.create(
             to = to,
             from_user = from_user,
             subject = subject,
-            body = body,
-            type = email_type
+            body = body
         )
         return True
     except Exception:
