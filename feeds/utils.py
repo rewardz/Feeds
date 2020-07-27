@@ -97,6 +97,8 @@ def tag_users_to_post(post, user_list):
             try:
                 user = USERMODEL.objects.get(id=user_id)
                 post.tag_user(user)
+                message = _("You are tagged to a post by %s" % str(post.created_by))
+                push_notification(post.created_by, message, user)
             except Exception:
                 continue
     if remove_user_list:
