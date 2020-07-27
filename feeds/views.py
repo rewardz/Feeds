@@ -14,13 +14,15 @@ from rest_framework.response import Response
 
 from .constants import POST_TYPE, SHARED_WITH
 from .models import (
-    Comment, Documents, Post, PostLiked, PollsAnswer, Images, CommentLiked,
+    Comment, Documents, FlagPost, Post, PostLiked, PollsAnswer,
+    Images, CommentLiked,
 )
 from .paginator import FeedsResultsSetPagination
 from .serializers import (
     CommentDetailSerializer, CommentSerializer, CommentCreateSerializer,
-    DocumentsSerializer, PostLikedSerializer, PostSerializer, PostDetailSerializer,
-    PollsAnswerSerializer, ImagesSerializer, UserInfoSerializer, VideosSerializer,
+    DocumentsSerializer, FlagPostSerializer, PostLikedSerializer, PostSerializer,
+    PostDetailSerializer, PollsAnswerSerializer, ImagesSerializer,
+    UserInfoSerializer, VideosSerializer,
 )
 from .utils import (
     accessible_posts_by_user, tag_users_to_post, user_can_delete, user_can_edit
@@ -355,6 +357,30 @@ class PostViewSet(viewsets.ModelViewSet):
             raise ValidationError(_('This is not a correct answer.'))
         serializer = self.get_serializer(poll)
         return Response(serializer.data)
+
+    @detail_route(methods=["POST"], permission_classes=(permissions.IsAuthenticated,))
+    def flag(self, request, *args, **kwargs):
+        user = self.request.user
+        organization = user.organization
+        post_id = self.kwargs.get("pk", None)
+        payload = self.request.data
+        data = {k: v for k, v in payload.items()}
+        if not post_id:
+            raise ValidationError(_('Post ID required to vote'))
+        post_id = int(post_id)
+        accessible_posts = accessible_posts_by_user(user, organization).values_list('id', flat=True)
+        if post_id not in accessible_posts:
+            raise ValidationError(_('You do not have access'))
+        data["flagger"] = user.id
+        try:
+            post = Post.objects.get(id=post_id)
+            data["post"] = post.pk
+            serializer = FlagPostSerializer(data=data)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response(serializer.data)
+        except Post.DoesNotExist:
+            raise ValidationError(_('Post does not exist.'))
 
 
 class ImagesView(views.APIView):

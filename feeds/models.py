@@ -292,3 +292,13 @@ class PostTaggedUsers(models.Model):
     post = models.ForeignKey(Post, on_delete=models.CASCADE)
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     tagged_on = models.DateTimeField(auto_now_add=True)
+
+
+class FlagPost(models.Model):
+    post = models.ForeignKey(Post, on_delete=models.CASCADE)
+    flagger = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    notes = models.TextField(verbose_name='reason')
+    accepted = models.BooleanField(default=False)
+    created_on = models.DateTimeField(auto_now_add=True)
+    modified_on = models.DateTimeField(auto_now=True)
+    notified = models.BooleanField(default=True)

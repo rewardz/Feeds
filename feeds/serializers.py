@@ -8,7 +8,7 @@ from rest_framework import exceptions, serializers
 
 from .constants import POST_TYPE
 from .models import (
-    Comment, CommentLiked, Documents, Post, PostLiked, PollsAnswer,
+    Comment, CommentLiked, Documents, FlagPost, Post, PostLiked, PollsAnswer,
     Images, Videos, Voter,
 )
 from .utils import (
@@ -410,3 +410,17 @@ class CommentsLikedSerializer(serializers.ModelSerializer):
         representation = super(CommentsLikedSerializer, self).to_representation(instance)
         representation["created_on"] = instance.created_on.strftime("%Y-%m-%d")
         return representation
+
+
+class FlagPostSerializer(serializers.ModelSerializer):
+    user_info = serializers.SerializerMethodField()
+
+    class Meta:
+        model = FlagPost
+        fields = (
+            "user_info", "accepted", "notified", "notes", "flagger", "post",
+        )
+
+    def get_user_info(self, instance):
+        user_detail = UserModel.objects.get(pk=instance.flagger.id)
+        return UserInfoSerializer(user_detail).data
