@@ -14,6 +14,9 @@ from .models import Post
 DEPARTMENT_MODEL = import_string(settings.DEPARTMENT_MODEL)
 ERROR_MESSAGE = "Priority post already exists for user. Set priority to false."
 USERMODEL = import_string(settings.CUSTOM_USER_MODEL)
+PENDING_EMAIL_MODEL = import_string(settings.PENDING_EMAIL)
+PUSH_NOTIFICATION_MODEL = import_string(settings.PUSH_NOTIFICATION)
+
 
 def accessible_posts_by_user(user, organization):
     if user.is_staff:
@@ -103,3 +106,29 @@ def tag_users_to_post(post, user_list):
                 post.untag_user(user)
             except Exception:
                 continue
+
+
+def add_email(to, from_user, subject, body, email_type):
+    try:
+        PENDING_EMAIL_MODEL.objects.create(
+            to = to,
+            from_user = from_user,
+            subject = subject,
+            body = body,
+            type = email_type
+        )
+        return True
+    except Exception:
+        return False
+
+
+def push_notification(sender, message, recipient):
+    try:
+        PUSH_NOTIFICATION_MODEL.objects.create(
+            sender=sender,
+            message=message,
+            recipient=recipient
+        )
+        return True
+    except Exception:
+        return False
