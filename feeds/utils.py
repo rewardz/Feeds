@@ -118,6 +118,22 @@ def notify_new_comment(post, creator):
         push_notification(creator, message, usr)
 
 
+def notify_new_poll_created(poll):
+    creator = poll.created_by
+    accessible_users = []
+    if poll.shared_with == SHARED_WITH.SELF_DEPARTMENT:
+        for dept in DEPARTMENT_MODEL.objects.filter(users=creator):
+            for usr in dept.users.all():
+                accessible_users.append(usr)
+    elif poll.shared_with == SHARED_WITH.ALL_DEPARTMENTS:
+        for usr in USERMODEL.objects.filter(organization=creator.organization):
+            accessible_users.append(usr)
+    message = _("%s created a new poll." % str(creator))
+    for usr in accessible_users:
+        push_notification(creator, message, usr)
+
+
+
 def add_email(to, from_user, subject, body, email_type):
     try:
         PENDING_EMAIL_MODEL.objects.create(

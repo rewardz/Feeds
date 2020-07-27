@@ -25,8 +25,8 @@ from .serializers import (
     UserInfoSerializer, VideosSerializer,
 )
 from .utils import (
-    accessible_posts_by_user, notify_new_comment, push_notification, tag_users_to_post,
-    user_can_delete, user_can_edit,
+    accessible_posts_by_user, notify_new_comment, notify_new_poll_created,
+    push_notification, tag_users_to_post, user_can_delete, user_can_edit,
 )
 
 CustomUser = import_string(settings.CUSTOM_USER_MODEL)
@@ -208,6 +208,7 @@ class PostViewSet(viewsets.ModelViewSet):
             answer_serializer.is_valid(raise_exception=True)
             answer_serializer.save()
         result = self.get_serializer(poll)
+        notify_new_poll_created(poll)
         return Response(result.data)
     
     @detail_route(methods=["GET", "POST"], permission_classes=(permissions.IsAuthenticated,))
