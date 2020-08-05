@@ -16,6 +16,7 @@ ERROR_MESSAGE = "Priority post already exists for user. Set priority to false."
 USERMODEL = import_string(settings.CUSTOM_USER_MODEL)
 PENDING_EMAIL_MODEL = import_string(settings.PENDING_EMAIL)
 PUSH_NOTIFICATION_MODEL = import_string(settings.PUSH_NOTIFICATION)
+NOTIFICATION_OBJECT_TYPE = import_string(settings.POST_NOTIFICATION_OBJECT_TYPE).Posts
 
 
 def accessible_posts_by_user(user, organization):
@@ -92,13 +93,15 @@ def tag_users_to_post(post, user_list):
     existing_tagged_users = [u.id for u in post.tagged_users.all()]
     remove_user_list = list(set(existing_tagged_users).difference(user_list))
     new_users_tagged = list(set(user_list).difference(existing_tagged_users))
+    object_type = NOTIFICATION_OBJECT_TYPE
     if new_users_tagged:
         for user_id in new_users_tagged:
             try:
                 user = USERMODEL.objects.get(id=user_id)
                 post.tag_user(user)
                 message = _("You are tagged to a post by %s" % str(post.created_by))
-                push_notification(post.created_by, message, user)
+                push_notification(post.created_by, message, user,
+                                  object_type=object_type, object_id=post.id)
             except Exception:
                 continue
     if remove_user_list:
@@ -113,9 +116,10 @@ def tag_users_to_post(post, user_list):
 def notify_new_comment(post, creator):
     commentator_ids = Comment.objects.filter(post=post).values_list('created_by__id', flat=True)
     commentators = USERMODEL.objects.filter(id__in=commentator_ids).exclude(id=creator.id)
+    object_type = NOTIFICATION_OBJECT_TYPE
     for usr in commentators:
         message = _("%s commented on the post." % str(creator))
-        push_notification(creator, message, usr)
+        push_notification(creator, message, usr, object_type=object_type, object_id=post.id)
 
 
 def notify_new_poll_created(poll):
@@ -129,8 +133,9 @@ def notify_new_poll_created(poll):
         for usr in USERMODEL.objects.filter(organization=creator.organization):
             accessible_users.append(usr)
     message = _("%s created a new poll." % str(creator))
+    object_type = NOTIFICATION_OBJECT_TYPE
     for usr in accessible_users:
-        push_notification(creator, message, usr)
+        push_notification(creator, message, usr, object_type=object_type, object_id=poll.id)
 
 
 def notify_flagged_post(post, user, reason):
@@ -143,8 +148,9 @@ def notify_flagged_post(post, user, reason):
         "User has marked the post in-appropriate due to the following reason"
         + "\n" + str(reason)
     )
+    object_type = NOTIFICATION_OBJECT_TYPE
     for usr in admin_users:
-        push_notification(user, message, usr)
+        push_notification(user, message, usr, object_type=object_type, object_id=post.id)
         add_email(usr.email, user.email, subject, body)
 
 
@@ -161,12 +167,14 @@ def add_email(to, from_user, subject, body):
         return False
 
 
-def push_notification(sender, message, recipient):
+def push_notification(sender, message, recipient, object_type=None, object_id=None):
     try:
         PUSH_NOTIFICATION_MODEL.objects.create(
             sender=sender,
             message=message,
-            recipient=recipient
+            recipient=recipient,
+            object_type=object_type,
+            object_id=object_id
         )
         return True
     except Exception:

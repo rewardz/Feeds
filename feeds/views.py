@@ -32,6 +32,7 @@ from .utils import (
 
 CustomUser = import_string(settings.CUSTOM_USER_MODEL)
 DEPARTMENT_MODEL = import_string(settings.DEPARTMENT_MODEL)
+NOTIFICATION_OBJECT_TYPE = import_string(settings.POST_NOTIFICATION_OBJECT_TYPE).Posts
 
 
 class PostViewSet(viewsets.ModelViewSet):
@@ -268,6 +269,7 @@ class PostViewSet(viewsets.ModelViewSet):
         message = None
         liked = False
         response_status = status.HTTP_304_NOT_MODIFIED
+        object_type = NOTIFICATION_OBJECT_TYPE
         if apreciation_type.lower() == "like":
             if PostLiked.objects.filter(post_id=post_id, created_by=user).exists():
                 PostLiked.objects.filter(post_id=post_id, created_by=user).delete()
@@ -282,7 +284,8 @@ class PostViewSet(viewsets.ModelViewSet):
                 post = Post.objects.filter(id=post_id).first()
                 if post:
                     notif_message = _("%s liked your post" % str(user))
-                    push_notification(user, notif_message, post.created_by)
+                    push_notification(user, notif_message, post.created_by,
+                                      object_type=object_type, object_id=post.id)
         count = PostLiked.objects.filter(post_id=post_id).count()
         user_info = UserInfoSerializer(user).data
         return Response({
