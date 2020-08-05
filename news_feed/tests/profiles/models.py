@@ -312,7 +312,7 @@ class PushNotification(models.Model):
         CustomUser, related_name="recipient",
         blank=True, null=True
     )
-
+    object_id = models.PositiveIntegerField(null=True, blank=True)
     object_type = models.SmallIntegerField(null=False, blank=True,
                                            default=NOTIFICATION_OBJECTS.Plain,
                                            choices=NOTIFICATION_OBJECTS())

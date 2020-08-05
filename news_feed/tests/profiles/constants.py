@@ -7,6 +7,7 @@ PLAIN = 0
 EVENT = 1
 REWARD = 2
 SURVEY = 3
+POSTS = 4
 
 UNREAD = 0
 READ = 1
@@ -22,6 +23,7 @@ NOTIFICATION_OBJECTS = Choices({
     "Event": EVENT,
     "Reward": REWARD,
     "Survey": SURVEY,
+    "Posts": POSTS,
 })
 
 NOTIFICATION_STATES = Choices({
