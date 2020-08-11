@@ -2,7 +2,9 @@ from django.contrib import admin
 from django.contrib.admin.widgets import FilteredSelectMultiple
 from django.db import models
 
-from news_feed.tests.profiles.models import CustomUser, Department, Organization
+from news_feed.tests.profiles.models import (
+    CustomUser, Department, Organization, PendingEmail, PushNotification
+)
 
 
 @admin.register(CustomUser)
@@ -43,3 +45,17 @@ class DepartmentAdmin(admin.ModelAdmin):
             "widget": FilteredSelectMultiple("", is_stacked=False)
         }
     }
+
+
+@admin.register(PendingEmail)
+class PendingEmailAdmin(admin.ModelAdmin):
+    list_display = ('to', 'from_user', 'subject', 'status')
+    list_filter = ('status',)
+    search_fields = ('to', 'from_user',)
+
+
+@admin.register(PushNotification)
+class PushNotificationAdmin(admin.ModelAdmin):
+    list_display = ('sender', 'recipient', 'state', 'status',)
+    list_filter = ('state', 'status',)
+    search_fields = ('sender',)

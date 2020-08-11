@@ -1,3 +1,5 @@
+from __future__ import division, print_function, unicode_literals
+
 import logging
 
 from django.conf import settings
@@ -11,6 +13,8 @@ from cropimg.fields import CIImageField, CIThumbnailField
 from easy_thumbnails.exceptions import InvalidImageFormatError
 from easy_thumbnails.files import get_thumbnailer
 from model_helpers import upload_to
+
+from.constants import NOTIFICATION_OBJECTS, NOTIFICATION_STATES, NOTIFICATION_STATUS
 
 
 logger = logging.getLogger(__name__)
@@ -250,3 +254,91 @@ class PasswordHistory(models.Model):
     class Meta:
         verbose_name = "Password history entry"
         verbose_name_plural = "Password history entries"
+
+
+class PendingEmail(models.Model):
+    """
+    This model keeps record of all the weekly mails sent.
+
+    Status is set to pending by default
+    Once email sending process is success then this record is deleted
+    If email sending process failed then status is set to error
+    """
+    PENDING = 0
+    ERROR = 1
+    SENT = 3
+    SPAM = 4
+    BOUNCED = 5
+
+    EMAIL_STATUS = (
+        (PENDING, 'Pending'),
+        (ERROR, 'Error'),
+        (SENT, 'Sent'),
+        (SPAM, 'Spam'),
+        (BOUNCED, 'Bounced'),
+    )
+    EMAIL_TYPE = ("HTML", "Text")
+    to = models.EmailField(verbose_name=_("Destination Email"), max_length=255)
+    from_user = models.EmailField(verbose_name=_("Sender email"), max_length=255, blank=True, null=True)
+    subject = models.CharField(verbose_name=_("Email Subject"), max_length=255)
+    body = models.TextField(verbose_name=_("Email Body"))
+    type = models.SmallIntegerField(verbose_name=_("type"), choices=list(enumerate(EMAIL_TYPE)), default=0, blank=True)
+    status = models.PositiveSmallIntegerField(verbose_name=_("status"), choices=EMAIL_STATUS, default=PENDING, db_index=True)
+    remarks = models.TextField(null=True, blank=True, verbose_name=_("remarks"))
+    created = models.DateTimeField(auto_now_add=True, verbose_name=_("created"))
+
+    class Meta:
+        verbose_name = _("pending email")
+        verbose_name_plural = _("pending emails")
+
+    def __unicode__(self):
+        return u"%s - %s" % (self.to, self.subject)
+
+
+class PushNotification(models.Model):
+    IMAGE_SIZES = {
+        "thumbnail": (150, 150),
+        "display": (320, 251)
+    }
+
+    sender = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    message = models.TextField(
+        blank=True, null=True, max_length=255,
+        help_text="You have 255 characters left."
+    )
+    image = CIImageField(upload_to="notifications/", blank=True, null=True)
+
+    recipient = models.ForeignKey(
+        CustomUser, related_name="recipient",
+        blank=True, null=True
+    )
+    object_id = models.PositiveIntegerField(null=True, blank=True)
+    object_type = models.SmallIntegerField(null=False, blank=True,
+                                           default=NOTIFICATION_OBJECTS.Plain,
+                                           choices=NOTIFICATION_OBJECTS())
+
+    state = models.SmallIntegerField(null=False,
+                                     default=NOTIFICATION_STATES.unread,
+                                     choices=NOTIFICATION_STATES())
+    status = models.SmallIntegerField(null=False,
+                                      default=NOTIFICATION_STATUS.unsent,
+                                      choices=NOTIFICATION_STATUS())
+
+    is_read = models.BooleanField(default=False)
+    url = models.URLField(null=True, blank=True)
+    created = models.DateTimeField(auto_now_add=True)
+    updated = models.DateTimeField(auto_now=True)
+
+    def __unicode__(self):
+        return "{sender} - {recipient}".format(sender=self.sender,
+                                               recipient=self.recipient)
+
+    def save(self, *args, **kwargs):
+        if not self.image:
+            self.image = self.image
+        super(PushNotification, self).save(*args, **kwargs)
+
+    class Meta:
+        verbose_name = "Notification"
+        verbose_name_plural = "PushNotification"
+        ordering = ("-created", )

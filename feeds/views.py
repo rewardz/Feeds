@@ -25,11 +25,14 @@ from .serializers import (
     UserInfoSerializer, VideosSerializer,
 )
 from .utils import (
-    accessible_posts_by_user, tag_users_to_post, user_can_delete, user_can_edit
+    accessible_posts_by_user, notify_new_comment, notify_new_poll_created,
+    notify_flagged_post, push_notification, tag_users_to_post,
+    user_can_delete, user_can_edit,
 )
 
 CustomUser = import_string(settings.CUSTOM_USER_MODEL)
 DEPARTMENT_MODEL = import_string(settings.DEPARTMENT_MODEL)
+NOTIFICATION_OBJECT_TYPE = import_string(settings.POST_NOTIFICATION_OBJECT_TYPE).Posts
 
 
 class PostViewSet(viewsets.ModelViewSet):
@@ -207,6 +210,7 @@ class PostViewSet(viewsets.ModelViewSet):
             answer_serializer.is_valid(raise_exception=True)
             answer_serializer.save()
         result = self.get_serializer(poll)
+        notify_new_poll_created(poll)
         return Response(result.data)
     
     @detail_route(methods=["GET", "POST"], permission_classes=(permissions.IsAuthenticated,))
@@ -245,6 +249,9 @@ class PostViewSet(viewsets.ModelViewSet):
             serializer = CommentCreateSerializer(data=data)
             serializer.is_valid(raise_exception=True)
             serializer.save()
+            post = Post.objects.filter(id=post_id).first()
+            if post:
+                notify_new_comment(post, self.request.user)
             return Response(serializer.data)
     
     @detail_route(methods=["POST"], permission_classes=(permissions.IsAuthenticated,))
@@ -262,6 +269,7 @@ class PostViewSet(viewsets.ModelViewSet):
         message = None
         liked = False
         response_status = status.HTTP_304_NOT_MODIFIED
+        object_type = NOTIFICATION_OBJECT_TYPE
         if apreciation_type.lower() == "like":
             if PostLiked.objects.filter(post_id=post_id, created_by=user).exists():
                 PostLiked.objects.filter(post_id=post_id, created_by=user).delete()
@@ -273,6 +281,11 @@ class PostViewSet(viewsets.ModelViewSet):
                 message = "Successfully Liked"
                 liked = True
                 response_status = status.HTTP_201_CREATED
+                post = Post.objects.filter(id=post_id).first()
+                if post:
+                    notif_message = _("%s liked your post" % str(user))
+                    push_notification(user, notif_message, post.created_by,
+                                      object_type=object_type, object_id=post.id)
         count = PostLiked.objects.filter(post_id=post_id).count()
         user_info = UserInfoSerializer(user).data
         return Response({
@@ -378,6 +391,7 @@ class PostViewSet(viewsets.ModelViewSet):
             serializer = FlagPostSerializer(data=data)
             serializer.is_valid(raise_exception=True)
             serializer.save()
+            notify_flagged_post(post, self.request.user, data["notes"])
             return Response(serializer.data)
         except Post.DoesNotExist:
             raise ValidationError(_('Post does not exist.'))
@@ -493,6 +507,10 @@ class CommentViewset(viewsets.ModelViewSet):
             message = "Successfully Liked"
             liked = True
             response_status = status.HTTP_200_OK
+            comment = Comment.objects.filter(id=comment_id).first()
+            if comment:
+                notif_message = _("%s has liked your comment" % str(user))
+                push_notification(user, notif_message, comment.created_by)
         count = CommentLiked.objects.filter(comment_id=comment_id).count()
         user_info = UserInfoSerializer(user).data
         return Response({
