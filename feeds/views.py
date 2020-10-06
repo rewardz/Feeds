@@ -25,9 +25,9 @@ from .serializers import (
     UserInfoSerializer, VideosSerializer,
 )
 from .utils import (
-    accessible_posts_by_user, notify_new_comment, notify_new_poll_created,
-    notify_flagged_post, push_notification, tag_users_to_post,
-    user_can_delete, user_can_edit,
+    accessible_posts_by_user, get_user_name, notify_new_comment,
+    notify_new_poll_created, notify_flagged_post, push_notification,
+    tag_users_to_post, user_can_delete, user_can_edit,
 )
 
 CustomUser = import_string(settings.CUSTOM_USER_MODEL)
@@ -282,8 +282,10 @@ class PostViewSet(viewsets.ModelViewSet):
                 liked = True
                 response_status = status.HTTP_201_CREATED
                 post = Post.objects.filter(id=post_id).first()
+                user_name = get_user_name(user)
+                post_string = post.title[:20] + "..." if post.title else ""
                 if post:
-                    notif_message = _("%s liked your post" % str(user))
+                    notif_message = _("'%s' likes your post %s" % (user_name, post_string))
                     push_notification(user, notif_message, post.created_by,
                                       object_type=object_type, object_id=post.id)
         count = PostLiked.objects.filter(post_id=post_id).count()
@@ -508,8 +510,10 @@ class CommentViewset(viewsets.ModelViewSet):
             liked = True
             response_status = status.HTTP_200_OK
             comment = Comment.objects.filter(id=comment_id).first()
+            user_name = get_user_name(user)
+            comment_string = comment.content[:20] + "..." if comment.content else ""
             if comment:
-                notif_message = _("%s has liked your comment" % str(user))
+                notif_message = _("'%s' likes your comment %s" % (user_name, comment_string))
                 push_notification(user, notif_message, comment.created_by)
         count = CommentLiked.objects.filter(comment_id=comment_id).count()
         user_info = UserInfoSerializer(user).data

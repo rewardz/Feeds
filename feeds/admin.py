@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from feeds.models import Post, Comment, PostLiked, PollsAnswer
+from feeds.models import FlagPost, Post, Comment, PostLiked, PollsAnswer
 
 
 @admin.register(Post)
@@ -26,3 +26,8 @@ class PostLikedAdmin(admin.ModelAdmin):
 @admin.register(PollsAnswer)
 class PollsAnswerAdmin(admin.ModelAdmin):
     list_display = ('question', 'answer_text', 'votes', 'get_voters')
+
+
+@admin.register(FlagPost)
+class FlagPostAdmin(admin.ModelAdmin):
+    list_display = ('post', 'flagger', 'notes', 'accepted', 'notified')
