@@ -17,6 +17,8 @@ USERMODEL = import_string(settings.CUSTOM_USER_MODEL)
 PENDING_EMAIL_MODEL = import_string(settings.PENDING_EMAIL)
 PUSH_NOTIFICATION_MODEL = import_string(settings.PUSH_NOTIFICATION)
 NOTIFICATION_OBJECT_TYPE = import_string(settings.POST_NOTIFICATION_OBJECT_TYPE).Posts
+NOTIF_OBJECT_TYPE_FIELD_NAME = settings.NOTIF_OBJECT_TYPE_FIELD_NAME
+NOTIF_OBJECT_ID_FIELD_NAME = settings.NOTIF_OBJECT_ID_FIELD_NAME
 
 
 def accessible_posts_by_user(user, organization):
@@ -208,20 +210,16 @@ def add_email(to, from_user, subject, body):
 
 def push_notification(sender, message, recipient, object_type=None, object_id=None):
     try:
-        if not object_type:
-            PUSH_NOTIFICATION_MODEL.objects.create(
-                sender=sender,
-                message=message,
-                recipient=recipient,
-            )
-        else:
-            PUSH_NOTIFICATION_MODEL.objects.create(
-                sender=sender,
-                message=message,
-                recipient=recipient,
-                object_type=object_type,
-                object_id=object_id
-            )
+        notification = PUSH_NOTIFICATION_MODEL.objects.create(
+            sender=sender,
+            message=message,
+            recipient=recipient,
+        )
+        if object_type:
+            setattr(notification, NOTIF_OBJECT_TYPE_FIELD_NAME, object_type)
+        if object_id:
+            setattr(notification, NOTIF_OBJECT_ID_FIELD_NAME, object_id)
+        notification.save()
         return True
     except Exception:
         return False
