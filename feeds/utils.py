@@ -71,6 +71,21 @@ def get_profile_image(user):
     return getattr(user, profile_image, settings.NO_PROFILE_IMAGE)
 
 
+def get_user_name(user):
+    """
+    This function returns the user name as "first_name" + "last_name"
+    if first_name exists else returns the user email
+    """
+    first_name = settings.PROFILE_FIRST_NAME
+    last_name = settings.PROFILE_LAST_NAME
+    fname = getattr(user, first_name, None)
+    lname = getattr(user, last_name, None)
+    if not fname:
+        return user.email
+    else:
+        return fname + " " + lname if lname else fname
+
+
 def user_can_edit(user, instance):
     if instance.post_type == POST_TYPE.USER_CREATED_POLL:
         return False
@@ -94,12 +109,14 @@ def tag_users_to_post(post, user_list):
     remove_user_list = list(set(existing_tagged_users).difference(user_list))
     new_users_tagged = list(set(user_list).difference(existing_tagged_users))
     object_type = NOTIFICATION_OBJECT_TYPE
+    created_by_user_name = get_user_name(post.created_by)
+    post_str = post.title[:20] + "..." if post.title else ""
     if new_users_tagged:
         for user_id in new_users_tagged:
             try:
                 user = USERMODEL.objects.get(id=user_id)
                 post.tag_user(user)
-                message = _("You are tagged to a post by %s" % str(post.created_by))
+                message = _("'%s' has mentioned you in post '%s'" % (created_by_user_name, post_str))
                 push_notification(post.created_by, message, user,
                                   object_type=object_type, object_id=post.id)
             except Exception:
@@ -115,11 +132,30 @@ def tag_users_to_post(post, user_list):
 
 def notify_new_comment(post, creator):
     commentator_ids = Comment.objects.filter(post=post).values_list('created_by__id', flat=True)
+    # get all the commentators except the one currently commenting
     commentators = USERMODEL.objects.filter(id__in=commentator_ids).exclude(id=creator.id)
+    # also exclude the creator of the post
+    commentators = commentators.exclude(id=post.created_by.id)
     object_type = NOTIFICATION_OBJECT_TYPE
+
+    comment_creator_string = get_user_name(creator)
+    post_string = post.title[:20] + "..." if post.title else ""
+
     for usr in commentators:
-        message = _("%s commented on the post." % str(creator))
-        push_notification(creator, message, usr, object_type=object_type, object_id=post.id)
+        message = _("'%s' commented on the post '%s'" % (comment_creator_string, post_string))
+        push_notification(
+            creator, message, usr, object_type=object_type, object_id=post.id
+        )
+
+    # post creator always receives a notification when a new comment is made
+    try:
+        post_creator = USERMODEL.objects.get(id=post.created_by.id)
+        message = _("'%s' commented on your post '%s'" % (comment_creator_string, post_string))
+        push_notification(
+            creator, message, post_creator, object_type=object_type, object_id=post.id
+        )
+    except Exception:
+        pass
 
 
 def notify_new_poll_created(poll):
@@ -132,7 +168,8 @@ def notify_new_poll_created(poll):
     elif poll.shared_with == SHARED_WITH.ALL_DEPARTMENTS:
         for usr in USERMODEL.objects.filter(organization=creator.organization):
             accessible_users.append(usr)
-    message = _("%s created a new poll." % str(creator))
+    user_name = get_user_name(creator)
+    message = _("'%s' started a new poll." % user_name)
     object_type = NOTIFICATION_OBJECT_TYPE
     for usr in accessible_users:
         push_notification(creator, message, usr, object_type=object_type, object_id=poll.id)
@@ -142,7 +179,9 @@ def notify_flagged_post(post, user, reason):
     admin_users = USERMODEL.objects.filter(
         organization=user.organization, is_staff=True
     )
-    message = _("%s has reported the post %s" % (str(user), str(post.id)))
+    user_name = get_user_name(user)
+    post_string = post.title[:20] if post.title else ""
+    message = _("'%s' has reported the post '%s'" % (user_name, post_string))
     subject = _("Inappropriate post")
     body = _(
         "User has marked the post in-appropriate due to the following reason"
@@ -169,13 +208,20 @@ def add_email(to, from_user, subject, body):
 
 def push_notification(sender, message, recipient, object_type=None, object_id=None):
     try:
-        PUSH_NOTIFICATION_MODEL.objects.create(
-            sender=sender,
-            message=message,
-            recipient=recipient,
-            object_type=object_type,
-            object_id=object_id
-        )
+        if not object_type:
+            PUSH_NOTIFICATION_MODEL.objects.create(
+                sender=sender,
+                message=message,
+                recipient=recipient,
+            )
+        else:
+            PUSH_NOTIFICATION_MODEL.objects.create(
+                sender=sender,
+                message=message,
+                recipient=recipient,
+                object_type=object_type,
+                object_id=object_id
+            )
         return True
     except Exception:
         return False
