@@ -25,7 +25,7 @@ from .serializers import (
     UserInfoSerializer, VideosSerializer,
 )
 from .utils import (
-    accessible_posts_by_user, get_user_name, notify_new_comment,
+    accessible_posts_by_user, extract_tagged_users, get_user_name, notify_new_comment,
     notify_new_poll_created, notify_flagged_post, push_notification,
     tag_users_to_post, user_can_delete, user_can_edit,
 )
@@ -49,15 +49,22 @@ class PostViewSet(viewsets.ModelViewSet):
         data = {k: v for k, v in payload.items()}
         delete_image_ids = data.get('delete_image_ids', None)
         delete_document_ids = data.get('delete_document_ids', None)
-        tag_users = data.get('tag_users', None)
+
+        tag_users = []
+        title_str = data.get('title', None)
+        if title_str:
+            title_tagged = extract_tagged_users(title_str)
+            if title_tagged:
+                tag_users.extend(title_tagged)
+
+        description_str = data.get('description', None)
+        if description_str:
+            description_tagged = extract_tagged_users(description_str)
+            if description_tagged:
+                tag_users.extend(description_tagged)
+
         if tag_users:
-            tag_users = [u.strip() for u in tag_users.split(',')]
-            try:
-                tag_users = list(map(int, tag_users))
-                data['tag_users'] = tag_users
-            except ValueError:
-                raise serializers.ValidationError(
-                    _("Improper values submitted for user ids to tag"))
+            data['tag_users'] = tag_users
 
         if delete_image_ids:
             delete_image_ids = delete_image_ids.split(",")

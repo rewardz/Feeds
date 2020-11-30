@@ -1,5 +1,7 @@
 from __future__ import division, print_function, unicode_literals
 
+import re
+
 from django.conf import settings
 from django.db.models import Q
 from django.utils.translation import ugettext as _
@@ -223,3 +225,39 @@ def push_notification(sender, message, recipient, object_type=None, object_id=No
         return True
     except Exception:
         return False
+
+
+def extract_tagged_users(match_string):
+    pattern = "<tag.*?>(.*?)<\\/tag>"
+    matches = []
+    user_ids = []
+
+    matches_found = re.findall(pattern, match_string)
+    if matches_found:
+        matches.extend(matches_found)
+
+    if not matches:
+        return user_ids
+
+    for user_detail in matches:
+        user_info = extract_user_info(user_detail)
+        if not user_info:
+            continue
+        email = user_info['email_id']
+        try:
+            user = USERMODEL.objects.get(email=email)
+            user_ids.append(user.id)
+        except Exception:
+            continue
+    return user_ids
+
+
+def extract_user_info(user_detail):
+    user_info = {}
+    email_pattern = r"<email_id>(([\w.-]+)@([\w.-]+))</email_id>"
+    email_detail = re.compile(email_pattern).search(user_detail)
+    email_id = None
+    if email_detail:
+        email_id = email_detail.group(1)
+    user_info['email_id'] = email_id
+    return user_info
