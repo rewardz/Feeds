@@ -26,7 +26,7 @@ from .serializers import (
 )
 from .utils import (
     accessible_posts_by_user, extract_tagged_users, get_user_name, notify_new_comment,
-    notify_new_poll_created, notify_flagged_post, push_notification,
+    notify_new_poll_created, notify_flagged_post, push_notification, tag_users_to_comment,
     tag_users_to_post, user_can_delete, user_can_edit,
 )
 
@@ -250,12 +250,22 @@ class PostViewSet(viewsets.ModelViewSet):
         elif self.request.method == "POST":
             payload = self.request.data
             data = {k: v for k, v in payload.items()}
+
+            tag_users = []
+            content = data.get('content', None)
+            if content:
+                tagged = extract_tagged_users(content)
+                if tagged:
+                    tag_users.extend(tagged)
+
             data['post'] = post_id
             data['created_by'] = self.request.user.id
             data['modified_by'] = self.request.user.id
             serializer = CommentCreateSerializer(data=data)
             serializer.is_valid(raise_exception=True)
-            serializer.save()
+            inst = serializer.save()
+            if tag_users:
+                tag_users_to_comment(inst, tag_users)
             post = Post.objects.filter(id=post_id).first()
             if post:
                 notify_new_comment(post, self.request.user)
