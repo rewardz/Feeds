@@ -1,5 +1,7 @@
 from __future__ import division, print_function, unicode_literals
 
+import re
+
 from django.conf import settings
 from django.db.models import Q
 from django.utils.translation import ugettext as _
@@ -132,6 +134,32 @@ def tag_users_to_post(post, user_list):
                 continue
 
 
+def tag_users_to_comment(comment, user_list):
+    existing_tagged_users = [u.id for u in comment.tagged_users.all()]
+    remove_user_list = list(set(existing_tagged_users).difference(user_list))
+    new_users_tagged = list(set(user_list).difference(existing_tagged_users))
+    object_type = NOTIFICATION_OBJECT_TYPE
+    created_by_user_name = get_user_name(comment.created_by)
+    comment_str = comment.content[:20] + "..." if comment.content else ""
+    if new_users_tagged:
+        for user_id in new_users_tagged:
+            try:
+                user = USERMODEL.objects.get(id=user_id)
+                comment.tag_user(user)
+                message = _("'%s' has mentioned you in comment '%s'" % (created_by_user_name, comment_str))
+                push_notification(comment.created_by, message, user,
+                                  object_type=object_type, object_id=comment.id)
+            except Exception:
+                continue
+    if remove_user_list:
+        for user_id in remove_user_list:
+            try:
+                user = USERMODEL.objects.get(id=user_id)
+                comment.untag_user(user)
+            except Exception:
+                continue
+
+
 def notify_new_comment(post, creator):
     commentator_ids = Comment.objects.filter(post=post).values_list('created_by__id', flat=True)
     # get all the commentators except the one currently commenting
@@ -223,3 +251,50 @@ def push_notification(sender, message, recipient, object_type=None, object_id=No
         return True
     except Exception:
         return False
+
+
+def extract_tagged_users(match_string):
+    pattern = "<tag.*?>(.*?)<\\/tag>"
+    matches = []
+    user_ids = []
+
+    matches_found = re.findall(pattern, match_string)
+    if matches_found:
+        matches.extend(matches_found)
+
+    if not matches:
+        return user_ids
+
+    for user_detail in matches:
+        user_info = extract_user_info(user_detail)
+        if not user_info:
+            continue
+        email = user_info['email_id']
+        user_id = user_info['user_id']
+        if not user_id:
+            try:
+                user = USERMODEL.objects.get(email=email)
+                user_ids.append(user.id)
+            except Exception:
+                continue
+        else:
+            user_ids.append(user_id)
+    return user_ids
+
+
+def extract_user_info(user_detail):
+    user_info = {}
+    email_pattern = r"<email_id>(([\w.-]+)@([\w.-]+))</email_id>"
+    email_detail = re.compile(email_pattern).search(user_detail)
+    email_id = None
+    if email_detail:
+        email_id = email_detail.group(1)
+    user_info['email_id'] = email_id
+
+    user_id_pattern = r"<user_id>([0-9]+)</user_id>"
+    user_id_detail = re.compile(user_id_pattern).search(user_detail)
+    user_id = None
+    if user_id_detail:
+        user_id = user_id_detail.group(1)
+    user_info['user_id'] = user_id
+    return user_info

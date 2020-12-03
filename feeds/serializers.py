@@ -273,12 +273,13 @@ class CommentSerializer(serializers.ModelSerializer):
     liked_count = serializers.SerializerMethodField()
     liked_by = serializers.SerializerMethodField()
     has_liked = serializers.SerializerMethodField()
+    tagged_users = serializers.SerializerMethodField()
 
     class Meta:
         model = Comment
         fields = ("id", "content", "created_by", "created_on", "modified_by",
                   "modified_on", "post", "commented_by_user_info",
-                  "liked_count", "liked_by", "has_liked")
+                  "liked_count", "liked_by", "has_liked", "tagged_users",)
 
     def get_commented_by_user_info(self, instance):
         created_by = instance.created_by
@@ -291,6 +292,10 @@ class CommentSerializer(serializers.ModelSerializer):
     def get_liked_by(self, instance):
         result = CommentLiked.objects.filter(comment=instance).order_by('-created_on')
         return CommentsLikedSerializer(result, many=True, read_only=True).data
+
+    def get_tagged_users(self, instance):
+        result = instance.tagged_users.all()
+        return UserInfoSerializer(result, many=True, read_only=True).data
 
     def get_has_liked(self, instance):
         request = self.context['request']
@@ -325,7 +330,7 @@ class CommentDetailSerializer(CommentSerializer):
         fields = (
             "id", "content", "created_by", "created_on", "modified_by",
             "modified_on", "post", "commented_by_user_info",
-            "liked_count", "liked_by", "has_liked"
+            "liked_count", "liked_by", "has_liked", "tagged_users",
         )
 
 

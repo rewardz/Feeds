@@ -227,6 +227,19 @@ class Comment(UserInfo):
     post = models.ForeignKey(Post, on_delete=models.CASCADE)
     modified_by = models.ForeignKey(CustomUser, related_name="comment_modifier", null=True)
     modified_on = models.DateTimeField(auto_now=True, null=True, blank=True)
+    tagged_users = models.ManyToManyField(
+        CustomUser, related_name="comment_tagged_users",
+        through="CommentTaggedUsers", blank=True
+    )
+
+    def tag_user(self, user):
+        CommentTaggedUsers.objects.create(comment=self, user=user)
+
+    def untag_user(self, user):
+        ctu = CommentTaggedUsers.objects.filter(comment=self, user=user)
+        if ctu:
+            for u in ctu:
+                u.delete()
 
     def __unicode__(self):
         return "%s" % self.content
@@ -290,6 +303,12 @@ class Voter(models.Model):
 
 class PostTaggedUsers(models.Model):
     post = models.ForeignKey(Post, on_delete=models.CASCADE)
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    tagged_on = models.DateTimeField(auto_now_add=True)
+
+
+class CommentTaggedUsers(models.Model):
+    comment = models.ForeignKey(Comment, on_delete=models.CASCADE)
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     tagged_on = models.DateTimeField(auto_now_add=True)
 
