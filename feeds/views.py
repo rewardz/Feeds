@@ -1,8 +1,14 @@
 from __future__ import division, print_function, unicode_literals
 
+import os
+import requests
+
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
 from django.conf import settings
 from django.db.models import Q
 from django.http import Http404
+from django.utils import timezone
 from django.utils.module_loading import import_string
 from django.utils.translation import ugettext as _
 
@@ -25,9 +31,9 @@ from .serializers import (
     UserInfoSerializer, VideosSerializer,
 )
 from .utils import (
-    accessible_posts_by_user, extract_tagged_users, get_user_name, notify_new_comment,
-    notify_new_poll_created, notify_flagged_post, push_notification, tag_users_to_comment,
-    tag_users_to_post, user_can_delete, user_can_edit,
+    accessible_posts_by_user, extract_tagged_users, get_user_name, get_presigned_s3_url,
+    notify_new_comment, notify_new_poll_created, notify_flagged_post, push_notification,
+    tag_users_to_comment, tag_users_to_post, user_can_delete, user_can_edit,
 )
 
 CustomUser = import_string(settings.CUSTOM_USER_MODEL)
@@ -127,15 +133,42 @@ class PostViewSet(viewsets.ModelViewSet):
 
         videos = dict((request.FILES).lists()).get('videos', None)
         if videos:
+            now = timezone.now()
+            fmt = '%Y/%m/%d'
+            dc = now.strftime(fmt)
+            inst_verbose = 'video'
+            inst_id = str(post_id)
             for video in videos:
-                data = {'post': post_id}
-                data['video'] = video
-                video_serializer = VideosSerializer(data=data)
-                if video_serializer.is_valid():
-                    video_serializer.save()
-                else:
-                    return Response({'message': 'Video not uploaded'},
-                                      status=status.HTTP_400_BAD_REQUEST)
+                if video.size > 100000000:
+                    raise ValidationError(_("Video size too large. Videos should be less than 100MB"))
+                destination_path = '{inst_name}/{dc}/{id}/{name}'.format(
+                    inst_name=inst_verbose, dc=dc, id=inst_id, name=video.name
+                )
+
+                temp_path = os.path.join(settings.MEDIA_ROOT, destination_path)
+
+                default_storage.save(temp_path, ContentFile(video.read()))
+
+                response = get_presigned_s3_url(destination_path)
+
+                with open(temp_path, 'rb') as f:
+                    files = {'file': (temp_path, f)}
+                    http_response = requests.post(response['url'], data=response['fields'], files=files)
+
+                    print(http_response.status_code)
+                path = default_storage.delete(temp_path)
+
+            raise ValidationError("Error")
+
+
+                # data = {'post': post_id}
+                # data['video'] = video
+                # video_serializer = VideosSerializer(data=data)
+                # if video_serializer.is_valid():
+                #     video_serializer.save()
+                # else:
+                #     return Response({'message': 'Video not uploaded'},
+                #                       status=status.HTTP_400_BAD_REQUEST)
 
     def create(self, request, *args, **kwargs):
         data = self._create_or_update(request, create=True)
