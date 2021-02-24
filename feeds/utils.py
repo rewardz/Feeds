@@ -1,6 +1,7 @@
 from __future__ import division, print_function, unicode_literals
 
 import re
+import boto3
 
 from django.conf import settings
 from django.db.models import Q
@@ -21,6 +22,13 @@ PUSH_NOTIFICATION_MODEL = import_string(settings.PUSH_NOTIFICATION)
 NOTIFICATION_OBJECT_TYPE = import_string(settings.POST_NOTIFICATION_OBJECT_TYPE).Posts
 NOTIF_OBJECT_TYPE_FIELD_NAME = settings.NOTIF_OBJECT_TYPE_FIELD_NAME
 NOTIF_OBJECT_ID_FIELD_NAME = settings.NOTIF_OBJECT_ID_FIELD_NAME
+
+# S3 details
+BUCKET = settings.BUCKET
+REGION = settings.S3_REGION
+ENDPOINT_URL = settings.S3_ENDPOINT_URL
+AWS_ACCESS_KEY_ID = settings.AWS_S3_ACCESS_KEY_ID
+AWS_SECRET_ACCESS_KEY = settings.AWS_S3_SECRET_ACCESS_KEY
 
 
 def accessible_posts_by_user(user, organization):
@@ -298,3 +306,25 @@ def extract_user_info(user_detail):
         user_id = user_id_detail.group(1)
     user_info['user_id'] = user_id
     return user_info
+
+
+def get_presigned_s3_url(destination_path):
+    session = boto3.session.Session()
+    s3 = session.client(
+        's3',
+        region_name=REGION,
+        # endpoint_url=ENDPOINT_URL,
+        aws_access_key_id=AWS_ACCESS_KEY_ID,
+        aws_secret_access_key=AWS_SECRET_ACCESS_KEY
+    )
+
+    response = s3.generate_presigned_post(
+        Bucket=BUCKET,
+        Key=destination_path,
+        Fields={"acl": "public-read"},
+        Conditions=[
+            {"acl": "public-read"}
+        ],
+        ExpiresIn=3600
+    )
+    return response
