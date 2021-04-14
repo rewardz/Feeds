@@ -415,6 +415,25 @@ class PostViewSet(viewsets.ModelViewSet):
         except Post.DoesNotExist:
             raise ValidationError(_('Post does not exist.'))
 
+    @list_route(methods=["POST"], permission_classes=(permissions.IsAuthenticated,))
+    def pinned_post(self, request, *args, **kwargs):
+        user = self.request.user
+        organization = user.organization
+        payload = self.request.data
+        priority = payload.get("priority", True)
+        post_id = payload.get("post_id", None)
+        if not post_id:
+            raise ValidationError(_('Post ID required to set priority'))
+        post_id = int(post_id)
+        accessible_posts = accessible_posts_by_user(user, organization).values_list('id', flat=True)
+        if post_id not in accessible_posts:
+            raise ValidationError(_('You do not have access'))
+        try:
+            post = Post.objects.get(pk=post_id)
+            post.pinned(user)
+        except Post.DoesNotExist as exp:
+            raise ValidationError(_('Poll does not exist.'))
+
 
 class ImagesView(views.APIView):
     parser_classes = (MultiPartParser,)
