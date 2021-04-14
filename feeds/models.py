@@ -143,6 +143,14 @@ class Post(UserInfo):
         except Post.DoesNotExist:
             raise ValidationError(_("Post does not exist"))
 
+    def pinned(self, user):
+        is_admin = user.is_staff
+        if is_admin:
+            earlier_pinned = Post.objects.filter(organization=user.organization, priority=True)
+            earlier_pinned.update(priority=False)
+            self.priority = True
+            self.save()
+
     def __unicode__(self):
         return self.title if self.title else str(self.pk)
     
