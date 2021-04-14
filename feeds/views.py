@@ -431,6 +431,7 @@ class PostViewSet(viewsets.ModelViewSet):
         try:
             post = Post.objects.get(pk=post_id)
             post.pinned(user)
+            return Response(self.get_serializer(post).data)
         except Post.DoesNotExist as exp:
             raise ValidationError(_('Post does not exist.'))
 
