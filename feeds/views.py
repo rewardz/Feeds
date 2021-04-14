@@ -432,7 +432,7 @@ class PostViewSet(viewsets.ModelViewSet):
             post = Post.objects.get(pk=post_id)
             post.pinned(user)
         except Post.DoesNotExist as exp:
-            raise ValidationError(_('Poll does not exist.'))
+            raise ValidationError(_('Post does not exist.'))
 
 
 class ImagesView(views.APIView):
