@@ -143,12 +143,19 @@ class Post(UserInfo):
         except Post.DoesNotExist:
             raise ValidationError(_("Post does not exist"))
 
-    def pinned(self, user):
+    def pinned(self, user, prior_till=None):
         is_admin = user.is_staff
         if is_admin:
             earlier_pinned = Post.objects.filter(organization=user.organization, priority=True)
+            if prior_till:
+                try:
+                    prior_till = int(prior_till)
+                    prior_till = timezone.now() + timezone.timedelta(days=prior_till)
+                except ValueError:
+                    raise ValidationError(_("Improper prior till"))
             earlier_pinned.update(priority=False)
             self.priority = True
+            self.prior_till = prior_till
             self.save()
 
     def __unicode__(self):

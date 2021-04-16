@@ -421,6 +421,7 @@ class PostViewSet(viewsets.ModelViewSet):
         organization = user.organization
         payload = self.request.data
         priority = payload.get("priority", True)
+        prior_till = payload.get("prior_till", None)
         post_id = payload.get("post_id", None)
         if not post_id:
             raise ValidationError(_('Post ID required to set priority'))
@@ -430,7 +431,12 @@ class PostViewSet(viewsets.ModelViewSet):
             raise ValidationError(_('You do not have access'))
         try:
             post = Post.objects.get(pk=post_id)
-            post.pinned(user)
+            if post.priority:
+                post.priority = False
+                post.prior_till = None
+                post.save()
+            else:
+                post.pinned(user, prior_till=prior_till)
             return Response(self.get_serializer(post).data)
         except Post.DoesNotExist as exp:
             raise ValidationError(_('Post does not exist.'))

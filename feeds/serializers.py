@@ -139,6 +139,7 @@ class PostSerializer(serializers.ModelSerializer):
     can_edit = serializers.SerializerMethodField()
     can_delete = serializers.SerializerMethodField()
     tagged_users = serializers.SerializerMethodField()
+    is_admin = serializers.SerializerMethodField()
 
     class Meta:
         model = Post
@@ -149,8 +150,13 @@ class PostSerializer(serializers.ModelSerializer):
             "priority", "prior_till",
             "shared_with", "images", "documents", "videos",
             "is_owner", "can_edit", "can_delete", "has_appreciated",
-            "appreciation_count", "comments_count", "tagged_users",
+            "appreciation_count", "comments_count", "tagged_users", "is_admin",
         )
+
+    def get_is_admin(self, instance):
+        request = self.context['request']
+        user = request.user
+        return user.is_staff
 
     def get_poll_info(self, instance):
         if not instance.post_type == POST_TYPE.USER_CREATED_POLL:
@@ -240,7 +246,7 @@ class PostDetailSerializer(PostSerializer):
             "priority", "prior_till", "shared_with", "images", "documents", "videos",
             "is_owner", "can_edit", "can_delete", "has_appreciated",
             "appreciation_count", "appreciated_by", "comments_count", "comments",
-            "tagged_users",
+            "tagged_users", "is_admin",
         )
 
     def get_comments(self, instance):
