@@ -1,7 +1,6 @@
 import logging
 
 from django.conf import settings
-from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.contrib.auth import get_user_model
 from django.db import models
@@ -9,6 +8,8 @@ from django.db.models import Sum
 from django.utils import timezone
 from django.utils.module_loading import import_string
 from django.utils.translation import ugettext as _
+
+from rest_framework.exceptions import ValidationError
 
 from cropimg.fields import CIImageField, CIThumbnailField
 from easy_thumbnails.exceptions import InvalidImageFormatError
