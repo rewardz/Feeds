@@ -61,10 +61,7 @@ class Post(UserInfo):
     active_days = models.SmallIntegerField(
         default=1, validators=[MinValueValidator(1), MaxValueValidator(30)]
     )
-    modified_by = models.ForeignKey(
-        CustomUser, related_name="post_modifier", null=True,
-        on_delete=models.SET_NULL
-    )
+    modified_by = models.ForeignKey(CustomUser, related_name="post_modifier", null=True)
     modified_on = models.DateTimeField(auto_now=True, null=True, blank=True)
     mark_delete = models.BooleanField(default=False)
     tagged_users = models.ManyToManyField(
@@ -242,15 +239,9 @@ class Documents(models.Model):
 
 class Comment(UserInfo):
     content = models.TextField()
-    parent = models.ForeignKey(
-        'self', blank=True, null=True, related_name="comment_response",
-        on_delete=models.SET_NULL
-    )
+    parent = models.ForeignKey('self', blank=True, null=True, related_name="comment_response")
     post = models.ForeignKey(Post, on_delete=models.CASCADE)
-    modified_by = models.ForeignKey(
-        CustomUser, related_name="comment_modifier", null=True,
-        on_delete=models.SET_NULL
-    )
+    modified_by = models.ForeignKey(CustomUser, related_name="comment_modifier", null=True)
     modified_on = models.DateTimeField(auto_now=True, null=True, blank=True)
     tagged_users = models.ManyToManyField(
         CustomUser, related_name="comment_tagged_users",
@@ -320,9 +311,9 @@ class PollsAnswer(models.Model):
 
 
 class Voter(models.Model):
-    answer = models.ForeignKey(PollsAnswer, on_delete=models.CASCADE)
-    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
-    question = models.ForeignKey(Post, on_delete=models.CASCADE)
+    answer = models.ForeignKey(PollsAnswer)
+    user = models.ForeignKey(CustomUser)
+    question = models.ForeignKey(Post)
     date_voted = models.DateTimeField(auto_now_add=True)
 
 
