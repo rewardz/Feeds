@@ -10,6 +10,7 @@ router.register(r'comments', CommentViewset, basename='comments')
 
 api_urls = router.urls
 
+app_name = "feeds"
 urlpatterns = [
     url(r'^api/', include(api_urls)),
     url(r'^api/images/(?P<pk>[0-9]+)/$', ImagesDetailView.as_view()),
