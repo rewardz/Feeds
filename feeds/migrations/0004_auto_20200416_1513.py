@@ -18,7 +18,7 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
                 ('document', models.FileField(null=True, upload_to=feeds.models.post_upload_to_path, blank=True)),
-                ('post', models.ForeignKey(to='feeds.Post')),
+                ('post', models.ForeignKey(to='feeds.Post', on_delete=models.CASCADE)),
             ],
         ),
         migrations.AlterField(
