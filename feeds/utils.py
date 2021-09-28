@@ -40,7 +40,7 @@ def accessible_posts_by_user(user, organization):
         result = Post.objects.filter(Q(organization=organization, \
                                     shared_with=SHARED_WITH.ALL_DEPARTMENTS) |\
                                  Q(created_by__in=dept_users))
-    result = result.filter(mark_delete=False)
+    result = result.filter(mark_delete=False).exclude(created_by__is_active=False)
     return result
 
 
