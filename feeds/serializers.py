@@ -140,6 +140,7 @@ class PostSerializer(serializers.ModelSerializer):
     can_delete = serializers.SerializerMethodField()
     tagged_users = serializers.SerializerMethodField()
     is_admin = serializers.SerializerMethodField()
+    user_reaction_type = serializers.SerializerMethodField()
 
     class Meta:
         model = Post
@@ -151,6 +152,7 @@ class PostSerializer(serializers.ModelSerializer):
             "shared_with", "images", "documents", "videos",
             "is_owner", "can_edit", "can_delete", "has_appreciated",
             "appreciation_count", "comments_count", "tagged_users", "is_admin",
+            "user_reaction_type",
         )
 
     def get_is_admin(self, instance):
@@ -201,6 +203,13 @@ class PostSerializer(serializers.ModelSerializer):
         request = self.context['request']
         user = request.user
         return PostLiked.objects.filter(post=instance, created_by=user).exists()
+
+    def get_user_reaction_type(self, instance):
+        request = self.context['request']
+        user = request.user
+        if PostLiked.objects.filter(post=instance, created_by=user).exists():
+            return PostLiked.objects.filter(post=instance, created_by=user).reaction_type
+        return None
 
     def get_appreciation_count(self, instance):
         return PostLiked.objects.filter(post=instance).count()

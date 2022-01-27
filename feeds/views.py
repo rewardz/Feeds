@@ -12,7 +12,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import MultiPartParser, FormParser, FileUploadParser, JSONParser
 from rest_framework.response import Response
 
-from .constants import POST_TYPE, SHARED_WITH
+from .constants import POST_TYPE, SHARED_WITH, REACTION_TYPE_FOR_FEEDS
 from .models import (
     Comment, Documents, FlagPost, Post, PostLiked, PollsAnswer,
     Images, CommentLiked,
@@ -282,29 +282,28 @@ class PostViewSet(viewsets.ModelViewSet):
         accessible_posts = accessible_posts_by_user(user, organization).values_list('id', flat=True)
         if post_id not in accessible_posts:
             raise ValidationError(_('You do not have access to this post'))
-        apreciation_type = self.request.query_params.get("type", "like")
-        message = None
-        liked = False
-        response_status = status.HTTP_304_NOT_MODIFIED
+        appreciation_type = self.request.data.get('reaction_type')
         object_type = NOTIFICATION_OBJECT_TYPE
-        if apreciation_type.lower() == "like":
-            if PostLiked.objects.filter(post_id=post_id, created_by=user).exists():
+        if PostLiked.objects.filter(post_id=post_id, created_by=user).exists():
+            if not appreciation_type:
                 PostLiked.objects.filter(post_id=post_id, created_by=user).delete()
-                message = "Successfully unliked"
-                liked = False
-                response_status = status.HTTP_200_OK
             else:
-                data = PostLiked.objects.create(post_id=post_id, created_by=user)
-                message = "Successfully Liked"
-                liked = True
-                response_status = status.HTTP_201_CREATED
-                post = Post.objects.filter(id=post_id).first()
-                user_name = get_user_name(user)
-                post_string = post.title[:20] + "..." if post.title else ""
-                if post:
-                    notif_message = _("'%s' likes your post %s" % (user_name, post_string))
-                    push_notification(user, notif_message, post.created_by,
-                                      object_type=object_type, object_id=post.id)
+                PostLiked.objects.filter(post_id=post_id, created_by=user).update(reaction_type=appreciation_type)
+            message = "Successfully unliked"
+            liked = False
+            response_status = status.HTTP_200_OK
+        else:
+            PostLiked.objects.create(post_id=post_id, created_by=user, reaction_type=appreciation_type)
+            message = "Successfully Liked"
+            liked = True
+            response_status = status.HTTP_201_CREATED
+            post = Post.objects.filter(id=post_id).first()
+            user_name = get_user_name(user)
+            post_string = post.title[:20] + "..." if post.title else ""
+            if post:
+                notif_message = _("'%s' likes your post %s" % (user_name, post_string))
+                push_notification(user, notif_message, post.created_by,
+                                  object_type=object_type, object_id=post.id)
         count = PostLiked.objects.filter(post_id=post_id).count()
         user_info = UserInfoSerializer(user).data
         return Response({
