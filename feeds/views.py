@@ -282,18 +282,21 @@ class PostViewSet(viewsets.ModelViewSet):
         accessible_posts = accessible_posts_by_user(user, organization).values_list('id', flat=True)
         if post_id not in accessible_posts:
             raise ValidationError(_('You do not have access to this post'))
-        appreciation_type = self.request.data.get('reaction_type')
+        reaction_type = self.request.data.get('reaction_type')
         object_type = NOTIFICATION_OBJECT_TYPE
-        if PostLiked.objects.filter(post_id=post_id, created_by=user).exists():
-            if not appreciation_type:
-                PostLiked.objects.filter(post_id=post_id, created_by=user).delete()
+        post_object = PostLiked.objects.filter(post_id=post_id, created_by=user)
+        liked = False
+        message = "Successfully unliked"
+        if post_object:
+            if not reaction_type:
+                post_object.delete()
             else:
-                PostLiked.objects.filter(post_id=post_id, created_by=user).update(reaction_type=appreciation_type)
-            message = "Successfully unliked"
-            liked = False
+                liked = True
+                message = "Successfully Liked"
+                post_object.update(reaction_type=reaction_type)
             response_status = status.HTTP_200_OK
         else:
-            PostLiked.objects.create(post_id=post_id, created_by=user, reaction_type=appreciation_type)
+            post_object = PostLiked.objects.create(post_id=post_id, created_by=user, reaction_type=reaction_type)
             message = "Successfully Liked"
             liked = True
             response_status = status.HTTP_201_CREATED
@@ -306,8 +309,14 @@ class PostViewSet(viewsets.ModelViewSet):
                                   object_type=object_type, object_id=post.id)
         count = PostLiked.objects.filter(post_id=post_id).count()
         user_info = UserInfoSerializer(user).data
-        return Response({
-            "message": message, "liked": liked, "count": count, "user_info":user_info},
+        data = {
+            "message": message,
+            "liked": liked,
+            "count": count,
+            "user_info":user_info
+            "reaction_type" : post_object.reaction_type
+        }
+        return Response(data,
             status=response_status)
 
     @detail_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
