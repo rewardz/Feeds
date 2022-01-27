@@ -16,7 +16,7 @@ from easy_thumbnails.exceptions import InvalidImageFormatError
 from easy_thumbnails.files import get_thumbnailer
 from model_helpers import upload_to
 
-from .constants import POST_TYPE, SHARED_WITH
+from .constants import POST_TYPE, SHARED_WITH, REACTION_TYPE_FOR_FEEDS
 
 logger = logging.getLogger(__name__)
 
@@ -262,6 +262,11 @@ class Comment(UserInfo):
 
 
 class PostLiked(UserInfo):
+    reaction_type = models.PositiveIntegerField(
+        choices=REACTION_TYPE_FOR_FEEDS(),
+        default=REACTION_TYPE_FOR_FEEDS.clap,
+        verbose_name=_("user reaction type")
+    )
     post = models.ForeignKey(Post, on_delete=models.CASCADE)
 
     def __unicode__(self):

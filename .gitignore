@@ -4,3 +4,4 @@ news_env/
 *.sqlite*
 *\.log
 news_feed/media/
+.idea
