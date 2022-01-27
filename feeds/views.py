@@ -287,6 +287,7 @@ class PostViewSet(viewsets.ModelViewSet):
         liked = False
         message = "Successfully unliked"
         post_object = None
+        import ipdb; ipdb.set_trace()
         if PostLiked.objects.filter(post_id=post_id, created_by=user).exists():
             if not reaction_type:
                 PostLiked.objects.filter(post_id=post_id, created_by=user).delete()
