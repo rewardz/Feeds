@@ -284,7 +284,7 @@ class PostViewSet(viewsets.ModelViewSet):
             raise ValidationError(_('You do not have access to this post'))
         reaction_type = self.request.data.get('reaction_type')
         object_type = NOTIFICATION_OBJECT_TYPE
-        post_object = PostLiked.objects.filter(post_id=post_id, created_by=user)
+        post_object = PostLiked.objects.filter(post_id=post_id, created_by=user).first()
         liked = False
         message = "Successfully unliked"
         if post_object:
@@ -313,7 +313,7 @@ class PostViewSet(viewsets.ModelViewSet):
             "message": message,
             "liked": liked,
             "count": count,
-            "user_info":user_info
+            "user_info":user_info,
             "reaction_type" : post_object.reaction_type
         }
         return Response(data,
