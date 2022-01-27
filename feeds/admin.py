@@ -22,8 +22,12 @@ class CommentAdmin(admin.ModelAdmin):
 
 @admin.register(PostLiked)
 class PostLikedAdmin(admin.ModelAdmin):
-    list_display = ('created_by', 'created_on', 'post',)
+    list_display = ('id, ''created_by', 'created_on', 'post',
+                    'reaction_type'
+                    )
     readonly_fields = ('created_by',)
+    list_filter = ('reaction_type',)
+    search_fields = ("created_by__email",)
 
 
 @admin.register(PollsAnswer)
