@@ -21,6 +21,10 @@ DEPARTMENT_MODEL = import_string(settings.DEPARTMENT_MODEL)
 UserModel = import_string(settings.CUSTOM_USER_MODEL)
 
 
+def get_user_detail(user_id):
+    return getattr(UserModel, settings.ALL_USER_OBJECT).filter(pk=user_id).first()
+
+
 class DepartmentDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
@@ -190,7 +194,7 @@ class PostSerializer(serializers.ModelSerializer):
 
     def get_created_by_user_info(self, instance):
         created_by = instance.created_by
-        user_detail = UserModel.objects.get(pk=created_by.id)
+        user_detail = get_user_detail(created_by.id)
         return UserInfoSerializer(user_detail).data
 
     def get_is_owner(self, instance):
@@ -289,7 +293,7 @@ class CommentSerializer(serializers.ModelSerializer):
 
     def get_commented_by_user_info(self, instance):
         created_by = instance.created_by
-        user_detail = UserModel.objects.get(pk=created_by.id)
+        user_detail = get_user_detail(created_by.id)
         return UserInfoSerializer(user_detail).data
 
     def get_liked_count(self, instance):
@@ -351,7 +355,7 @@ class PostLikedSerializer(serializers.ModelSerializer):
     
     def get_user_info(self, instance):
         created_by = instance.created_by
-        user_detail = UserModel.objects.get(pk=created_by.id)
+        user_detail = get_user_detail(created_by.id)
         return UserInfoSerializer(user_detail).data
 
     def to_representation(self, instance):
@@ -414,7 +418,7 @@ class CommentsLikedSerializer(serializers.ModelSerializer):
 
     def get_user_info(self, instance):
         created_by = instance.created_by
-        user_detail = UserModel.objects.get(pk=created_by.id)
+        user_detail = get_user_detail(created_by.id)
         return UserInfoSerializer(user_detail).data
 
     def to_representation(self, instance):
@@ -433,5 +437,5 @@ class FlagPostSerializer(serializers.ModelSerializer):
         )
 
     def get_user_info(self, instance):
-        user_detail = UserModel.objects.get(pk=instance.flagger.id)
+        user_detail = get_user_detail(instance.flagger.id)
         return UserInfoSerializer(user_detail).data
