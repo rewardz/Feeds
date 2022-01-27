@@ -1,49 +1,49 @@
-Django==1.8.14
-pytz==2015.4
-wsgiref==0.1.2
-djangorestframework==3.1.3
-Pillow==2.9.0
-django-filter==0.10.0
+Django>=1.8.14
+pytz>=2015.4
+wsgiref>=0.1.2
+djangorestframework>=3.1.3
+Pillow>=2.9.0
+django-filter>=0.10.0
 
-pylint==1.6.4
-pylint-django==0.7.2
-psycopg2>=2.5.4,<=2.8.4
-django-annoying==0.8.4
-django-tinymce==2.0.5
-django-redis==4.8.0
-gunicorn==19.6.0
-django-taggit==0.22.2
+pylint>=1.6.4
+pylint-django>=0.7.2
+psycopg2>=2.5.4
+django-annoying>=0.8.4
+django-tinymce>=2.0.5
+django-redis>=4.8.0
+gunicorn>=19.6.0
+django-taggit>=0.22.2
 # Testing
-nose==1.3.7
-unittest2==1.1.0
-freezegun==0.3.5
-requests-mock==1.4.0
+nose>=1.3.7
+unittest2>=1.1.0
+freezegun>=0.3.5
+requests-mock>=1.4.0
 
 # GeoDjango extra Widgets
-django-floppyforms==1.8.0
+django-floppyforms>=1.8.0
 
 # Thumbnail resizing and generation
-django-image-cropping<1.3.0
+django-image-cropping>=1.3.0
 
-easy-thumbnails==2.2
+easy-thumbnails>=2.2
 # Photo Gallery, since 3.8 Django 1.11 is required
-django-photologue<3.8
+django-photologue>=3.8
 # The last version supporting Django 1.8
-django-storages==1.5.2
-boto3==1.9.70
-memoized-property==1.0.2
+django-storages>=1.5.2
+boto3>=1.9.70
+memoized-property>=1.0.2
 django-model-helpers>=1.2.1
-html2text>=2015.4.14,<=2015.11.4
-pep8==1.6.2
-requests==2.12.4
-python-memcached==1.59
+html2text>=2015.4.14
+pep8>=1.6.2
+requests>=2.12.4
+python-memcached>=1.59
 # libraries needed by requests to avoid the error:
 # extension to TLS is not available on this platform.
 # sudo apt-get install libffi-dev libssl-dev
-pyOpenSSL==16.2.0
-ndg-httpsclient==0.4.2
-pyasn1==0.1.9
+pyOpenSSL>=16.2.0
+ndg-httpsclient>=0.4.2
+pyasn1>=0.1.9
 #connect apps
-Unirest==1.1.6
-requests-oauthlib==0.7.0
-oauthlib==2.0.1
+Unirest>=1.1.6 # This dependency has to be removed
+requests-oauthlib>=0.7.0
+oauthlib>=2.0.1
