@@ -13,8 +13,10 @@ POST_TYPE = Choices({
 })
 
 REACTION_TYPE_FOR_FEEDS = Choices({
-    "applause": 0,
-    "clap": 1,
-    "like": 2,
-    "love": 3,
+    "celebrate": 0,
+    "curious": 1,
+    "insightful": 2,
+    "like": 3,
+    "love": 4,
+    "support": 5,
 })
