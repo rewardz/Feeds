@@ -264,7 +264,7 @@ class Comment(UserInfo):
 class PostLiked(UserInfo):
     reaction_type = models.PositiveIntegerField(
         choices=REACTION_TYPE_FOR_FEEDS(),
-        default=REACTION_TYPE_FOR_FEEDS.clap,
+        default=REACTION_TYPE_FOR_FEEDS.celebrate,
         verbose_name=_("user reaction type")
     )
     post = models.ForeignKey(Post, on_delete=models.CASCADE)
