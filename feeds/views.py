@@ -191,7 +191,7 @@ class PostViewSet(viewsets.ModelViewSet):
         result = result.order_by('-priority', '-modified_on', '-created_on')
         return result
 
-    @action(detail=True, methods=["POST"], permission_classes=(permissions.IsAuthenticated,))
+    @action(detail=False, methods=["POST"], permission_classes=(permissions.IsAuthenticated,))
     def create_poll(self, request, *args, **kwargs):
         user = self.request.user
         organization = user.organization
@@ -415,7 +415,7 @@ class PostViewSet(viewsets.ModelViewSet):
         except Post.DoesNotExist:
             raise ValidationError(_('Post does not exist.'))
 
-    @action(detail=True, methods=["POST"], permission_classes=(permissions.IsAuthenticated,))
+    @action(detail=False, methods=["POST"], permission_classes=(permissions.IsAuthenticated,))
     def pinned_post(self, request, *args, **kwargs):
         user = self.request.user
         organization = user.organization
