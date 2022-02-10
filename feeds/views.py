@@ -1,4 +1,4 @@
-from __future__ import division, print_function, unicode_literals
+
 
 from django.conf import settings
 from django.db.models import Q
@@ -7,7 +7,7 @@ from django.utils.module_loading import import_string
 from django.utils.translation import ugettext as _
 
 from rest_framework import permissions, viewsets, serializers, status, views
-from rest_framework.decorators import api_view, detail_route, list_route, permission_classes
+from rest_framework.decorators import api_view, action, action, permission_classes
 from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import MultiPartParser, FormParser, FileUploadParser, JSONParser
 from rest_framework.response import Response
@@ -46,7 +46,7 @@ class PostViewSet(viewsets.ModelViewSet):
         current_user = self.request.user
         if not current_user:
             raise serializers.ValidationError({'created_by': _('Created by is required!')})
-        data = {k: v for k, v in payload.items()}
+        data = {k: v for k, v in list(payload.items())}
         delete_image_ids = data.get('delete_image_ids', None)
         delete_document_ids = data.get('delete_document_ids', None)
 
@@ -191,12 +191,12 @@ class PostViewSet(viewsets.ModelViewSet):
         result = result.order_by('-priority', '-modified_on', '-created_on')
         return result
 
-    @list_route(methods=["POST"], permission_classes=(permissions.IsAuthenticated,))
+    @action(detail=False, methods=["POST"], permission_classes=(permissions.IsAuthenticated,))
     def create_poll(self, request, *args, **kwargs):
         user = self.request.user
         organization = user.organization
         payload = self.request.data
-        data = {k: v for k, v in payload.items()}
+        data = {k: v for k, v in list(payload.items())}
         question = data.get('title', None)
         if not question:
             raise ValidationError(_('Question(title) is required to create a poll'))
@@ -220,7 +220,7 @@ class PostViewSet(viewsets.ModelViewSet):
         notify_new_poll_created(poll)
         return Response(result.data)
     
-    @detail_route(methods=["GET", "POST"], permission_classes=(permissions.IsAuthenticated,))
+    @action(detail=True, methods=["GET", "POST"], permission_classes=(permissions.IsAuthenticated,))
     def comments(self, request, *args, **kwargs):
         """
         List of all the comments related to the post
@@ -249,7 +249,7 @@ class PostViewSet(viewsets.ModelViewSet):
             return Response(serializer.data)
         elif self.request.method == "POST":
             payload = self.request.data
-            data = {k: v for k, v in payload.items()}
+            data = {k: v for k, v in list(payload.items())}
 
             tag_users = []
             content = data.get('content', None)
@@ -271,7 +271,7 @@ class PostViewSet(viewsets.ModelViewSet):
                 notify_new_comment(post, self.request.user)
             return Response(serializer.data)
     
-    @detail_route(methods=["POST"], permission_classes=(permissions.IsAuthenticated,))
+    @action(detail=True, methods=["POST"], permission_classes=(permissions.IsAuthenticated,))
     def appreciate(self, request, *args, **kwargs):
         user = self.request.user
         organization = user.organization
@@ -311,7 +311,7 @@ class PostViewSet(viewsets.ModelViewSet):
             "message": message, "liked": liked, "count": count, "user_info":user_info},
             status=response_status)
 
-    @detail_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
+    @action(detail=True, methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
     def appreciated_by(self, request, *args, **kwargs):
         user = self.request.user
         organization = user.organization
@@ -331,7 +331,7 @@ class PostViewSet(viewsets.ModelViewSet):
         serializer = PostLikedSerializer(posts_liked, many=True, read_only=True)
         return Response(serializer.data)
 
-    @detail_route(methods=["GET", "POST"],
+    @action(detail=True, methods=["GET", "POST"],
     permission_classes=(permissions.IsAuthenticated,))
     def answers(self, request, *args, **kwargs):
         user = self.request.user
@@ -352,14 +352,14 @@ class PostViewSet(viewsets.ModelViewSet):
             return Response(serializer.data)
         if request.method == 'POST':
             payload = self.request.data
-            data = {k: v for k, v in payload.items()}
+            data = {k: v for k, v in list(payload.items())}
             data['question'] = post_id
             serializer = PollsAnswerSerializer(data=data)
             serializer.is_valid(raise_exception=True)
             serializer.save()
             return Response(serializer.data)
     
-    @detail_route(methods=["POST"], permission_classes=(permissions.IsAuthenticated,))
+    @action(detail=True, methods=["POST"], permission_classes=(permissions.IsAuthenticated,))
     def vote(self, request, *args, **kwargs):
         user = self.request.user
         organization = user.organization
@@ -390,13 +390,13 @@ class PostViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(poll)
         return Response(serializer.data)
 
-    @detail_route(methods=["POST"], permission_classes=(permissions.IsAuthenticated,))
+    @action(detail=True, methods=["POST"], permission_classes=(permissions.IsAuthenticated,))
     def flag(self, request, *args, **kwargs):
         user = self.request.user
         organization = user.organization
         post_id = self.kwargs.get("pk", None)
         payload = self.request.data
-        data = {k: v for k, v in payload.items()}
+        data = {k: v for k, v in list(payload.items())}
         if not post_id:
             raise ValidationError(_('Post ID required to vote'))
         post_id = int(post_id)
@@ -415,7 +415,7 @@ class PostViewSet(viewsets.ModelViewSet):
         except Post.DoesNotExist:
             raise ValidationError(_('Post does not exist.'))
 
-    @list_route(methods=["POST"], permission_classes=(permissions.IsAuthenticated,))
+    @action(detail=False, methods=["POST"], permission_classes=(permissions.IsAuthenticated,))
     def pinned_post(self, request, *args, **kwargs):
         user = self.request.user
         organization = user.organization
@@ -525,7 +525,7 @@ class CommentViewset(viewsets.ModelViewSet):
         result = Comment.objects.filter(post__in=posts)
         return result
 
-    @detail_route(methods=["POST"], permission_classes=(permissions.IsAuthenticated,))
+    @action(detail=True, methods=["POST"], permission_classes=(permissions.IsAuthenticated,))
     def like(self, request, *args, **kwargs):
         user = self.request.user
         organization = user.organization

@@ -1,4 +1,4 @@
-from __future__ import division, print_function, unicode_literals
+
 
 import logging
 
@@ -113,7 +113,7 @@ class CustomUser(CustomUserBase):
         "thumbnail": (150, 150)
     }
 
-    organization = models.ForeignKey(Organization, related_name="users")
+    organization = models.ForeignKey(Organization, related_name="users", on_delete=models.CASCADE)
     employee_id = models.TextField(default="", editable=True, unique=True)
     is_p2p_staff = models.BooleanField(default=False, help_text="p2p staff is not limited by p2p_points_limit, but can "
                                        "recognize users in the same org only")
@@ -207,7 +207,7 @@ class Department(models.Model):
     """
     Make department codes selectable and stuff
     """
-    organization = models.ForeignKey(Organization, related_name="departments")
+    organization = models.ForeignKey(Organization, related_name="departments", on_delete=models.CASCADE)
     name = models.CharField(max_length=100)
     slug = models.SlugField(max_length=200)
     users = models.ManyToManyField("CustomUser", related_name="departments", blank=True)
@@ -243,7 +243,7 @@ class PasswordHistoryQueryset(models.QuerySet):
 
 
 class PasswordHistory(models.Model):
-    user = models.ForeignKey("profiles.CustomUser", related_name="password_history")
+    user = models.ForeignKey("profiles.CustomUser", related_name="password_history", on_delete=models.CASCADE)
     password = models.CharField(max_length=100, blank=True, null=False)
     created = models.DateTimeField(auto_now_add=True)
     objects = PasswordHistoryQueryset.as_manager()
@@ -292,7 +292,7 @@ class PendingEmail(models.Model):
         verbose_name_plural = _("pending emails")
 
     def __unicode__(self):
-        return u"%s - %s" % (self.to, self.subject)
+        return "%s - %s" % (self.to, self.subject)
 
 
 class PushNotification(models.Model):
@@ -310,7 +310,8 @@ class PushNotification(models.Model):
 
     recipient = models.ForeignKey(
         CustomUser, related_name="recipient",
-        blank=True, null=True
+        blank=True, null=True,
+        on_delete=models.SET_NULL
     )
     object_id = models.PositiveIntegerField(null=True, blank=True)
     object_type = models.SmallIntegerField(null=False, blank=True,
