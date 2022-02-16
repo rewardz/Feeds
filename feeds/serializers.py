@@ -16,13 +16,11 @@ from .utils import (
     user_can_delete, user_can_edit
 )
 
-
 DEPARTMENT_MODEL = import_string(settings.DEPARTMENT_MODEL)
 UserModel = import_string(settings.CUSTOM_USER_MODEL)
 
 
 class DepartmentDetailSerializer(serializers.ModelSerializer):
-
     class Meta:
         model = DEPARTMENT_MODEL
         fields = (
@@ -77,7 +75,6 @@ class DocumentsSerializer(serializers.ModelSerializer):
 
 
 class VideosSerializer(serializers.ModelSerializer):
-
     class Meta:
         model = Videos
         fields = (
@@ -102,7 +99,7 @@ class PollSerializer(serializers.ModelSerializer):
 
     def get_answers(self, instance):
         request = self.context.get('request')
-        serializer_context = {'request': request }
+        serializer_context = {'request': request}
         user = request.user
         result = instance.related_answers()
         if not instance.is_poll_active:
@@ -140,6 +137,7 @@ class PostSerializer(serializers.ModelSerializer):
     can_delete = serializers.SerializerMethodField()
     tagged_users = serializers.SerializerMethodField()
     is_admin = serializers.SerializerMethodField()
+    tags = serializers.SerializerMethodField()
 
     class Meta:
         model = Post
@@ -150,8 +148,11 @@ class PostSerializer(serializers.ModelSerializer):
             "priority", "prior_till",
             "shared_with", "images", "documents", "videos",
             "is_owner", "can_edit", "can_delete", "has_appreciated",
-            "appreciation_count", "comments_count", "tagged_users", "is_admin",
+            "appreciation_count", "comments_count", "tagged_users", "is_admin", "tags"
         )
+
+    def get_tags(self, obj):
+        return list(obj.tags.values_list("name", flat=True))
 
     def get_is_admin(self, instance):
         request = self.context['request']
@@ -162,7 +163,7 @@ class PostSerializer(serializers.ModelSerializer):
         if not instance.post_type == POST_TYPE.USER_CREATED_POLL:
             return None
         request = self.context.get('request')
-        serializer_context = {'request': request }
+        serializer_context = {'request': request}
         return PollSerializer(
             instance, read_only=True, context=serializer_context
         ).data
@@ -227,16 +228,15 @@ class PostSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         representation = super(PostSerializer, self).to_representation(instance)
         representation["created_on"] = instance.created_on.strftime("%Y-%m-%d")
-        representation["modified_on"] = instance.modified_on.\
+        representation["modified_on"] = instance.modified_on. \
             strftime("%Y-%m-%d") if instance.modified_on else None
         return representation
 
 
 class PostDetailSerializer(PostSerializer):
-
     comments = serializers.SerializerMethodField()
     appreciated_by = serializers.SerializerMethodField()
-    
+
     class Meta:
         model = Post
         fields = (
@@ -251,7 +251,7 @@ class PostDetailSerializer(PostSerializer):
 
     def get_comments(self, instance):
         request = self.context.get('request')
-        serializer_context = {'request': request }
+        serializer_context = {'request': request}
         post_id = instance.id
         comments = Comment.objects.filter(post=post_id).order_by('-created_on')[:20]
         return CommentSerializer(
@@ -274,7 +274,6 @@ class PostDetailSerializer(PostSerializer):
 
 
 class CommentSerializer(serializers.ModelSerializer):
-
     commented_by_user_info = serializers.SerializerMethodField()
     liked_count = serializers.SerializerMethodField()
     liked_by = serializers.SerializerMethodField()
@@ -321,7 +320,7 @@ class CommentCreateSerializer(CommentSerializer):
         model = Comment
         fields = ("id", "count", "content", "created_by", "created_on",
                   "modified_by", "post", "commented_by_user_info",)
-    
+
     def get_count(self, instance):
         return Comment.objects.filter(post=instance.post).count()
 
@@ -330,7 +329,6 @@ class CommentCreateSerializer(CommentSerializer):
 
 
 class CommentDetailSerializer(CommentSerializer):
-
     class Meta:
         model = Comment
         fields = (
@@ -348,7 +346,7 @@ class PostLikedSerializer(serializers.ModelSerializer):
         fields = (
             "user_info", "created_on",
         )
-    
+
     def get_user_info(self, instance):
         created_by = instance.created_by
         user_detail = UserModel.objects.get(pk=created_by.id)
@@ -394,12 +392,11 @@ class SubmittedPollsAnswerSerializer(PollsAnswerSerializer):
 
 
 class FinalPollsAnswerSerializer(SubmittedPollsAnswerSerializer):
-
     class Meta:
         model = PollsAnswer
         fields = (
             "id", "question", "answer_text", "votes", "has_voted",
-            "percentage", "voters_info",  "is_winner",
+            "percentage", "voters_info", "is_winner",
         )
 
 

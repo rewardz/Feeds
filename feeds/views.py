@@ -36,7 +36,7 @@ NOTIFICATION_OBJECT_TYPE = import_string(settings.POST_NOTIFICATION_OBJECT_TYPE)
 
 
 class PostViewSet(viewsets.ModelViewSet):
-    parser_classes = (MultiPartParser, JSONParser, FormParser, )
+    parser_classes = (MultiPartParser, JSONParser, FormParser,)
     permission_classes = (permissions.IsAuthenticated,)
     pagination_class = FeedsResultsSetPagination
 
@@ -99,7 +99,7 @@ class PostViewSet(viewsets.ModelViewSet):
         data['modified_by'] = current_user.id
         data['organization'] = current_user.organization_id
         return data
-    
+
     def _upload_files(self, request, post_id):
         images = dict((request.FILES).lists()).get('images', None)
         if images:
@@ -111,7 +111,7 @@ class PostViewSet(viewsets.ModelViewSet):
                     image_serializer.save()
                 else:
                     return Response({'message': 'Image not uploaded'},
-                                      status=status.HTTP_400_BAD_REQUEST)
+                                    status=status.HTTP_400_BAD_REQUEST)
 
         documents = dict((request.FILES).lists()).get('documents', None)
         if documents:
@@ -123,7 +123,7 @@ class PostViewSet(viewsets.ModelViewSet):
                     document_serializer.save()
                 else:
                     return Response({'message': 'Document not uploaded'},
-                                      status=status.HTTP_400_BAD_REQUEST)
+                                    status=status.HTTP_400_BAD_REQUEST)
 
         videos = dict((request.FILES).lists()).get('videos', None)
         if videos:
@@ -135,11 +135,22 @@ class PostViewSet(viewsets.ModelViewSet):
                     video_serializer.save()
                 else:
                     return Response({'message': 'Video not uploaded'},
-                                      status=status.HTTP_400_BAD_REQUEST)
+                                    status=status.HTTP_400_BAD_REQUEST)
+
+    def save_custom_tags(self, tags, organization):
+        try:
+            org_tags = organization.admin_tags.values_list("name", flat=True)
+
+            for tag in tags:
+                if tag not in org_tags:
+                    organization.user_tags.add(tag)
+        except Exception as e:
+            raise e
 
     def create(self, request, *args, **kwargs):
         data = self._create_or_update(request, create=True)
         tag_users = data.get('tag_users', None)
+        tags = data.get('tags', None)
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
         instance = serializer.save()
@@ -147,10 +158,14 @@ class PostViewSet(viewsets.ModelViewSet):
         if tag_users:
             tag_users_to_post(instance, tag_users)
 
+        if tags:
+            self.save_custom_tags(tags, instance.organization)
+            instance.tags.set(*tags)
+
         if request.FILES:
             self._upload_files(request, post_id)
         return Response(serializer.data)
-    
+
     def update(self, request, pk=None):
         instance = self.get_object()
         user = request.user
@@ -158,11 +173,15 @@ class PostViewSet(viewsets.ModelViewSet):
             raise serializers.ValidationError(_("You do not have permission to edit"))
         data = self._create_or_update(request)
         tag_users = data.get('tag_users', None)
+        tags = data.get('tags', None)
         data["created_by"] = instance.created_by.id
         serializer = self.get_serializer(instance, data=data)
         serializer.is_valid(raise_exception=True)
         if tag_users:
             tag_users_to_post(instance, tag_users)
+        if tags:
+            self.save_custom_tags(tags, instance.organization)
+            instance.tags.set(*tags)
         if request.FILES:
             self._upload_files(request, instance.pk)
         self.perform_update(serializer)
@@ -219,7 +238,7 @@ class PostViewSet(viewsets.ModelViewSet):
         result = self.get_serializer(poll)
         notify_new_poll_created(poll)
         return Response(result.data)
-    
+
     @detail_route(methods=["GET", "POST"], permission_classes=(permissions.IsAuthenticated,))
     def comments(self, request, *args, **kwargs):
         """
@@ -231,13 +250,13 @@ class PostViewSet(viewsets.ModelViewSet):
         if not post_id:
             raise ValidationError(_('Post ID required to retrieve all the related comments'))
         post_id = int(post_id)
-        accessible_posts = accessible_posts_by_user(user, organization).\
+        accessible_posts = accessible_posts_by_user(user, organization). \
             values_list('id', flat=True)
         if post_id not in accessible_posts:
             raise ValidationError(_('You do not have access to comment on this post'))
         if self.request.method == "GET":
-            serializer_context = {'request': self.request }
-            comments = Comment.objects.filter(post_id=post_id, parent=None).\
+            serializer_context = {'request': self.request}
+            comments = Comment.objects.filter(post_id=post_id, parent=None). \
                 order_by('-created_on')
             page = self.paginate_queryset(comments)
             if page is not None:
@@ -270,7 +289,7 @@ class PostViewSet(viewsets.ModelViewSet):
             if post:
                 notify_new_comment(post, self.request.user)
             return Response(serializer.data)
-    
+
     @detail_route(methods=["POST"], permission_classes=(permissions.IsAuthenticated,))
     def appreciate(self, request, *args, **kwargs):
         user = self.request.user
@@ -308,7 +327,7 @@ class PostViewSet(viewsets.ModelViewSet):
         count = PostLiked.objects.filter(post_id=post_id).count()
         user_info = UserInfoSerializer(user).data
         return Response({
-            "message": message, "liked": liked, "count": count, "user_info":user_info},
+            "message": message, "liked": liked, "count": count, "user_info": user_info},
             status=response_status)
 
     @detail_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
@@ -319,7 +338,7 @@ class PostViewSet(viewsets.ModelViewSet):
         if not post_id:
             raise ValidationError(_('Post ID required to appreciate a post'))
         post_id = int(post_id)
-        accessible_posts = accessible_posts_by_user(user, organization).\
+        accessible_posts = accessible_posts_by_user(user, organization). \
             values_list('id', flat=True)
         if post_id not in accessible_posts:
             raise ValidationError(_('You do not have access to this post'))
@@ -332,7 +351,7 @@ class PostViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     @detail_route(methods=["GET", "POST"],
-    permission_classes=(permissions.IsAuthenticated,))
+                  permission_classes=(permissions.IsAuthenticated,))
     def answers(self, request, *args, **kwargs):
         user = self.request.user
         organization = user.organization
@@ -358,7 +377,7 @@ class PostViewSet(viewsets.ModelViewSet):
             serializer.is_valid(raise_exception=True)
             serializer.save()
             return Response(serializer.data)
-    
+
     @detail_route(methods=["POST"], permission_classes=(permissions.IsAuthenticated,))
     def vote(self, request, *args, **kwargs):
         user = self.request.user
@@ -530,7 +549,7 @@ class CommentViewset(viewsets.ModelViewSet):
         user = self.request.user
         organization = user.organization
         posts = accessible_posts_by_user(user, organization)
-        accessible_comments = Comment.objects.filter(post__in=posts)\
+        accessible_comments = Comment.objects.filter(post__in=posts) \
             .values_list('id', flat=True)
         comment_id = self.kwargs.get("pk", None)
         if not comment_id:
@@ -561,7 +580,7 @@ class CommentViewset(viewsets.ModelViewSet):
         count = CommentLiked.objects.filter(comment_id=comment_id).count()
         user_info = UserInfoSerializer(user).data
         return Response({
-            "message": message, "liked": liked, "count": count, "user_info":user_info},
+            "message": message, "liked": liked, "count": count, "user_info": user_info},
             status=response_status)
 
 

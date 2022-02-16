@@ -15,6 +15,7 @@ from cropimg.fields import CIImageField, CIThumbnailField
 from easy_thumbnails.exceptions import InvalidImageFormatError
 from easy_thumbnails.files import get_thumbnailer
 from model_helpers import upload_to
+from taggit.managers import TaggableManager
 
 from .constants import POST_TYPE, SHARED_WITH
 
@@ -68,6 +69,7 @@ class Post(UserInfo):
         CustomUser, related_name="tagged_users",
         through="PostTaggedUsers", blank=True
     )
+    tags = TaggableManager()
 
     @property
     def is_poll(self):
@@ -94,7 +96,7 @@ class Post(UserInfo):
             if remaining_days == 1:
                 if hours > 24:
                     hours = hours - 24
-                return "{days} day and {hours} hour(s)".\
+                return "{days} day and {hours} hour(s)". \
                     format(days=remaining_days, hours=hours)
             return "{days} days".format(days=remaining_days)
         if hours > 1:
@@ -161,13 +163,12 @@ class Post(UserInfo):
 
     def __unicode__(self):
         return self.title if self.title else str(self.pk)
-    
+
     class Meta:
         ordering = ("-pk",)
 
 
 class Images(models.Model):
-    
     IMAGE_SIZES = {
         "thumbnail": (150, 150),
         "display": (960, 720),
@@ -214,7 +215,7 @@ class Images(models.Model):
         except ValueError as ex:
             logger.error("Error generating display for %s (pk=%d) :  %s", self, self.pk, ex)
             return ""
-    
+
     @property
     def large_img_url(self):
         try:
@@ -222,7 +223,7 @@ class Images(models.Model):
             return large_img_url
         except ValueError as ex:
             logger.error("Error generating display for %s (pk=%d) :  %s", self, self.pk, ex)
-            return ""    
+            return ""
 
 
 class Videos(models.Model):
