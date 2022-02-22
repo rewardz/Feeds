@@ -60,6 +60,8 @@ REST_FRAMEWORK = {
     ),
 }
 
+ALL_USER_OBJECT = 'objects'
+
 AUTH_USER_MODEL = 'profiles.CustomUser'
 CUSTOM_USER_MODEL = 'news_feed.tests.profiles.models.CustomUser'
 ORGANIZATION_MODEL = 'news_feed.tests.profiles.models.Organization'
