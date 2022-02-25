@@ -139,11 +139,11 @@ class PostViewSet(viewsets.ModelViewSet):
 
     def save_custom_tags(self, tags, organization):
         try:
-            org_tags = organization.admin_tags.values_list("name", flat=True)
+            org_tags = organization.post_admin_tags.values_list("name", flat=True)
 
             for tag in tags:
                 if tag not in org_tags:
-                    organization.user_tags.add(tag)
+                    organization.post_user_tags.add(tag)
         except Exception as e:
             raise e
 
