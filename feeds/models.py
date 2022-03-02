@@ -248,6 +248,7 @@ class Comment(UserInfo):
         CustomUser, related_name="comment_tagged_users",
         through="CommentTaggedUsers", blank=True
     )
+    mark_delete = models.BooleanField(default=False)
 
     def tag_user(self, user):
         CommentTaggedUsers.objects.create(comment=self, user=user)
@@ -257,6 +258,14 @@ class Comment(UserInfo):
         if ctu:
             for u in ctu:
                 u.delete()
+
+    def mark_as_delete(self, user):
+        try:
+            self.mark_delete = True
+            self.modified_by = user
+            self.save()
+        except Post.DoesNotExist:
+            raise ValidationError(_("Comment does not exist"))
 
     def __unicode__(self):
         return "%s" % self.content

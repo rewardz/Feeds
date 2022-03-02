@@ -16,7 +16,7 @@ class PostAdmin(admin.ModelAdmin):
 
 @admin.register(Comment)
 class CommentAdmin(admin.ModelAdmin):
-    list_display = ('content', 'parent', 'created_by', 'created_on', 'post')
+    list_display = ('content', 'parent', 'created_by', 'created_on', 'post', 'mark_delete')
     readonly_fields = ('created_by', 'modified_by', )
 
 
