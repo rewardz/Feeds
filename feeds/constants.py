@@ -9,5 +9,7 @@ SHARED_WITH = Choices({
 POST_TYPE = Choices({
     "USER_CREATED_POST": 1,
     "USER_CREATED_POLL": 2,
-    "SYSTEM_CREATED_POST": 3
+    "SYSTEM_CREATED_POST": 3,
+    "MOST_LIKED": 4,
+    "MOST_APPRECIATED": 5,
 })
