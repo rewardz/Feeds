@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('feeds', '0011_auto_20201130_1017'),
+        ('feeds', '0012_post_tags'),
     ]
 
     operations = [
