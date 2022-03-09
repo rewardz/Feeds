@@ -11,6 +11,7 @@ EXTERNAL_APPS = (
     'rest_framework.authtoken',
     'easy_thumbnails',
     'image_cropping',
+    'taggit',
 )
 
 INTERNAL_APPS = (
