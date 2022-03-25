@@ -11,3 +11,4 @@ dist/
 .idea/
 feeds.egg-info
 tags
+env
