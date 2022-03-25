@@ -10,3 +10,4 @@ build/
 dist/
 .idea/
 feeds.egg-info
+tags
