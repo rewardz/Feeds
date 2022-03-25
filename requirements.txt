@@ -7,7 +7,7 @@ django-filter
 
 pylint
 pylint-django
-psycopg2==2.9.1
+psycopg2>=2.9.1,<=2.9.3
 django-annoying
 django-tinymce
 django-redis
@@ -23,12 +23,10 @@ requests-mock
 django-floppyforms
 
 # Thumbnail resizing and generation
-django-image-cropping==1.5.0
+django-image-cropping>=1.5.0,<=1.7
 
 easy-thumbnails
-# Photo Gallery, since 3.8 Django 1.11 is required
-django-photologue==3.13
-# The last version supporting Django 1.8
+django-photologue>=3.13,<=3.15.1
 django-storages
 boto3
 memoized-property
