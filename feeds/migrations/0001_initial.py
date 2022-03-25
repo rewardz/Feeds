@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+
 
 from django.db import migrations, models
 from django.conf import settings
@@ -20,8 +20,8 @@ class Migration(migrations.Migration):
                 ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
                 ('created_on', models.DateTimeField(auto_now_add=True)),
                 ('content', models.TextField()),
-                ('created_by', models.ForeignKey(to=settings.AUTH_USER_MODEL)),
-                ('parent', models.ForeignKey(related_name='comment_response', blank=True, to='feeds.Comment', null=True)),
+                ('created_by', models.ForeignKey(to=settings.AUTH_USER_MODEL, on_delete=models.CASCADE)),
+                ('parent', models.ForeignKey(related_name='comment_response', blank=True, to='feeds.Comment', null=True, on_delete=models.SET_NULL)),
             ],
             options={
                 'abstract': False,
@@ -32,8 +32,8 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
                 ('created_on', models.DateTimeField(auto_now_add=True)),
-                ('created_by', models.ForeignKey(to=settings.AUTH_USER_MODEL)),
-                ('post', models.ForeignKey(to='feeds.Comment')),
+                ('created_by', models.ForeignKey(to=settings.AUTH_USER_MODEL, on_delete=models.CASCADE)),
+                ('post', models.ForeignKey(to='feeds.Comment', on_delete=models.CASCADE)),
             ],
             options={
                 'abstract': False,
@@ -69,8 +69,8 @@ class Migration(migrations.Migration):
                 ('prior_till', models.DateTimeField(null=True, blank=True)),
                 ('shared_with', models.SmallIntegerField(default=10, choices=[(20, 'All departments'), (10, 'Self department')])),
                 ('post_type', models.SmallIntegerField(default=1, choices=[(3, 'System created post'), (2, 'User created poll'), (1, 'User created post')])),
-                ('created_by', models.ForeignKey(to=settings.AUTH_USER_MODEL)),
-                ('organization', models.ForeignKey(to='profiles.Organization')),
+                ('created_by', models.ForeignKey(to=settings.AUTH_USER_MODEL, on_delete=models.CASCADE)),
+                ('organization', models.ForeignKey(to='profiles.Organization', on_delete=models.CASCADE)),
             ],
             options={
                 'ordering': ('-pk',),
@@ -81,8 +81,8 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
                 ('created_on', models.DateTimeField(auto_now_add=True)),
-                ('created_by', models.ForeignKey(to=settings.AUTH_USER_MODEL)),
-                ('post', models.ForeignKey(to='feeds.Post')),
+                ('created_by', models.ForeignKey(to=settings.AUTH_USER_MODEL, on_delete=models.CASCADE)),
+                ('post', models.ForeignKey(to='feeds.Post', on_delete=models.CASCADE)),
             ],
             options={
                 'abstract': False,
@@ -93,7 +93,7 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
                 ('video', models.FileField(upload_to=b'post/videos')),
-                ('post', models.ForeignKey(to='feeds.Post')),
+                ('post', models.ForeignKey(to='feeds.Post', on_delete=models.CASCADE)),
             ],
         ),
         migrations.CreateModel(
@@ -101,15 +101,15 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
                 ('date_voted', models.DateTimeField(auto_now_add=True)),
-                ('answer', models.ForeignKey(to='feeds.PollsAnswer')),
-                ('question', models.ForeignKey(to='feeds.Post')),
-                ('user', models.ForeignKey(to=settings.AUTH_USER_MODEL)),
+                ('answer', models.ForeignKey(to='feeds.PollsAnswer', on_delete=models.CASCADE)),
+                ('question', models.ForeignKey(to='feeds.Post', on_delete=models.CASCADE)),
+                ('user', models.ForeignKey(to=settings.AUTH_USER_MODEL, on_delete=models.CASCADE)),
             ],
         ),
         migrations.AddField(
             model_name='pollsanswer',
             name='question',
-            field=models.ForeignKey(to='feeds.Post'),
+            field=models.ForeignKey(to='feeds.Post', on_delete=models.CASCADE),
         ),
         migrations.AddField(
             model_name='pollsanswer',
@@ -119,11 +119,11 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='images',
             name='post',
-            field=models.ForeignKey(to='feeds.Post'),
+            field=models.ForeignKey(to='feeds.Post', on_delete=models.CASCADE),
         ),
         migrations.AddField(
             model_name='comment',
             name='post',
-            field=models.ForeignKey(to='feeds.Post'),
+            field=models.ForeignKey(to='feeds.Post', on_delete=models.CASCADE),
         ),
     ]

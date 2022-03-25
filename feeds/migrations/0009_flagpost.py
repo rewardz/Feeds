@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+
 
 from django.db import migrations, models
 from django.conf import settings
@@ -21,8 +21,8 @@ class Migration(migrations.Migration):
                 ('accepted', models.BooleanField(default=True)),
                 ('created_on', models.DateTimeField(auto_now_add=True)),
                 ('modified_on', models.DateTimeField(auto_now=True)),
-                ('flagger', models.ForeignKey(to=settings.AUTH_USER_MODEL)),
-                ('post', models.ForeignKey(to='feeds.Post')),
+                ('flagger', models.ForeignKey(to=settings.AUTH_USER_MODEL, on_delete=models.CASCADE)),
+                ('post', models.ForeignKey(to='feeds.Post', on_delete=models.CASCADE)),
             ],
         ),
     ]

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+
 
 from django.db import migrations, models
 from django.conf import settings
@@ -18,8 +18,8 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
                 ('tagged_on', models.DateTimeField(auto_now_add=True)),
-                ('post', models.ForeignKey(to='feeds.Post')),
-                ('user', models.ForeignKey(to=settings.AUTH_USER_MODEL)),
+                ('post', models.ForeignKey(to='feeds.Post', on_delete=models.CASCADE)),
+                ('user', models.ForeignKey(to=settings.AUTH_USER_MODEL, on_delete=models.CASCADE)),
             ],
         ),
         migrations.AddField(
