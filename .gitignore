@@ -12,3 +12,5 @@ dist/
 feeds.egg-info
 tags
 env
+build/lib
+dist
