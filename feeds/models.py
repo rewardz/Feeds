@@ -17,12 +17,13 @@ from easy_thumbnails.files import get_thumbnailer
 from model_helpers import upload_to
 from taggit.managers import TaggableManager
 
-from .constants import POST_TYPE, SHARED_WITH
+from .constants import POST_TYPE, REACTION_TYPE, SHARED_WITH
 
 logger = logging.getLogger(__name__)
 
 CustomUser = settings.AUTH_USER_MODEL
 Organization = import_string(settings.ORGANIZATION_MODEL)
+Transaction = import_string(settings.TRANSACTION_MODEL)
 
 
 def post_upload_to_path(instance, filename):
@@ -104,10 +105,40 @@ class UserInfo(models.Model):
         abstract = True
 
 
+class ReportAbuse(models.Model):
+    user = models.ForeignKey(CustomUser, related_name="reporter", on_delete=models.CASCADE)
+    reason = models.TextField()
+    is_active = models.BooleanField(default=True)
+    created_on = models.DateTimeField(auto_now_add=True)
+    modified_on = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        abstract = True
+
+
+class ECardCategory(models.Model):
+    name = models.CharField(max_length=100, blank=False)
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
+
+    def __unicode__(self):
+        return "{}: {}".format(self.organization.name, self.name)
+
+
+class ECard(CIImageModel):
+    category = models.ForeignKey(ECardCategory, on_delete=models.CASCADE)
+
+    def __unicode__(self):
+        return "{}: {}".format(self.category.name, self.image)
+
+
 class Post(UserInfo):
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
     title = models.CharField(max_length=200, null=True, blank=True)
     description = models.TextField(null=True, blank=True)
+    user = models.ForeignKey(CustomUser, related_name="appreciated_user", on_delete=models.CASCADE, null=True, blank=True)
+    transaction = models.ForeignKey(Transaction, on_delete=models.CASCADE, null=True, blank=True)
+    ecard = models.ForeignKey(ECard, on_delete=models.CASCADE, null=True, blank=True)
+    gif = models.URLField(null=True, blank=True)
     published_date = models.DateTimeField(blank=True, null=True)
     priority = models.BooleanField(default=False)
     prior_till = models.DateTimeField(blank=True, null=True)
@@ -270,6 +301,7 @@ class Comment(UserInfo):
 
 class PostLiked(UserInfo):
     post = models.ForeignKey(Post, on_delete=models.CASCADE)
+    reaction_type = models.SmallIntegerField(choices=REACTION_TYPE(), default=REACTION_TYPE.LIKE)
 
     def __unicode__(self):
         return "%s like post %s" % (self.created_by, self.post)
@@ -277,9 +309,24 @@ class PostLiked(UserInfo):
 
 class CommentLiked(UserInfo):
     comment = models.ForeignKey(Comment, on_delete=models.CASCADE)
+    reaction_type = models.SmallIntegerField(choices=REACTION_TYPE(), default=REACTION_TYPE.LIKE)
 
     def __unicode__(self):
         return "%s like comment %s" % (self.created_by, self.comment)
+
+
+class PostReportAbuse(ReportAbuse):
+    post = models.ForeignKey(Post, on_delete=models.CASCADE)
+
+    def __unicode__(self):
+        return "User {user} has reported the post {post}".format(user=self.user, post=self.post)
+
+
+class CommentReportAbuse(ReportAbuse):
+    comment = models.ForeignKey(Comment, on_delete=models.CASCADE)
+
+    def __unicode__(self):
+        return "User {user} has reported the comment {comment}".format(user=self.user, comment=self.comment)
 
 
 class PollsAnswer(models.Model):

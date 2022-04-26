@@ -12,4 +12,14 @@ POST_TYPE = Choices({
     "SYSTEM_CREATED_POST": 3,
     "MOST_LIKED": 4,
     "MOST_APPRECIATED": 5,
+    "USER_CREATED_APPRECIATION": 6,
+})
+
+REACTION_TYPE = Choices({
+    "LIKE": 0,
+    "CELEBRATE": 1,
+    "SUPPORT": 2,
+    "LOVE": 3,
+    "INSIGHTFUL": 4,
+    "CURIOUS": 5,
 })
