@@ -106,7 +106,7 @@ class UserInfo(models.Model):
 
 
 class ReportAbuse(models.Model):
-    user = models.ForeignKey(CustomUser, related_name="reporter", on_delete=models.CASCADE)
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     reason = models.TextField()
     is_active = models.BooleanField(default=True)
     created_on = models.DateTimeField(auto_now_add=True)
