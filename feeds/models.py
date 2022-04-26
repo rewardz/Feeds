@@ -36,6 +36,66 @@ def post_upload_to_path(instance, filename):
     )
 
 
+class CIImageModel(models.Model):
+    IMAGE_SIZES = {
+        "thumbnail": (150, 150),
+        "display": (960, 720),
+        "large": (1024, 2048)
+    }
+    image = CIImageField(upload_to=post_upload_to_path, blank=True, null=True)
+    img_large = CIThumbnailField('image', (1, 1), blank=True, null=True)
+    img_display = CIThumbnailField('image', (1, 1), blank=True, null=True)
+    img_thumbnail = CIThumbnailField('image', (1, 1), blank=True, null=True)
+
+    def __init__(self, *args, **kwargs):
+        for key in self.IMAGE_SIZES:
+            field = self._meta.get_field('img_%s' % key)
+            field.size = self.IMAGE_SIZES[key]
+        super(CIImageModel, self).__init__(*args, **kwargs)
+
+    def get_thumbnail(self, size_name, default_url=""):
+        if not self.image:
+            return default_url
+        try:
+            return get_thumbnailer(self.image).get_thumbnail({
+                'size': self.IMAGE_SIZES[size_name],
+                'ci_box': getattr(self, "img_%s" % size_name),
+            }).url
+        except InvalidImageFormatError as ex:
+            logger.error("Error generating thumbnail for %s (pk=%d) :  %s", self, self.pk, ex)
+            return default_url
+
+    @property
+    def thumbnail_img_url(self):
+        try:
+            thumbnail_img_url = self.get_thumbnail("thumbnail")
+            return thumbnail_img_url
+        except ValueError as ex:
+            logger.error("Error generating thumbnail for %s (pk=%d) :  %s", self, self.pk, ex)
+            return ""
+
+    @property
+    def display_img_url(self):
+        try:
+            display_img_url = self.get_thumbnail("display")
+            return display_img_url
+        except ValueError as ex:
+            logger.error("Error generating display for %s (pk=%d) :  %s", self, self.pk, ex)
+            return ""
+
+    @property
+    def large_img_url(self):
+        try:
+            large_img_url = self.get_thumbnail("large")
+            return large_img_url
+        except ValueError as ex:
+            logger.error("Error generating large for %s (pk=%d) :  %s", self, self.pk, ex)
+            return ""
+    
+    class Meta:
+        abstract = True
+
+
 class UserInfo(models.Model):
     created_by = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     created_on = models.DateTimeField(auto_now_add=True)
@@ -168,62 +228,8 @@ class Post(UserInfo):
         ordering = ("-pk",)
 
 
-class Images(models.Model):
-    IMAGE_SIZES = {
-        "thumbnail": (150, 150),
-        "display": (960, 720),
-        "large": (1024, 2048)
-    }
+class Images(CIImageModel):
     post = models.ForeignKey(Post, on_delete=models.CASCADE)
-    image = CIImageField(upload_to=post_upload_to_path, blank=True, null=True)
-    img_large = CIThumbnailField('image', (1, 1), blank=True, null=True)
-    img_display = CIThumbnailField('image', (1, 1), blank=True, null=True)
-    img_thumbnail = CIThumbnailField('image', (1, 1), blank=True, null=True)
-
-    def __init__(self, *args, **kwargs):
-        for key in self.IMAGE_SIZES:
-            field = self._meta.get_field('img_%s' % key)
-            field.size = self.IMAGE_SIZES[key]
-        super(Images, self).__init__(*args, **kwargs)
-
-    def get_thumbnail(self, size_name, default_url=""):
-        if not self.image:
-            return default_url
-        try:
-            return get_thumbnailer(self.image).get_thumbnail({
-                'size': self.IMAGE_SIZES[size_name],
-                'ci_box': getattr(self, "img_%s" % size_name),
-            }).url
-        except InvalidImageFormatError as ex:
-            logger.error("Error generating thumbnail for %s (pk=%d) :  %s", self, self.pk, ex)
-            return default_url
-
-    @property
-    def thumbnail_img_url(self):
-        try:
-            thumbnail_img_url = self.get_thumbnail("thumbnail")
-            return thumbnail_img_url
-        except ValueError as ex:
-            logger.error("Error generating thumbnail for %s (pk=%d) :  %s", self, self.pk, ex)
-            return ""
-
-    @property
-    def display_img_url(self):
-        try:
-            display_img_url = self.get_thumbnail("display")
-            return display_img_url
-        except ValueError as ex:
-            logger.error("Error generating display for %s (pk=%d) :  %s", self, self.pk, ex)
-            return ""
-
-    @property
-    def large_img_url(self):
-        try:
-            large_img_url = self.get_thumbnail("large")
-            return large_img_url
-        except ValueError as ex:
-            logger.error("Error generating display for %s (pk=%d) :  %s", self, self.pk, ex)
-            return ""
 
 
 class Videos(models.Model):
