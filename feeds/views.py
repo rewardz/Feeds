@@ -14,13 +14,14 @@ from rest_framework.response import Response
 
 from .constants import POST_TYPE, SHARED_WITH
 from .models import (
-    Comment, Documents, FlagPost, Post, PostLiked, PollsAnswer,
-    Images, CommentLiked,
+    Comment, Documents, ECard, ECardCategory, FlagPost,
+    Post, PostLiked, PollsAnswer, Images, CommentLiked,
 )
 from .paginator import FeedsResultsSetPagination
 from .serializers import (
     CommentDetailSerializer, CommentSerializer, CommentCreateSerializer,
-    DocumentsSerializer, FlagPostSerializer, PostLikedSerializer, PostSerializer,
+    DocumentsSerializer, ECardCategorySerializer, ECardSerializer, 
+    FlagPostSerializer, PostLikedSerializer, PostSerializer,
     PostDetailSerializer, PollsAnswerSerializer, ImagesSerializer,
     UserInfoSerializer, VideosSerializer,
 )
@@ -609,3 +610,28 @@ def search_user(request):
             Q(first_name__istartswith=search_term))
     serializer = UserInfoSerializer(result, many=True)
     return Response(serializer.data)
+
+
+class ECardCategoryViewSet(viewsets.ModelViewSet):
+    queryset = ECardCategory.objects.none()
+    serializer_class = ECardCategorySerializer
+    permission_classes = [permissions.IsAdminUser, ]
+
+    def get_queryset(self):
+        user = self.request.user
+        queryset = ECardCategory.objects.filter(organization=user.organization)
+        return queryset
+
+
+class ECardViewSet(viewsets.ModelViewSet):
+    queryset = ECard.objects.none()
+    serializer_class = ECardSerializer
+    permission_classes = [permissions.IsAdminUser, ]
+
+    def get_queryset(self):
+        user = self.request.user
+        queryset = ECard.objects.filter(category__organization=user.organization)
+        category = self.request.GET.get('category')
+        if category:
+            queryset = queryset.filter(category_id=category)
+        return queryset

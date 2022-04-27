@@ -8,8 +8,8 @@ from rest_framework import exceptions, serializers
 
 from .constants import POST_TYPE
 from .models import (
-    Comment, CommentLiked, Documents, FlagPost, Post, PostLiked, PollsAnswer,
-    Images, Videos, Voter,
+    Comment, CommentLiked, Documents, ECard, ECardCategory, FlagPost,
+    Post, PostLiked, PollsAnswer, Images, Videos, Voter,
 )
 from .utils import (
     get_departments, get_profile_image, validate_priority,
@@ -436,3 +436,18 @@ class FlagPostSerializer(serializers.ModelSerializer):
     def get_user_info(self, instance):
         user_detail = get_user_detail(instance.flagger.id)
         return UserInfoSerializer(user_detail).data
+
+
+class ECardCategorySerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = ECardCategory
+        fields = ('pk', 'name', 'organization')
+
+
+class ECardSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source="category.name", read_only=True)
+
+    class Meta:
+        model = ECard
+        fields = ('pk', 'category', 'category_name', 'image')
