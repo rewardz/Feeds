@@ -16,6 +16,7 @@ EXTERNAL_APPS = (
 
 INTERNAL_APPS = (
     'news_feed.tests.profiles',
+    'news_feed.tests.finance',
     'feeds',
 )
 
@@ -67,6 +68,7 @@ AUTH_USER_MODEL = 'profiles.CustomUser'
 CUSTOM_USER_MODEL = 'news_feed.tests.profiles.models.CustomUser'
 ORGANIZATION_MODEL = 'news_feed.tests.profiles.models.Organization'
 DEPARTMENT_MODEL = 'news_feed.tests.profiles.models.Department'
+TRANSACTION_MODEL = "news_feed.tests.finance.models.Transaction"
 PROFILE_IMAGE_PROPERTY = 'thumbnail_img_url'
 NO_PROFILE_IMAGE = ''
 PENDING_EMAIL = 'news_feed.tests.profiles.models.PendingEmail'
