@@ -12,7 +12,7 @@ class Migration(migrations.Migration):
     dependencies = [
         ('finance', '0001_initial'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
-        ('profiles', '0006_pushnotification_object_id'),
+        ('profiles', '0001_initial'),
         ('feeds', '0013_auto_20220309_0543'),
     ]
 
