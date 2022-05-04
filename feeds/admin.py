@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from feeds.models import FlagPost, Post, Comment, PostLiked, PollsAnswer
+from feeds.models import Comment, ECard, ECardCategory, FlagPost, PollsAnswer, Post, PostLiked, PostReportAbuse
 
 
 @admin.register(Post)
@@ -35,3 +35,18 @@ class PollsAnswerAdmin(admin.ModelAdmin):
 class FlagPostAdmin(admin.ModelAdmin):
     list_display = ('post', 'flagger', 'notes', 'accepted', 'notified')
     readonly_fields = ('flagger',)
+
+
+@admin.register(ECardCategory)
+class ECardCategoryAdmin(admin.ModelAdmin):
+    list_display = ('name', 'organization')
+
+
+@admin.register(ECard)
+class ECardAdmin(admin.ModelAdmin):
+    list_display = ('category', 'image')
+
+
+@admin.register(PostReportAbuse)
+class PostReportAbuseAdmin(admin.ModelAdmin):
+    list_display = ('post', 'user', 'is_active')
