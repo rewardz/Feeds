@@ -139,6 +139,7 @@ class Post(UserInfo):
     transaction = models.ForeignKey(Transaction, on_delete=models.CASCADE, null=True, blank=True)
     ecard = models.ForeignKey(ECard, on_delete=models.CASCADE, null=True, blank=True)
     gif = models.URLField(null=True, blank=True)
+    cc_users = models.ManyToManyField(CustomUser, related_name="cc_users", blank=True)
     published_date = models.DateTimeField(blank=True, null=True)
     priority = models.BooleanField(default=False)
     prior_till = models.DateTimeField(blank=True, null=True)

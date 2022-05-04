@@ -73,6 +73,11 @@ class Migration(migrations.Migration):
         ),
         migrations.AddField(
             model_name='post',
+            name='cc_users',
+            field=models.ManyToManyField(related_name='cc_users', to=settings.AUTH_USER_MODEL, blank=True),
+        ),
+        migrations.AddField(
+            model_name='post',
             name='gif',
             field=models.URLField(null=True, blank=True),
         ),
@@ -95,6 +100,11 @@ class Migration(migrations.Migration):
             model_name='post',
             name='post_type',
             field=models.SmallIntegerField(default=1, choices=[(5, 'Most appreciated'), (4, 'Most liked'), (3, 'System created post'), (6, 'User created appreciation'), (2, 'User created poll'), (1, 'User created post')]),
+        ),
+        migrations.AlterField(
+            model_name='post',
+            name='shared_with',
+            field=models.SmallIntegerField(default=10, choices=[(30, 'Admin only'), (20, 'All departments'), (10, 'Self department')]),
         ),
         migrations.AddField(
             model_name='postreportabuse',
