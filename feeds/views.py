@@ -631,7 +631,7 @@ class ECardViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         queryset = ECard.objects.filter(category__organization=user.organization)
-        category = self.request.GET.get('category')
+        category = self.request.query_params.get('category')
         if category:
             queryset = queryset.filter(category_id=category)
         search = self.request.query_params.get('search')
