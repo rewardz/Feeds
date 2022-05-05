@@ -5,11 +5,13 @@ from django.db import migrations, models
 import cropimg.fields
 import feeds.models
 from django.conf import settings
+import taggit.managers
 
 
 class Migration(migrations.Migration):
 
     dependencies = [
+        ('taggit', '0002_auto_20150616_2121'),
         ('finance', '0001_initial'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
         ('profiles', '0001_initial'),
@@ -120,6 +122,11 @@ class Migration(migrations.Migration):
             model_name='ecard',
             name='category',
             field=models.ForeignKey(to='feeds.ECardCategory'),
+        ),
+        migrations.AddField(
+            model_name='ecard',
+            name='tags',
+            field=taggit.managers.TaggableManager(to='taggit.Tag', through='taggit.TaggedItem', help_text='A comma-separated list of tags.', verbose_name='Tags'),
         ),
         migrations.AddField(
             model_name='post',

@@ -447,7 +447,11 @@ class ECardCategorySerializer(serializers.ModelSerializer):
 
 class ECardSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source="category.name", read_only=True)
+    tags = serializers.SerializerMethodField()
 
     class Meta:
         model = ECard
-        fields = ('pk', 'category', 'category_name', 'image')
+        fields = ('pk', 'category', 'category_name', 'image', 'tags')
+
+    def get_tags(self, obj):
+        return list(obj.tags.values_list("name", flat=True))

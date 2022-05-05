@@ -126,6 +126,7 @@ class ECardCategory(models.Model):
 
 class ECard(CIImageModel):
     category = models.ForeignKey(ECardCategory, on_delete=models.CASCADE)
+    tags = TaggableManager()
 
     def __unicode__(self):
         return "{}: {}".format(self.category.name, self.image)
