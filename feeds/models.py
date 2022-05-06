@@ -31,7 +31,10 @@ def post_upload_to_path(instance, filename):
     fmt = '%Y/%m/%d'
     dc = now.strftime(fmt)
     inst_verbose = instance._meta.verbose_name
-    inst_id = str(instance.post.pk)
+    if instance.post:
+        inst_id = str(instance.post.pk)
+    else:
+        inst_id = str(instance.pk)
     return 'post/{inst_name}/{dc}/{id}/{name}'.format(
         inst_name=inst_verbose, dc=dc, id=inst_id, name=filename
     )
