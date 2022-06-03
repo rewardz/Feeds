@@ -1,10 +1,16 @@
 from django.contrib import admin
 
+from ajax_select import make_ajax_form
+
 from feeds.models import Comment, ECard, ECardCategory, FlagPost, PollsAnswer, Post, PostLiked, PostReportAbuse
 
 
 @admin.register(Post)
 class PostAdmin(admin.ModelAdmin):
+    form = make_ajax_form(Post, {
+        'organization': 'Organization',
+        'user': 'CustomUser',
+    })
     list_display = (
         'title', 'organization', 'shared_with', 'post_type',
         'created_by', 'created_on', 'modified_on', 'modified_by', 'mark_delete',

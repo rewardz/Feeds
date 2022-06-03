@@ -12,6 +12,7 @@ EXTERNAL_APPS = (
     'easy_thumbnails',
     'image_cropping',
     'taggit',
+    'ajax_select',
 )
 
 INTERNAL_APPS = (
