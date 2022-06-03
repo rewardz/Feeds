@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 CustomUser = settings.AUTH_USER_MODEL
 Organization = import_string(settings.ORGANIZATION_MODEL)
+Department = import_string(settings.DEPARTMENT_MODEL)
 
 
 def post_upload_to_path(instance, filename):
@@ -62,6 +63,7 @@ class Post(UserInfo):
     active_days = models.SmallIntegerField(
         default=1, validators=[MinValueValidator(1), MaxValueValidator(30)]
     )
+    departments = models.ManyToManyField(Department, related_name="posts")
     modified_by = models.ForeignKey(CustomUser, related_name="post_modifier", null=True)
     modified_on = models.DateTimeField(auto_now=True, null=True, blank=True)
     mark_delete = models.BooleanField(default=False)
