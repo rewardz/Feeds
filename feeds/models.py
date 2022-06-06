@@ -129,6 +129,7 @@ class ECardCategory(models.Model):
 
 
 class ECard(CIImageModel):
+    name = models.CharField(max_length=100, blank=False)
     category = models.ForeignKey(ECardCategory, on_delete=models.CASCADE)
     tags = TaggableManager()
 
