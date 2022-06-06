@@ -142,6 +142,10 @@ class PostSerializer(serializers.ModelSerializer):
     tagged_users = serializers.SerializerMethodField()
     is_admin = serializers.SerializerMethodField()
     tags = serializers.SerializerMethodField()
+    departments = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=DEPARTMENT_MODEL.objects.all(),
+        required=False, allow_null=True
+    )
 
     class Meta:
         model = Post
@@ -152,7 +156,8 @@ class PostSerializer(serializers.ModelSerializer):
             "priority", "prior_till",
             "shared_with", "images", "documents", "videos",
             "is_owner", "can_edit", "can_delete", "has_appreciated",
-            "appreciation_count", "comments_count", "tagged_users", "is_admin", "tags"
+            "appreciation_count", "comments_count", "tagged_users", "is_admin", "tags",
+            "departments",
         )
 
     def get_tags(self, obj):
@@ -227,7 +232,11 @@ class PostSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         validate_priority(validated_data)
-        return super(PostSerializer, self).create(validated_data)
+        departments = validated_data.pop('departments', None)
+        post = Post.objects.create(**validated_data)
+        if post and departments:
+            post.departments.add(*departments)
+        return post
 
     def to_representation(self, instance):
         representation = super(PostSerializer, self).to_representation(instance)
