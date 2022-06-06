@@ -636,5 +636,5 @@ class ECardViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(category_id=category)
         search = self.request.query_params.get('search')
         if search:
-            queryset = queryset.filter(tags__name__icontains=search)
+            queryset = queryset.filter(name__icontains=search)
         return queryset

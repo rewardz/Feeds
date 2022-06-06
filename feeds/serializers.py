@@ -451,7 +451,7 @@ class ECardSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ECard
-        fields = ('pk', 'category', 'category_name', 'image', 'tags')
+        fields = ('pk', 'name', 'image', 'tags', 'category', 'category_name')
 
     def get_tags(self, obj):
         return list(obj.tags.values_list("name", flat=True))
