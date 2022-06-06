@@ -8,7 +8,6 @@ asgiref==3.5.0
     # via django
 cffi==1.15.0
     # via cryptography
-cropimg-django @ git+https://github.com/rewardz/cropimg-django.git@0.5
     # via feeds (setup.py)
 cryptography==36.0.2
     # via pyopenssl
