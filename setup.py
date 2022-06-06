@@ -36,6 +36,7 @@ install_requires = [
     "pyOpenSSL",
     "ndg-httpsclient",
     'pyasn1',
+    'cropimg-django'
 ]
 
 
