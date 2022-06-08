@@ -4,13 +4,11 @@ from django.utils.module_loading import import_string
 
 from ajax_select import register, LookupChannel
 
-# CustomUser = settings.AUTH_USER_MODEL
 Organization = import_string(settings.ORGANIZATION_MODEL)
 
 
 @register('CustomUser')
 class CustomUserLookup(LookupChannel):
-    # model = CustomUser
     model = get_user_model()
     min_length = 3
 
