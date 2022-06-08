@@ -15,7 +15,7 @@ class PostAdmin(admin.ModelAdmin):
         'title', 'organization', 'shared_with', 'post_type',
         'created_by', 'created_on', 'modified_on', 'modified_by', 'mark_delete',
     )
-    readonly_fields = ('cc_users', 'created_by', 'modified_by',)
+    readonly_fields = ('transaction', 'nomination', 'cc_users', 'created_by', 'modified_by',)
     list_filter = ('organization', 'priority', 'mark_delete',)
     search_fields = ('organization__name',)
 
