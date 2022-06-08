@@ -9,7 +9,7 @@ from feeds.models import Comment, ECard, ECardCategory, FlagPost, PollsAnswer, P
 class PostAdmin(admin.ModelAdmin):
     form = make_ajax_form(Post, {
         'organization': 'Organization',
-        # 'user': 'CustomUser',
+        'user': 'CustomUser',
     })
     list_display = (
         'title', 'organization', 'shared_with', 'post_type',
