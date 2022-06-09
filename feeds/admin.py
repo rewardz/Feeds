@@ -2,7 +2,8 @@ from django.contrib import admin
 
 from ajax_select import make_ajax_form
 
-from feeds.models import Comment, ECard, ECardCategory, FlagPost, PollsAnswer, Post, PostLiked, PostReportAbuse
+from feeds.models import (
+    Comment, ECard, ECardCategory, FlagPost, Images, PollsAnswer, Post, PostLiked, PostReportAbuse)
 
 
 @admin.register(Post)
@@ -56,3 +57,8 @@ class ECardAdmin(admin.ModelAdmin):
 @admin.register(PostReportAbuse)
 class PostReportAbuseAdmin(admin.ModelAdmin):
     list_display = ('post', 'user', 'is_active')
+
+
+@admin.register(Images)
+class ImagesAdmin(admin.ModelAdmin):
+    list_display = ('post', 'image')
