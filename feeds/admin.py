@@ -1,4 +1,6 @@
 from django.contrib import admin
+from django.contrib.admin.widgets import FilteredSelectMultiple
+from django.db import models
 
 from feeds.models import FlagPost, Post, Comment, PostLiked, PollsAnswer
 
@@ -12,6 +14,13 @@ class PostAdmin(admin.ModelAdmin):
     readonly_fields = ('created_by', 'modified_by',)
     list_filter = ('organization', 'priority', 'mark_delete',)
     search_fields = ('organization__name',)
+
+    formfield_overrides = {
+        # Make many to many field user FilteredSelectMultiple widget instead of the default
+        models.ManyToManyField: {
+            "widget": FilteredSelectMultiple("", is_stacked=False)
+        }
+    }
 
 
 @admin.register(Comment)
