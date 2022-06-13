@@ -21,6 +21,7 @@ PUSH_NOTIFICATION_MODEL = import_string(settings.PUSH_NOTIFICATION)
 NOTIFICATION_OBJECT_TYPE = import_string(settings.POST_NOTIFICATION_OBJECT_TYPE).Posts
 NOTIF_OBJECT_TYPE_FIELD_NAME = settings.NOTIF_OBJECT_TYPE_FIELD_NAME
 NOTIF_OBJECT_ID_FIELD_NAME = settings.NOTIF_OBJECT_ID_FIELD_NAME
+USER_DEPARTMENT_RELATED_NAME = settings.USER_DEPARTMENT_RELATED_NAME
 
 
 def accessible_posts_by_user(user, organization):
@@ -28,6 +29,11 @@ def accessible_posts_by_user(user, organization):
         result = Post.objects.filter(organization=organization)
         result = result.filter(mark_delete=False)
         return result
+    # non staff user
+    # get the departments to which this user belongs
+    user_depts = getattr(user, USER_DEPARTMENT_RELATED_NAME).all()
+    result = Post.objects.filter(organization=organization, departments__in=user_depts)
+    """
     dept_users = []
     for dept in DEPARTMENT_MODEL.objects.filter(users=user):
         for usr in dept.users.all():
@@ -40,6 +46,7 @@ def accessible_posts_by_user(user, organization):
         result = Post.objects.filter(Q(organization=organization, \
                                     shared_with=SHARED_WITH.ALL_DEPARTMENTS) |\
                                  Q(created_by__in=dept_users))
+    """
     result = result.filter(mark_delete=False)
     return result
 
