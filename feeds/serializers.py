@@ -151,7 +151,7 @@ class PostSerializer(serializers.ModelSerializer):
         model = Post
         fields = (
             "id", "created_by", "created_on", "modified_by", "modified_on",
-            "organization", "created_by_user_info",
+            "organizations", "created_by_user_info",
             "title", "description", "post_type", "poll_info", "active_days",
             "priority", "prior_till",
             "shared_with", "images", "documents", "videos",
