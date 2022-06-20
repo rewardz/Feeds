@@ -17,6 +17,7 @@ from .utils import (
 )
 
 DEPARTMENT_MODEL = import_string(settings.DEPARTMENT_MODEL)
+Organization = import_string(settings.ORGANIZATION_MODEL)
 UserModel = import_string(settings.CUSTOM_USER_MODEL)
 
 
@@ -146,6 +147,10 @@ class PostSerializer(serializers.ModelSerializer):
         many=True, queryset=DEPARTMENT_MODEL.objects.all(),
         required=False, allow_null=True
     )
+    organizations = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=Organization.objects.all(),
+        required=False, allow_null=True
+    )
 
     class Meta:
         model = Post
@@ -231,11 +236,21 @@ class PostSerializer(serializers.ModelSerializer):
         return UserInfoSerializer(result, many=True, read_only=True).data
 
     def create(self, validated_data):
+        request = self.context.get('request')
         validate_priority(validated_data)
+        organizations = validated_data.pop('organizations', None)
+
+        if not organizations:
+            organizations = [request.user.organization]
+
         departments = validated_data.pop('departments', None)
         post = Post.objects.create(**validated_data)
-        if post and departments:
-            post.departments.add(*departments)
+
+        if post:
+            if organizations:
+                post.organizations.add(*organizations)
+            if departments:
+                post.departments.add(*departments)
         return post
 
     def to_representation(self, instance):
@@ -254,7 +269,7 @@ class PostDetailSerializer(PostSerializer):
         model = Post
         fields = (
             "id", "created_by", "created_on", "modified_by", "modified_on",
-            "organization", "created_by_user_info",
+            "organizations", "created_by_user_info",
             "title", "description", "post_type", "poll_info", "active_days",
             "priority", "prior_till", "shared_with", "images", "documents", "videos",
             "is_owner", "can_edit", "can_delete", "has_appreciated",
