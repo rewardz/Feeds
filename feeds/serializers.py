@@ -236,7 +236,7 @@ class PostSerializer(serializers.ModelSerializer):
         return UserInfoSerializer(result, many=True, read_only=True).data
 
     def create(self, validated_data):
-        request = self.context.get('request')
+        request = self.context.get('request', None)
         validate_priority(validated_data)
         organizations = validated_data.pop('organizations', None)
 
