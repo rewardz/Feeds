@@ -8,12 +8,12 @@ from feeds.models import FlagPost, Post, Comment, PostLiked, PollsAnswer
 @admin.register(Post)
 class PostAdmin(admin.ModelAdmin):
     list_display = (
-        'title', 'organization', 'shared_with', 'post_type',
+        'title', 'shared_with', 'post_type',
         'created_by', 'created_on', 'modified_on', 'modified_by', 'mark_delete',
     )
     readonly_fields = ('created_by', 'modified_by',)
-    list_filter = ('organization', 'priority', 'mark_delete',)
-    search_fields = ('organization__name',)
+    list_filter = ('priority', 'mark_delete',)
+    # search_fields = ('organization__name',)
 
     formfield_overrides = {
         # Make many to many field user FilteredSelectMultiple widget instead of the default
