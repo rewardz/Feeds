@@ -46,7 +46,7 @@ class UserInfo(models.Model):
 
 
 class Post(UserInfo):
-    organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
+    organizations = models.ManyToManyField(Organization, related_name="posts")
     title = models.CharField(max_length=200, null=True, blank=True)
     description = models.TextField(null=True, blank=True)
     published_date = models.DateTimeField(blank=True, null=True)
