@@ -212,6 +212,7 @@ class PostViewSet(viewsets.ModelViewSet):
 
     @list_route(methods=["POST"], permission_classes=(permissions.IsAuthenticated,))
     def create_poll(self, request, *args, **kwargs):
+        context = {'request': request}
         user = self.request.user
         organization = user.organization
         payload = self.request.data
@@ -226,7 +227,7 @@ class PostViewSet(viewsets.ModelViewSet):
         data['created_by'] = user.pk
         data['modified_by'] = user.pk
         data['organization'] = organization.pk
-        question_serializer = PostSerializer(data=data)
+        question_serializer = PostSerializer(data=data, context=context)
         question_serializer.is_valid(raise_exception=True)
         poll = question_serializer.save()
         for answer in answers:
