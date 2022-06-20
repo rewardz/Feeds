@@ -25,14 +25,16 @@ USER_DEPARTMENT_RELATED_NAME = settings.USER_DEPARTMENT_RELATED_NAME
 
 
 def accessible_posts_by_user(user, organization):
+    if not isinstance(organization, (list, tuple)):
+        organization = [organization]
     if user.is_staff:
-        result = Post.objects.filter(organization=organization)
+        result = Post.objects.filter(organizations__in=organization)
         result = result.filter(mark_delete=False)
         return result
     # non staff user
     # get the departments to which this user belongs
     user_depts = getattr(user, USER_DEPARTMENT_RELATED_NAME).all()
-    result = Post.objects.filter(organization=organization, departments__in=user_depts)
+    result = Post.objects.filter(organizations__in=organization, departments__in=user_depts)
     """
     dept_users = []
     for dept in DEPARTMENT_MODEL.objects.filter(users=user):
