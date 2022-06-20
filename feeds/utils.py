@@ -34,21 +34,8 @@ def accessible_posts_by_user(user, organization):
     # non staff user
     # get the departments to which this user belongs
     user_depts = getattr(user, USER_DEPARTMENT_RELATED_NAME).all()
-    result = Post.objects.filter(organizations__in=organization, departments__in=user_depts)
-    """
-    dept_users = []
-    for dept in DEPARTMENT_MODEL.objects.filter(users=user):
-        for usr in dept.users.all():
-            dept_users.append(usr.id)
-    if not dept_users:
-        # If user does not belong to any department just show posts created by him
-        result = Post.objects.filter(Q(organization=organization,
-                                       created_by=user))
-    else:
-        result = Post.objects.filter(Q(organization=organization, \
-                                    shared_with=SHARED_WITH.ALL_DEPARTMENTS) |\
-                                 Q(created_by__in=dept_users))
-    """
+    result = Post.objects.filter(organizations__in=organization)
+    result = result.filter(Q(departments__in=user_depts) | Q(departments__isnull=True))
     result = result.filter(mark_delete=False)
     return result
 
