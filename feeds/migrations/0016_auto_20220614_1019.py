@@ -7,7 +7,6 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('profiles', '0006_pushnotification_object_id'),
         ('feeds', '0015_update_department_m2m_values'),
     ]
 
