@@ -18,6 +18,8 @@ from .utils import (
 
 DEPARTMENT_MODEL = import_string(settings.DEPARTMENT_MODEL)
 UserModel = import_string(settings.CUSTOM_USER_MODEL)
+Nominations = import_string(settings.NOMINATIONS_MODEL)
+TrophyBadge = import_string(settings.TROPHY_BADGE_MODEL)
 
 
 def get_user_detail(user_id):
@@ -127,6 +129,53 @@ class PollSerializer(serializers.ModelSerializer):
         return instance.total_votes()
 
 
+class TrophyBadgeSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = TrophyBadge
+        fields = ("id",
+                  "name",
+                  "description",
+                  "background_color",
+                  "icon")
+
+
+class NominationsSerializer(serializers.ModelSerializer):
+    nomination_icon = serializers.SerializerMethodField()
+    review_level = serializers.SerializerMethodField()
+    nominator_name = serializers.SerializerMethodField()
+    badges = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Nominations
+        fields = ("id",
+                  "nomination_icon",
+                  "review_level",
+                  "nominator_name",
+                  "comment",
+                  "created",
+                  "badges")
+
+    @staticmethod
+    def get_review_level(instance):
+        return instance.category.reviewer_levels
+
+    def get_nominator_name(self, instance):
+        return instance.nominator.full_name
+
+    def get_nomination_icon(self, instance):
+        question_obj = instance.question.first()
+        try:
+            return question_obj.icon.url
+        except (ValueError, AttributeError):
+            return ""
+
+    def get_badges(self, instance):
+        if instance.category and instance.category.badge:
+            return TrophyBadgeSerializer(instance=instance.category.badge).data
+        return None
+
+
 class PostSerializer(serializers.ModelSerializer):
     images = serializers.SerializerMethodField()
     documents = serializers.SerializerMethodField()
@@ -142,6 +191,8 @@ class PostSerializer(serializers.ModelSerializer):
     tagged_users = serializers.SerializerMethodField()
     is_admin = serializers.SerializerMethodField()
     tags = serializers.SerializerMethodField()
+    nomination = NominationsSerializer()
+    feed_type = serializers.SerializerMethodField()
 
     class Meta:
         model = Post
@@ -152,7 +203,8 @@ class PostSerializer(serializers.ModelSerializer):
             "priority", "prior_till",
             "shared_with", "images", "documents", "videos",
             "is_owner", "can_edit", "can_delete", "has_appreciated",
-            "appreciation_count", "comments_count", "tagged_users", "is_admin", "tags"
+            "appreciation_count", "comments_count", "tagged_users", "is_admin", "tags",
+            "nomination", "feed_type"
         )
 
     def get_tags(self, obj):
@@ -235,6 +287,13 @@ class PostSerializer(serializers.ModelSerializer):
         representation["modified_on"] = instance.modified_on. \
             strftime("%Y-%m-%d") if instance.modified_on else None
         return representation
+
+    def get_feed_type(self, instance):
+        if instance.post_type == POST_TYPE.USER_CREATED_NOMINATION:
+            return "nomination"
+        elif instance.post_type == POST_TYPE.USER_CREATED_APPRECIATION:
+            return "appreciation"
+        return instance.post_type
 
 
 class PostDetailSerializer(PostSerializer):

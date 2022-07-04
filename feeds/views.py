@@ -6,12 +6,13 @@ from django.http import Http404
 from django.utils.module_loading import import_string
 from django.utils.translation import ugettext as _
 
-from rest_framework import permissions, viewsets, serializers, status, views
+from rest_framework import permissions, viewsets, serializers, status, views, filters
 from rest_framework.decorators import api_view, detail_route, list_route, permission_classes
 from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import MultiPartParser, FormParser, FileUploadParser, JSONParser
 from rest_framework.response import Response
 
+from .filters import PostFilter
 from .constants import POST_TYPE, SHARED_WITH
 from .models import (
     Comment, Documents, ECard, ECardCategory, FlagPost,
@@ -638,3 +639,24 @@ class ECardViewSet(viewsets.ModelViewSet):
         if search:
             queryset = queryset.filter(name__icontains=search)
         return queryset
+
+
+class UserFeedViewSet(viewsets.ModelViewSet):
+    parser_classes = (JSONParser,)
+    permission_classes = (permissions.IsAuthenticated,)
+    serializer_class = PostSerializer
+    filter_backends = (filters.DjangoFilterBackend,)
+
+    def get_queryset(self):
+        feed_flag = self.request.query_params.get("feed", None)
+        user = self.request.user
+        feeds = Post.objects.filter(post_type__in=[POST_TYPE.USER_CREATED_APPRECIATION,
+                                                   POST_TYPE.USER_CREATED_NOMINATION])
+        feeds = PostFilter(self.request.GET, queryset=feeds).qs
+        if feed_flag == "received":
+            feeds = feeds.filter(user=user)
+        elif feed_flag == "given":
+            feeds = feeds.filter(nomination__nominator=user)
+        else:
+            feeds = feeds.filter(Q(nomination__nominator=user) | Q(user=user)).distinct()
+        return feeds
