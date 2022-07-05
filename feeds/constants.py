@@ -12,4 +12,5 @@ POST_TYPE = Choices({
     "SYSTEM_CREATED_POST": 3,
     "MOST_LIKED": 4,
     "MOST_APPRECIATED": 5,
+    "FEEDBACK_POST": 6,
 })
