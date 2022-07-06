@@ -14,6 +14,7 @@ class Migration(migrations.Migration):
         ('taggit', '0002_auto_20150616_2121'),
         ('finance', '0001_initial'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
+        ('nominations', '0001_initial'),
         ('profiles', '0001_initial'),
         ('feeds', '0013_auto_20220309_0543'),
     ]
@@ -42,6 +43,7 @@ class Migration(migrations.Migration):
                 ('img_large', cropimg.fields.CIThumbnailField(size=(1, 1), max_length=30, null=True, image_field=b'image', blank=True)),
                 ('img_display', cropimg.fields.CIThumbnailField(size=(1, 1), max_length=30, null=True, image_field=b'image', blank=True)),
                 ('img_thumbnail', cropimg.fields.CIThumbnailField(size=(1, 1), max_length=30, null=True, image_field=b'image', blank=True)),
+                ('name', models.CharField(max_length=100)),
             ],
             options={
                 'abstract': False,
@@ -85,6 +87,11 @@ class Migration(migrations.Migration):
         ),
         migrations.AddField(
             model_name='post',
+            name='nomination',
+            field=models.ForeignKey(blank=True, to='nominations.Nominations', null=True),
+        ),
+        migrations.AddField(
+            model_name='post',
             name='transaction',
             field=models.ForeignKey(blank=True, to='finance.Transaction', null=True),
         ),
@@ -101,7 +108,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='post',
             name='post_type',
-            field=models.SmallIntegerField(default=1, choices=[(5, 'Most appreciated'), (4, 'Most liked'), (3, 'System created post'), (6, 'User created appreciation'), (2, 'User created poll'), (1, 'User created post')]),
+            field=models.SmallIntegerField(default=1, choices=[(5, 'Most appreciated'), (4, 'Most liked'), (3, 'System created post'), (6, 'User created appreciation'), (7, 'User created nomination'), (2, 'User created poll'), (1, 'User created post')]),
         ),
         migrations.AlterField(
             model_name='post',
