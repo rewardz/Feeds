@@ -20,6 +20,8 @@ DEPARTMENT_MODEL = import_string(settings.DEPARTMENT_MODEL)
 UserModel = import_string(settings.CUSTOM_USER_MODEL)
 Nominations = import_string(settings.NOMINATIONS_MODEL)
 TrophyBadge = import_string(settings.TROPHY_BADGE_MODEL)
+UserStrength = import_string(settings.USER_STRENGTH_MODEL)
+
 
 
 def get_user_detail(user_id):
@@ -176,6 +178,13 @@ class NominationsSerializer(serializers.ModelSerializer):
         return None
 
 
+class UserStrengthSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = UserStrength
+        fields = ('id', 'name', 'illustration', 'background_color', 'message', 'icon')
+
+
 class PostSerializer(serializers.ModelSerializer):
     images = serializers.SerializerMethodField()
     documents = serializers.SerializerMethodField()
@@ -193,6 +202,7 @@ class PostSerializer(serializers.ModelSerializer):
     tags = serializers.SerializerMethodField()
     nomination = NominationsSerializer()
     feed_type = serializers.SerializerMethodField()
+    user_strength = serializers.SerializerMethodField()
 
     class Meta:
         model = Post
@@ -204,7 +214,7 @@ class PostSerializer(serializers.ModelSerializer):
             "shared_with", "images", "documents", "videos",
             "is_owner", "can_edit", "can_delete", "has_appreciated",
             "appreciation_count", "comments_count", "tagged_users", "is_admin", "tags",
-            "nomination", "feed_type"
+            "nomination", "feed_type", "user_strength"
         )
 
     def get_tags(self, obj):
@@ -294,6 +304,13 @@ class PostSerializer(serializers.ModelSerializer):
         elif instance.post_type == POST_TYPE.USER_CREATED_APPRECIATION:
             return "appreciation"
         return instance.post_type
+
+    def get_user_strength(self, instance):
+        if instance.transaction:
+            strength_id = instance.transaction.context.get('strength_id')
+            if strength_id:
+                return UserStrengthSerializer(instance=UserStrength.objects.filter(id=strength_id).first()).data
+        return None
 
 
 class PostDetailSerializer(PostSerializer):
