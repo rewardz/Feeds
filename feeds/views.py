@@ -656,7 +656,9 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         if feed_flag == "received":
             feeds = feeds.filter(user=user)
         elif feed_flag == "given":
-            feeds = feeds.filter(nomination__nominator=user)
+            feeds = feeds.filter(Q(nomination__nominator=user) | Q(created_by=user))
+        elif feed_flag == "approvals":
+            feeds = feeds.filter(nomination__assigned_reviewer=user)
         else:
-            feeds = feeds.filter(Q(nomination__nominator=user) | Q(user=user)).distinct()
-        return feeds
+            feeds = feeds.filter(Q(nomination__nominator=user) | Q(user=user) | Q(nomination__assigned_reviewer=user))
+        return feeds.distinct()
