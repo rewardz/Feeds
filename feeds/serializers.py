@@ -203,6 +203,7 @@ class PostSerializer(serializers.ModelSerializer):
     nomination = NominationsSerializer()
     feed_type = serializers.SerializerMethodField()
     user_strength = serializers.SerializerMethodField()
+    user = UserInfoSerializer()
 
     class Meta:
         model = Post
@@ -214,7 +215,7 @@ class PostSerializer(serializers.ModelSerializer):
             "shared_with", "images", "documents", "videos",
             "is_owner", "can_edit", "can_delete", "has_appreciated",
             "appreciation_count", "comments_count", "tagged_users", "is_admin", "tags",
-            "nomination", "feed_type", "user_strength"
+            "nomination", "feed_type", "user_strength", "user"
         )
 
     def get_tags(self, obj):
