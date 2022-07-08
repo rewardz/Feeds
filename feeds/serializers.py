@@ -327,7 +327,7 @@ class PostDetailSerializer(PostSerializer):
             "priority", "prior_till", "shared_with", "images", "documents", "videos",
             "is_owner", "can_edit", "can_delete", "has_appreciated",
             "appreciation_count", "appreciated_by", "comments_count", "comments",
-            "tagged_users", "is_admin",
+            "tagged_users", "is_admin", "nomination", "feed_type", "user_strength", "user"
         )
 
     def get_comments(self, instance):
