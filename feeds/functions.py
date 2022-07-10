@@ -15,7 +15,7 @@ def create_feedback_post(user, title, description, **kwargs):
       - documents: Documents attached
 
     Return: 
-      - True if post created successfully
+      - post if post created successfully
       - False if exception Raised
     """
     try:
@@ -44,7 +44,7 @@ def create_feedback_post(user, title, description, **kwargs):
                     document_serializer.save()
                 else:
                     return False
-        return True
+        return post
     except Exception:
         return False
 
