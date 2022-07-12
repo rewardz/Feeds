@@ -149,6 +149,13 @@ class UserStrengthSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', 'illustration', 'background_color', 'message', 'icon')
 
 
+class EcardSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = ECard
+        fields = ('id', 'name', 'image')
+
+
 class NominationsSerializer(serializers.ModelSerializer):
     nomination_icon = serializers.SerializerMethodField()
     review_level = serializers.SerializerMethodField()
@@ -213,6 +220,8 @@ class PostSerializer(serializers.ModelSerializer):
     feed_type = serializers.SerializerMethodField()
     user_strength = serializers.SerializerMethodField()
     user = UserInfoSerializer()
+    user_reaction_type = serializers.SerializerMethodField()
+    ecard = EcardSerializer()
 
     class Meta:
         model = Post
@@ -224,7 +233,7 @@ class PostSerializer(serializers.ModelSerializer):
             "shared_with", "images", "documents", "videos",
             "is_owner", "can_edit", "can_delete", "has_appreciated",
             "appreciation_count", "comments_count", "tagged_users", "is_admin", "tags",
-            "nomination", "feed_type", "user_strength", "user", "gif"
+            "nomination", "feed_type", "user_strength", "user", "user_reaction_type", "gif", "ecard",
         )
 
     def get_tags(self, obj):
@@ -320,6 +329,13 @@ class PostSerializer(serializers.ModelSerializer):
             strength_id = instance.transaction.context.get('strength_id')
             if strength_id:
                 return UserStrengthSerializer(instance=UserStrength.objects.filter(id=strength_id).first()).data
+        return None
+
+    def get_user_reaction_type(self, instance):
+        request = self.context['request']
+        user = request.user
+        if PostLiked.objects.filter(post=instance, created_by=user).exists():
+            return PostLiked.objects.filter(post=instance, created_by=user).values_list('reaction_type', flat=True)
         return None
 
 
