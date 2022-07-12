@@ -224,7 +224,7 @@ class PostSerializer(serializers.ModelSerializer):
             "shared_with", "images", "documents", "videos",
             "is_owner", "can_edit", "can_delete", "has_appreciated",
             "appreciation_count", "comments_count", "tagged_users", "is_admin", "tags",
-            "nomination", "feed_type", "user_strength", "user"
+            "nomination", "feed_type", "user_strength", "user", "gif"
         )
 
     def get_tags(self, obj):
