@@ -139,7 +139,8 @@ class TrophyBadgeSerializer(serializers.ModelSerializer):
                   "name",
                   "description",
                   "background_color",
-                  "icon")
+                  "icon",
+                  "points")
 
 
 class UserStrengthSerializer(serializers.ModelSerializer):
@@ -162,6 +163,7 @@ class NominationsSerializer(serializers.ModelSerializer):
     nominator_name = serializers.SerializerMethodField()
     badges = serializers.SerializerMethodField()
     user_strength = UserStrengthSerializer()
+    nominated_team_member = UserInfoSerializer()
 
     class Meta:
         model = Nominations
@@ -172,7 +174,8 @@ class NominationsSerializer(serializers.ModelSerializer):
                   "comment",
                   "created",
                   "badges",
-                  "user_strength",)
+                  "user_strength",
+                  "nominated_team_member",)
 
     @staticmethod
     def get_review_level(instance):
