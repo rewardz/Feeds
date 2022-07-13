@@ -23,9 +23,36 @@ TrophyBadge = import_string(settings.TROPHY_BADGE_MODEL)
 UserStrength = import_string(settings.USER_STRENGTH_MODEL)
 
 
-
 def get_user_detail(user_id):
     return getattr(UserModel, settings.ALL_USER_OBJECT).filter(pk=user_id).first()
+
+
+class DynamicFieldsModelSerializer(serializers.ModelSerializer):
+    """
+    A ModelSerializer that takes an additional `fields` argument that
+    controls which fields should be displayed.
+    """
+
+    def __init__(self, *args, **kwargs):
+        # Don't pass the 'fields' arg up to the superclass
+        fields = kwargs.pop('fields', None)
+        self.show_repr = kwargs.pop('show_repr', True)
+
+        # Instantiate the superclass normally
+        super(DynamicFieldsModelSerializer, self).__init__(*args, **kwargs)
+
+        request = self.context.get("request")
+        if not fields:
+            if request:
+                fields = request.query_params.get('fields')
+                fields = tuple(fields.split(",")) if fields else None
+
+        if fields is not None:
+            # Drop any fields that are not specified in the `fields` argument.
+            allowed = set(fields)
+            existing = set(self.fields)
+            for field_name in existing - allowed:
+                self.fields.pop(field_name)
 
 
 class DepartmentDetailSerializer(serializers.ModelSerializer):
@@ -36,14 +63,14 @@ class DepartmentDetailSerializer(serializers.ModelSerializer):
         )
 
 
-class UserInfoSerializer(serializers.ModelSerializer):
+class UserInfoSerializer(DynamicFieldsModelSerializer):
     departments = serializers.SerializerMethodField()
     profile_img = serializers.SerializerMethodField()
 
     class Meta:
         model = UserModel
         fields = (
-            "pk", "email", "first_name", "last_name", "departments", "profile_img",
+            "pk", "email", "first_name", "last_name", "departments", "profile_img", "full_name"
         )
 
     def get_departments(self, instance):
@@ -342,6 +369,26 @@ class PostSerializer(serializers.ModelSerializer):
         return None
 
 
+class CommentsLikedSerializer(serializers.ModelSerializer):
+    user_info = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CommentLiked
+        fields = (
+            "user_info", "created_on",
+        )
+
+    def get_user_info(self, instance):
+        created_by = instance.created_by
+        user_detail = get_user_detail(created_by.id)
+        return UserInfoSerializer(user_detail).data
+
+    def to_representation(self, instance):
+        representation = super(CommentsLikedSerializer, self).to_representation(instance)
+        representation["created_on"] = instance.created_on.strftime("%Y-%m-%d")
+        return representation
+
+
 class PostDetailSerializer(PostSerializer):
     comments = serializers.SerializerMethodField()
     appreciated_by = serializers.SerializerMethodField()
@@ -393,12 +440,13 @@ class CommentSerializer(serializers.ModelSerializer):
         model = Comment
         fields = ("id", "content", "created_by", "created_on", "modified_by",
                   "modified_on", "post", "commented_by_user_info",
-                  "liked_count", "liked_by", "has_liked", "tagged_users",)
+                  "liked_count", "liked_by", "has_liked", "tagged_users", "reaction_types")
 
     def get_commented_by_user_info(self, instance):
         created_by = instance.created_by
         user_detail = get_user_detail(created_by.id)
-        return UserInfoSerializer(user_detail).data
+        return UserInfoSerializer(user_detail,
+                                  fields=["pk", "first_name", "last_name", "profile_img", "full_name"]).data
 
     def get_liked_count(self, instance):
         return CommentLiked.objects.filter(comment=instance).count()
@@ -453,7 +501,7 @@ class PostLikedSerializer(serializers.ModelSerializer):
     class Meta:
         model = PostLiked
         fields = (
-            "user_info", "created_on",
+            "user_info", "created_on", "reaction_type"
         )
 
     def get_user_info(self, instance):
@@ -507,26 +555,6 @@ class FinalPollsAnswerSerializer(SubmittedPollsAnswerSerializer):
             "id", "question", "answer_text", "votes", "has_voted",
             "percentage", "voters_info", "is_winner",
         )
-
-
-class CommentsLikedSerializer(serializers.ModelSerializer):
-    user_info = serializers.SerializerMethodField()
-
-    class Meta:
-        model = CommentLiked
-        fields = (
-            "user_info", "created_on",
-        )
-
-    def get_user_info(self, instance):
-        created_by = instance.created_by
-        user_detail = get_user_detail(created_by.id)
-        return UserInfoSerializer(user_detail).data
-
-    def to_representation(self, instance):
-        representation = super(CommentsLikedSerializer, self).to_representation(instance)
-        representation["created_on"] = instance.created_on.strftime("%Y-%m-%d")
-        return representation
 
 
 class FlagPostSerializer(serializers.ModelSerializer):

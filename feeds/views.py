@@ -1,7 +1,7 @@
 from __future__ import division, print_function, unicode_literals
 
 from django.conf import settings
-from django.db.models import Q
+from django.db.models import Q, Count
 from django.http import Http404
 from django.utils.module_loading import import_string
 from django.utils.translation import ugettext as _
@@ -461,6 +461,24 @@ class PostViewSet(viewsets.ModelViewSet):
             return Response(self.get_serializer(post).data)
         except Post.DoesNotExist as exp:
             raise ValidationError(_('Post does not exist.'))
+
+    @detail_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
+    def post_appreciations(self, request, *args, **kwargs):
+        post_id = self.kwargs.get("pk", None)
+        post = Post.objects.get(id=post_id)
+        post_likes = post.postliked_set.all()
+        post_reactions = PostLikedSerializer(post_likes, many=True).data
+        reaction_counts = post_likes.values('reaction_type').annotate(reaction_count=Count('reaction_type'))
+        post_reactions.append({"counts": reaction_counts})
+        return Response(post_reactions)
+
+    @detail_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
+    def comments(self, request, *args, **kwargs):
+        post_id = self.kwargs.get("pk", None)
+        post = Post.objects.get(id=post_id)
+        comments = post.comment_set.all()
+        serializer = CommentSerializer(comments, many=True, context={"request": request})
+        return Response(serializer.data)
 
 
 class ImagesView(views.APIView):
