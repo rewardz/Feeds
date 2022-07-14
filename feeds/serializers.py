@@ -203,7 +203,8 @@ class NominationsSerializer(serializers.ModelSerializer):
                   "created",
                   "badges",
                   "user_strength",
-                  "nominated_team_member",)
+                  "nominated_team_member",
+                  "message_to_reviewer")
 
     @staticmethod
     def get_review_level(instance):
