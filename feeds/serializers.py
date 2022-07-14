@@ -3,6 +3,7 @@ from __future__ import division, print_function, unicode_literals
 from django.conf import settings
 from django.utils.module_loading import import_string
 from django.utils.translation import ugettext as _
+from django.db.models import Count
 
 from rest_framework import exceptions, serializers
 
@@ -364,9 +365,11 @@ class PostSerializer(serializers.ModelSerializer):
     def get_user_reaction_type(self, instance):
         request = self.context['request']
         user = request.user
-        if PostLiked.objects.filter(post=instance, created_by=user).exists():
-            return PostLiked.objects.filter(post=instance, created_by=user).values_list('reaction_type', flat=True)
-        return None
+        post_likes = PostLiked.objects.filter(post=instance, created_by=user)
+        if post_likes.exists():
+            return post_likes.values('reaction_type').annotate(
+                reaction_count=Count('reaction_type')).order_by('-reaction_count')[:2]
+        return list()
 
 
 class CommentsLikedSerializer(serializers.ModelSerializer):
