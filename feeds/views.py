@@ -465,8 +465,12 @@ class PostViewSet(viewsets.ModelViewSet):
     @detail_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
     def post_appreciations(self, request, *args, **kwargs):
         post_id = self.kwargs.get("pk", None)
+        recent = request.query_params.get("recent", None)
         post = Post.objects.get(id=post_id)
-        post_likes = post.postliked_set.all()
+        post_likes = post.postliked_set.all().order_by("-id")
+        if recent:
+            # returns latest 5 reactions
+            post_likes = post_likes[:5]
         post_reactions = PostLikedSerializer(post_likes, many=True).data
         reaction_counts = post_likes.values('reaction_type').annotate(reaction_count=Count('reaction_type'))
         post_reactions.append({"counts": reaction_counts})
