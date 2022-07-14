@@ -476,14 +476,6 @@ class PostViewSet(viewsets.ModelViewSet):
         post_reactions.append({"counts": reaction_counts})
         return Response(post_reactions)
 
-    @detail_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
-    def comments(self, request, *args, **kwargs):
-        post_id = self.kwargs.get("pk", None)
-        post = Post.objects.get(id=post_id)
-        comments = post.comment_set.all()
-        serializer = CommentSerializer(comments, many=True, context={"request": request})
-        return Response(serializer.data)
-
 
 class ImagesView(views.APIView):
     parser_classes = (MultiPartParser,)
