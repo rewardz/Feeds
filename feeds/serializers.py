@@ -247,14 +247,7 @@ class NominationsSerializer(serializers.ModelSerializer):
         return None
 
 
-class UserStrengthSerializer(serializers.ModelSerializer):
-
-    class Meta:
-        model = UserStrength
-        fields = ('id', 'name', 'illustration', 'background_color', 'message', 'icon')
-
-
-class PostSerializer(serializers.ModelSerializer):
+class PostSerializer(DynamicFieldsModelSerializer):
     images = serializers.SerializerMethodField()
     documents = serializers.SerializerMethodField()
     videos = serializers.SerializerMethodField()
