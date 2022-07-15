@@ -303,33 +303,32 @@ class PostViewSet(viewsets.ModelViewSet):
         accessible_posts = accessible_posts_by_user(user, organization).values_list('id', flat=True)
         if post_id not in accessible_posts:
             raise ValidationError(_('You do not have access to this post'))
-        apreciation_type = self.request.query_params.get("type", "like")
-        message = None
-        liked = False
-        response_status = status.HTTP_304_NOT_MODIFIED
+        reaction_type = self.request.data.get('type')
         object_type = NOTIFICATION_OBJECT_TYPE
-        if apreciation_type.lower() == "like":
-            if PostLiked.objects.filter(post_id=post_id, created_by=user).exists():
-                PostLiked.objects.filter(post_id=post_id, created_by=user).delete()
-                message = "Successfully unliked"
-                liked = False
-                response_status = status.HTTP_200_OK
-            else:
-                data = PostLiked.objects.create(post_id=post_id, created_by=user)
-                message = "Successfully Liked"
-                liked = True
-                response_status = status.HTTP_201_CREATED
-                post = Post.objects.filter(id=post_id).first()
-                user_name = get_user_name(user)
-                post_string = post.title[:20] + "..." if post.title else ""
-                if post:
-                    notif_message = _("'%s' likes your post %s" % (user_name, post_string))
-                    push_notification(user, notif_message, post.created_by,
-                                      object_type=object_type, object_id=post.id)
+        if PostLiked.objects.filter(post_id=post_id, created_by=user, reaction_type=reaction_type).exists():
+            PostLiked.objects.filter(post_id=post_id, created_by=user, reaction_type=reaction_type).delete()
+            liked = False
+            message = "Successfully Removed Reaction"
+            PostLiked.objects.filter(post_id=post_id, created_by=user).update(reaction_type=reaction_type)
+            post_object = PostLiked.objects.filter(post_id=post_id, created_by=user).first()
+            response_status = status.HTTP_200_OK
+        else:
+            post_object = PostLiked.objects.create(post_id=post_id, created_by=user, reaction_type=reaction_type)
+            message = "Successfully Added Reaction"
+            liked = True
+            response_status = status.HTTP_201_CREATED
+            post = Post.objects.filter(id=post_id).first()
+            user_name = get_user_name(user)
+            post_string = post.title[:20] + "..." if post.title else ""
+            if post:
+                notif_message = _("'%s' likes your post %s" % (user_name, post_string))
+                push_notification(user, notif_message, post.created_by,
+                                  object_type=object_type, object_id=post.id)
         count = PostLiked.objects.filter(post_id=post_id).count()
         user_info = UserInfoSerializer(user).data
         return Response({
-            "message": message, "liked": liked, "count": count, "user_info": user_info},
+            "message": message, "liked": liked, "count": count, "user_info": user_info,
+            "reaction_type": post_object.reaction_type if post_object else None},
             status=response_status)
 
     @detail_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
