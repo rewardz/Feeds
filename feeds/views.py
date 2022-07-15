@@ -705,14 +705,20 @@ class UserFeedViewSet(viewsets.ModelViewSet):
 
     @list_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
     def appreciated_by(self, request, *args, **kwargs):
-        my_appreciations_user = list(Post.objects.filter(
-            user=request.user, post_type=POST_TYPE.USER_CREATED_APPRECIATION).values_list(
-            'transaction__creator', flat=True))
-        my_nom_user = list(Post.objects.filter(
-            user=request.user, post_type=POST_TYPE.USER_CREATED_NOMINATION).values_list(
-            'nomination__nominator', flat=True))
+        strength_id = request.query_params.get("strength", None)
+        if strength_id is None:
+            raise ValidationError(_('strength_id is a required parameter.'))
+        try:
+            strength_id = int(strength_id)
+        except ValueError:
+            raise ValidationError(_('strength_id is should be numeric value.'))
+        user_appreciations = Post.objects.filter(
+            user=request.user, post_type=POST_TYPE.USER_CREATED_APPRECIATION).values(
+            'transaction__context', 'transaction__creator')
 
-        my_appreciations_user.extend(my_nom_user)
+        my_appreciations_user = [user_appreciation.get('transaction__creator') for user_appreciation in
+                                 user_appreciations if loads(user_appreciation.get('transaction__context')).get(
+            'strength_id') == strength_id]
         users = CustomUser.objects.filter(id__in=my_appreciations_user)
         serializer = UserInfoSerializer(users, many=True, fields=["pk", "email", "first_name", "last_name",
                                                                   "profile_pic_url", "profile_img"])
