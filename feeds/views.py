@@ -731,5 +731,5 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         else:
             raise ValidationError(_('User does not exist'))
         serializer = PostSerializer(queryset, many=True, context={"request": request}, fields=[
-            "id", "ecard", "gif", "images", "message", "points"])
+            "id", "ecard", "gif", "images", "description", "points"])
         return Response({"strengths": serializer.data})
