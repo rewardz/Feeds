@@ -268,6 +268,8 @@ class PostSerializer(DynamicFieldsModelSerializer):
     user = UserInfoSerializer()
     user_reaction_type = serializers.SerializerMethodField()
     ecard = EcardSerializer()
+    message = serializers.SerializerMethodField()
+    points = serializers.SerializerMethodField()
 
     class Meta:
         model = Post
@@ -279,7 +281,8 @@ class PostSerializer(DynamicFieldsModelSerializer):
             "shared_with", "images", "documents", "videos",
             "is_owner", "can_edit", "can_delete", "has_appreciated",
             "appreciation_count", "comments_count", "tagged_users", "is_admin", "tags",
-            "nomination", "feed_type", "user_strength", "user", "user_reaction_type", "gif", "ecard",
+            "nomination", "feed_type", "user_strength", "user", "user_reaction_type", "gif",
+            "ecard", "message", "points"
         )
 
     def get_tags(self, obj):
@@ -387,6 +390,23 @@ class PostSerializer(DynamicFieldsModelSerializer):
             return post_likes.values('reaction_type').annotate(
                 reaction_count=Count('reaction_type')).order_by('-reaction_count')[:2]
         return list()
+
+    @staticmethod
+    def get_message(instance):
+        if instance.transaction:
+            return instance.transaction.message
+        return None
+
+    @staticmethod
+    def get_points(instance):
+        points = 0
+        if instance.transaction:
+            points = instance.transaction.points
+            if points - int(points) == 0:
+                points = int(points)
+            else:
+                points = float(points)
+        return str(points)
 
 
 class CommentsLikedSerializer(serializers.ModelSerializer):
