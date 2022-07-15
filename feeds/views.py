@@ -2,6 +2,7 @@ from __future__ import division, print_function, unicode_literals
 
 from json import loads
 from django.conf import settings
+from django.db import transaction
 from django.db.models import Q, Count
 from django.http import Http404
 from django.utils.module_loading import import_string
@@ -654,6 +655,28 @@ class ECardViewSet(viewsets.ModelViewSet):
         if search:
             queryset = queryset.filter(name__icontains=search)
         return queryset
+
+    @transaction.atomic
+    def create(self, request):
+        user = self.request.user
+        data = request.data
+        serializer = ECardSerializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        ecard = serializer.save()
+        ecard.tags.add(*eval(data["tags"]))
+        return Response(data=serializer.data, status=status.HTTP_201_CREATED)
+
+    @transaction.atomic
+    def partial_update(self, request, pk=None):
+        ecard = self.get_object()
+        user = self.request.user
+        data = request.data
+        serializer = ECardSerializer(ecard, data=data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        ecard = serializer.save()
+        ecard.tags.clear()
+        ecard.tags.add(*eval(data["tags"]))
+        return Response(data=serializer.data, status=status.HTTP_200_OK)
 
 
 class UserFeedViewSet(viewsets.ModelViewSet):
