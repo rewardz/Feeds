@@ -707,11 +707,11 @@ class UserFeedViewSet(viewsets.ModelViewSet):
     def appreciated_by(self, request, *args, **kwargs):
         strength_id = request.query_params.get("strength", None)
         if strength_id is None:
-            raise ValidationError(_('strength_id is a required parameter.'))
+            raise ValidationError(_('strength is a required parameter.'))
         try:
             strength_id = int(strength_id)
         except ValueError:
-            raise ValidationError(_('strength_id is should be numeric value.'))
+            raise ValidationError(_('strength is should be numeric value.'))
         user_appreciations = Post.objects.filter(
             user=request.user, post_type=POST_TYPE.USER_CREATED_APPRECIATION).values(
             'transaction__context', 'transaction__creator')
