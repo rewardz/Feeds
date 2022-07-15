@@ -375,6 +375,8 @@ class PostSerializer(DynamicFieldsModelSerializer):
             strength_id = instance.transaction.context.get('strength_id')
             if strength_id:
                 return UserStrengthSerializer(instance=UserStrength.objects.filter(id=strength_id).first()).data
+        elif instance.nomination and instance.nomination.user_strength:
+            return UserStrengthSerializer(instance=instance.nomination.user_strength).data
         return None
 
     def get_user_reaction_type(self, instance):
