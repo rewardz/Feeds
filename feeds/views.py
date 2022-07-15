@@ -1,5 +1,6 @@
 from __future__ import division, print_function, unicode_literals
 
+from json import loads
 from django.conf import settings
 from django.db.models import Q, Count
 from django.http import Http404
@@ -24,7 +25,7 @@ from .serializers import (
     DocumentsSerializer, ECardCategorySerializer, ECardSerializer, 
     FlagPostSerializer, PostLikedSerializer, PostSerializer,
     PostDetailSerializer, PollsAnswerSerializer, ImagesSerializer,
-    UserInfoSerializer, VideosSerializer,
+    UserInfoSerializer, VideosSerializer, UserStrengthSerializer,
 )
 from .utils import (
     accessible_posts_by_user, extract_tagged_users, get_user_name, notify_new_comment,
@@ -35,6 +36,7 @@ from .utils import (
 CustomUser = import_string(settings.CUSTOM_USER_MODEL)
 DEPARTMENT_MODEL = import_string(settings.DEPARTMENT_MODEL)
 NOTIFICATION_OBJECT_TYPE = import_string(settings.POST_NOTIFICATION_OBJECT_TYPE).Posts
+UserStrength = import_string(settings.USER_STRENGTH_MODEL)
 
 
 class PostViewSet(viewsets.ModelViewSet):
@@ -675,3 +677,41 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         else:
             feeds = feeds.filter(Q(nomination__nominator=user) | Q(user=user) | Q(nomination__assigned_reviewer=user))
         return feeds.distinct()
+
+    @list_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
+    def appreciated_by(self, request, *args, **kwargs):
+        my_appreciations_user = list(Post.objects.filter(
+            user=request.user, post_type=POST_TYPE.USER_CREATED_APPRECIATION).values_list(
+            'transaction__creator', flat=True))
+        my_nom_user = list(Post.objects.filter(
+            user=request.user, post_type=POST_TYPE.USER_CREATED_NOMINATION).values_list(
+            'nomination__nominator', flat=True))
+
+        my_appreciations_user.extend(my_nom_user)
+        users = CustomUser.objects.filter(id__in=my_appreciations_user)
+        serializer = UserInfoSerializer(users, many=True, fields=["pk", "email", "first_name", "last_name",
+                                                                  "profile_pic_url", "profile_img"])
+        return Response({"users": serializer.data})
+
+    @list_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
+    def strengths(self, request, *args, **kwargs):
+        user_id = request.query_params.get("user_id", None)
+        if user_id is None:
+            raise ValidationError(_('user_id is a required parameter.'))
+        user = CustomUser.objects.filter(id=user_id)
+        if user.exists():
+            user = user.first()
+        else:
+            raise ValidationError(_('User does not exist'))
+        appreciations = list(Post.objects.filter(
+            user=request.user, post_type=POST_TYPE.USER_CREATED_APPRECIATION, created_by=user).values_list(
+            'transaction__context', flat=True))
+        user_strengths = [loads(appreciation).get('strength_id') for appreciation in appreciations if
+                          'strength_id' in loads(appreciation).keys()]
+        nom_strengths = list(Post.objects.filter(
+            user=request.user, post_type=POST_TYPE.USER_CREATED_NOMINATION, created_by=user).values_list(
+            'nomination__user_strength', flat=True))
+        user_strengths.extend(nom_strengths)
+        users_strengths = UserStrength.objects.filter(id__in=user_strengths)
+        serializer = UserStrengthSerializer(users_strengths, many=True)
+        return Response({"strengths": serializer.data})
