@@ -160,6 +160,7 @@ class PollSerializer(serializers.ModelSerializer):
 
 
 class TrophyBadgeSerializer(serializers.ModelSerializer):
+    award_points = serializers.SerializerMethodField()
 
     class Meta:
         model = TrophyBadge
@@ -168,14 +169,34 @@ class TrophyBadgeSerializer(serializers.ModelSerializer):
                   "description",
                   "background_color",
                   "icon",
-                  "points")
+                  "points",
+                  "award_points")
+
+    @staticmethod
+    def get_award_points(instance):
+        points = instance.points
+        if points - int(points) == 0:
+            points = int(points)
+        else:
+            points = float(points)
+        return str(points)
 
 
 class UserStrengthSerializer(serializers.ModelSerializer):
+    award_points = serializers.SerializerMethodField()
 
     class Meta:
         model = UserStrength
-        fields = ('id', 'name', 'illustration', 'background_color', 'message', 'icon')
+        fields = ('id', 'name', 'illustration', 'background_color', 'message', 'icon', 'points', 'award_points')
+
+    @staticmethod
+    def get_award_points(instance):
+        points = instance.points
+        if points - int(points) == 0:
+            points = int(points)
+        else:
+            points = float(points)
+        return str(points)
 
 
 class EcardSerializer(serializers.ModelSerializer):

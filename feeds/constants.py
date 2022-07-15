@@ -25,3 +25,11 @@ REACTION_TYPE = Choices({
     "INSIGHTFUL": 4,
     "CURIOUS": 5,
 })
+
+NOMINATION_STATUS = Choices({
+    "NONE": 0,
+    "in_review_approver1": 1,
+    "in_review_approver2": 2,
+    "approved": 3,
+    "rejected": 4
+})

@@ -14,7 +14,7 @@ from rest_framework.parsers import MultiPartParser, FormParser, FileUploadParser
 from rest_framework.response import Response
 
 from .filters import PostFilter
-from .constants import POST_TYPE, SHARED_WITH
+from .constants import POST_TYPE, NOMINATION_STATUS
 from .models import (
     Comment, Documents, ECard, ECardCategory, FlagPost,
     Post, PostLiked, PollsAnswer, Images, CommentLiked,
@@ -673,7 +673,9 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         elif feed_flag == "given":
             feeds = feeds.filter(Q(nomination__nominator=user) | Q(created_by=user))
         elif feed_flag == "approvals":
-            feeds = feeds.filter(nomination__assigned_reviewer=user)
+            feeds = feeds.filter(nomination__assigned_reviewer=user).exclude(
+                post_type=[POST_TYPE.USER_CREATED_NOMINATION], nomination__nom_status__in=[
+                    NOMINATION_STATUS.approved, NOMINATION_STATUS.rejected])
         else:
             feeds = feeds.filter(Q(nomination__nominator=user) | Q(user=user) | Q(nomination__assigned_reviewer=user))
         return feeds.distinct()
@@ -696,22 +698,15 @@ class UserFeedViewSet(viewsets.ModelViewSet):
     @list_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
     def strengths(self, request, *args, **kwargs):
         user_id = request.query_params.get("user_id", None)
+        queryset = self.get_queryset()
         if user_id is None:
             raise ValidationError(_('user_id is a required parameter.'))
         user = CustomUser.objects.filter(id=user_id)
         if user.exists():
             user = user.first()
+            queryset = queryset.filter(created_by=user)
         else:
             raise ValidationError(_('User does not exist'))
-        appreciations = list(Post.objects.filter(
-            user=request.user, post_type=POST_TYPE.USER_CREATED_APPRECIATION, created_by=user).values_list(
-            'transaction__context', flat=True))
-        user_strengths = [loads(appreciation).get('strength_id') for appreciation in appreciations if
-                          'strength_id' in loads(appreciation).keys()]
-        nom_strengths = list(Post.objects.filter(
-            user=request.user, post_type=POST_TYPE.USER_CREATED_NOMINATION, created_by=user).values_list(
-            'nomination__user_strength', flat=True))
-        user_strengths.extend(nom_strengths)
-        users_strengths = UserStrength.objects.filter(id__in=user_strengths)
-        serializer = UserStrengthSerializer(users_strengths, many=True)
+        serializer = PostSerializer(queryset, many=True, context={"request": request}, fields=[
+            "id", "user_strength", "feed_type", "nomination"])
         return Response({"strengths": serializer.data})
