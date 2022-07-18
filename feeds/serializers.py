@@ -212,6 +212,7 @@ class NominationsSerializer(DynamicFieldsModelSerializer):
     nominator_name = serializers.SerializerMethodField()
     badges = serializers.SerializerMethodField()
     user_strength = UserStrengthSerializer()
+    strength_name = serializers.SerializerMethodField()
     nominated_team_member = UserInfoSerializer()
 
     class Meta:
@@ -225,7 +226,8 @@ class NominationsSerializer(DynamicFieldsModelSerializer):
                   "badges",
                   "user_strength",
                   "nominated_team_member",
-                  "message_to_reviewer")
+                  "message_to_reviewer",
+                  "strength_name")
 
     @staticmethod
     def get_review_level(instance):
@@ -245,6 +247,10 @@ class NominationsSerializer(DynamicFieldsModelSerializer):
         if instance.category and instance.category.badge:
             return TrophyBadgeSerializer(instance=instance.category.badge).data
         return None
+
+    @staticmethod
+    def get_strength_name(instance):
+        return instance.user_strength.name
 
 
 class PostSerializer(DynamicFieldsModelSerializer):
