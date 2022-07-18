@@ -206,7 +206,7 @@ class EcardSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', 'image')
 
 
-class NominationsSerializer(serializers.ModelSerializer):
+class NominationsSerializer(DynamicFieldsModelSerializer):
     nomination_icon = serializers.SerializerMethodField()
     review_level = serializers.SerializerMethodField()
     nominator_name = serializers.SerializerMethodField()
