@@ -262,10 +262,11 @@ class PostSerializer(DynamicFieldsModelSerializer):
     tagged_users = serializers.SerializerMethodField()
     is_admin = serializers.SerializerMethodField()
     tags = serializers.SerializerMethodField()
-    nomination = NominationsSerializer()
+    nomination = serializers.SerializerMethodField()
     feed_type = serializers.SerializerMethodField()
     user_strength = serializers.SerializerMethodField()
     user = UserInfoSerializer()
+    reaction_type = serializers.SerializerMethodField()
     user_reaction_type = serializers.SerializerMethodField()
     ecard = EcardSerializer()
     points = serializers.SerializerMethodField()
@@ -279,7 +280,7 @@ class PostSerializer(DynamicFieldsModelSerializer):
             "priority", "prior_till",
             "shared_with", "images", "documents", "videos",
             "is_owner", "can_edit", "can_delete", "has_appreciated",
-            "appreciation_count", "comments_count", "tagged_users", "is_admin", "tags",
+            "appreciation_count", "comments_count", "tagged_users", "is_admin", "tags", "reaction_type",
             "nomination", "feed_type", "user_strength", "user", "user_reaction_type", "gif", "ecard", "points"
         )
 
@@ -380,14 +381,25 @@ class PostSerializer(DynamicFieldsModelSerializer):
             return UserStrengthSerializer(instance=instance.nomination.user_strength).data
         return None
 
+    def get_reaction_type(self, instance):
+        request = self.context['request']
+        user = request.user
+        post_likes = PostLiked.objects.filter(post=instance)
+        if post_likes.exists():
+            return post_likes.values('reaction_type').annotate(
+                reaction_count=Count('reaction_type')).order_by('-reaction_count')[:2]
+        return list()
+
     def get_user_reaction_type(self, instance):
         request = self.context['request']
         user = request.user
         post_likes = PostLiked.objects.filter(post=instance, created_by=user)
         if post_likes.exists():
-            return post_likes.values('reaction_type').annotate(
-                reaction_count=Count('reaction_type')).order_by('-reaction_count')[:2]
-        return list()
+            return post_likes.first().reaction_type
+        return None
+
+    def get_nomination(self, instance):
+        return NominationsSerializer(instance=instance.nomination, fields=self.context.get('nomination_fields')).data
 
     @staticmethod
     def get_points(instance):
