@@ -24,6 +24,7 @@ REACTION_TYPE = Choices({
     "LOVE": 3,
     "INSIGHTFUL": 4,
     "CURIOUS": 5,
+    "APPLAUSE": 6,
 })
 
 NOMINATION_STATUS = Choices({
