@@ -11,7 +11,6 @@ from feeds.models import (
 @admin.register(Post)
 class PostAdmin(admin.ModelAdmin):
     form = make_ajax_form(Post, {
-        'organization': 'Organization',
         'user': 'CustomUser',
     })
     list_display = (
@@ -19,7 +18,7 @@ class PostAdmin(admin.ModelAdmin):
         'created_by', 'created_on', 'modified_on', 'modified_by', 'mark_delete',
     )
     readonly_fields = ('transaction', 'nomination', 'cc_users', 'created_by', 'modified_by',)
-    list_filter = ('organization', 'priority', 'mark_delete',)
+    list_filter = ('priority', 'mark_delete',)
     # search_fields = ('organization__name',)
 
     formfield_overrides = {

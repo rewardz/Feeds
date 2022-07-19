@@ -7,13 +7,12 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('feeds', '0013_auto_20220309_0543'),
+        ('feeds', '0019_auto_20220719_1553'),
     ]
 
     operations = [
-        migrations.AddField(
+        migrations.RemoveField(
             model_name='post',
-            name='departments',
-            field=models.ManyToManyField(related_name='posts', to='profiles.Department'),
+            name='organization',
         ),
     ]
