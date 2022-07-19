@@ -743,6 +743,11 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             raise ValidationError(_('strength is a required parameter.'))
         if user_id is None:
             raise ValidationError(_('user_id is a required parameter.'))
+        if strength_id:
+            try:
+                strength_id = int(strength_id)
+            except ValueError:
+                raise ValidationError(_('strength should be numeric value.'))
 
         queryset = self.get_queryset().filter(post_type=POST_TYPE.USER_CREATED_APPRECIATION)
         user = CustomUser.objects.filter(id=user_id)
