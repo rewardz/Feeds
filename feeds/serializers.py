@@ -276,6 +276,7 @@ class PostSerializer(DynamicFieldsModelSerializer):
     user_reaction_type = serializers.SerializerMethodField()
     ecard = EcardSerializer()
     points = serializers.SerializerMethodField()
+    time_left = serializers.SerializerMethodField()
 
     class Meta:
         model = Post
@@ -286,8 +287,8 @@ class PostSerializer(DynamicFieldsModelSerializer):
             "priority", "prior_till",
             "shared_with", "images", "documents", "videos",
             "is_owner", "can_edit", "can_delete", "has_appreciated",
-            "appreciation_count", "comments_count", "tagged_users", "is_admin", "tags", "reaction_type",
-            "nomination", "feed_type", "user_strength", "user", "user_reaction_type", "gif", "ecard", "points"
+            "appreciation_count", "comments_count", "tagged_users", "is_admin", "tags", "reaction_type", "nomination",
+            "feed_type", "user_strength", "user", "user_reaction_type", "gif", "ecard", "points", "time_left",
         )
 
     def get_tags(self, obj):
@@ -417,6 +418,18 @@ class PostSerializer(DynamicFieldsModelSerializer):
             else:
                 points = float(points)
         return str(points)
+
+    @staticmethod
+    def get_time_left(instance):
+        if instance.nomination:
+            time_left_in_hours = instance.nomination.time_left_for_auto_action
+            if time_left_in_hours is None:
+                return ""
+            if time_left_in_hours < 1:
+                return "{}m Left".format(int(time_left_in_hours * 60))
+            else:
+                return "{}h Left".format(int(time_left_in_hours))
+        return ""
 
 
 class CommentsLikedSerializer(serializers.ModelSerializer):
