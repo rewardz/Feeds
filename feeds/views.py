@@ -738,15 +738,23 @@ class UserFeedViewSet(viewsets.ModelViewSet):
     @list_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
     def strengths(self, request, *args, **kwargs):
         user_id = request.query_params.get("user_id", None)
-        queryset = self.get_queryset().filter(post_type=POST_TYPE.USER_CREATED_APPRECIATION)
+        strength_id = request.query_params.get("strength", None)
+        if strength_id is None:
+            raise ValidationError(_('strength is a required parameter.'))
         if user_id is None:
             raise ValidationError(_('user_id is a required parameter.'))
+
+        queryset = self.get_queryset().filter(post_type=POST_TYPE.USER_CREATED_APPRECIATION)
         user = CustomUser.objects.filter(id=user_id)
         if user.exists():
             user = user.first()
             queryset = queryset.filter(created_by=user)
         else:
             raise ValidationError(_('User does not exist'))
+        transactions = queryset.values('id', 'transaction__context')
+        posts = [transaction.get('id') for transaction in transactions if loads(
+            transaction.get('transaction__context')).get('strength_id') == strength_id]
+        queryset = queryset.filter(id__in=posts)
         serializer = PostSerializer(queryset, many=True, context={"request": request}, fields=[
             "id", "ecard", "gif", "images", "description", "points"])
         return Response({"strengths": serializer.data})
@@ -754,9 +762,18 @@ class UserFeedViewSet(viewsets.ModelViewSet):
     @list_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
     def badges(self, request, *args, **kwargs):
         user_id = request.query_params.get("user_id", None)
+        badge_id = request.query_params.get("badge", None)
         if user_id is None:
             raise ValidationError(_('user_id is a required parameter.'))
-        queryset = self.get_queryset().filter(post_type=POST_TYPE.USER_CREATED_NOMINATION)
+        if badge_id is None:
+            raise ValidationError(_('badge is a required parameter.'))
+        if badge_id:
+            try:
+                badge_id = int(badge_id)
+            except ValueError:
+                raise ValidationError(_('badge should be numeric value.'))
+        queryset = self.get_queryset().filter(post_type=POST_TYPE.USER_CREATED_NOMINATION,
+                                              nomination__category__badge_id=badge_id)
         user = CustomUser.objects.filter(id=user_id)
         if user.exists():
             user = user.first()
