@@ -14,13 +14,14 @@ from rest_framework.response import Response
 
 from .constants import POST_TYPE, SHARED_WITH
 from .models import (
-    Comment, Documents, FlagPost, Post, PostLiked, PollsAnswer,
-    Images, CommentLiked,
+    Comment, Documents, ECard, ECardCategory, FlagPost,
+    Post, PostLiked, PollsAnswer, Images, CommentLiked,
 )
 from .paginator import FeedsResultsSetPagination
 from .serializers import (
     CommentDetailSerializer, CommentSerializer, CommentCreateSerializer,
-    DocumentsSerializer, FlagPostSerializer, PostLikedSerializer, PostSerializer,
+    DocumentsSerializer, ECardCategorySerializer, ECardSerializer, 
+    FlagPostSerializer, PostLikedSerializer, PostSerializer,
     PostDetailSerializer, PollsAnswerSerializer, ImagesSerializer,
     UserInfoSerializer, VideosSerializer,
 )
@@ -204,9 +205,14 @@ class PostViewSet(viewsets.ModelViewSet):
         return serializer_class(*args, **kwargs)
 
     def get_queryset(self):
+        feedback = self.request.query_params.get('feedback', None)
+        if feedback and feedback == "true":
+            allow_feedback = True
+        else:
+            allow_feedback = False
         user = self.request.user
         org = self.request.user.organization
-        result = accessible_posts_by_user(user, org)
+        result = accessible_posts_by_user(user, org, allow_feedback=allow_feedback)
         result = result.order_by('-priority', '-modified_on', '-created_on')
         return result
 
@@ -245,14 +251,19 @@ class PostViewSet(viewsets.ModelViewSet):
         """
         List of all the comments related to the post
         """
+        feedback = self.request.query_params.get('feedback', None)
+        if feedback and feedback == "true":
+            allow_feedback = True
+        else:
+            allow_feedback = False
         user = self.request.user
         organization = user.organization
         post_id = self.kwargs.get("pk", None)
         if not post_id:
             raise ValidationError(_('Post ID required to retrieve all the related comments'))
         post_id = int(post_id)
-        accessible_posts = accessible_posts_by_user(user, organization). \
-            values_list('id', flat=True)
+        accessible_posts = accessible_posts_by_user(
+            user, organization, allow_feedback=allow_feedback).values_list('id', flat=True)
         if post_id not in accessible_posts:
             raise ValidationError(_('You do not have access to comment on this post'))
         if self.request.method == "GET":
@@ -610,3 +621,31 @@ def search_user(request):
             Q(first_name__istartswith=search_term))
     serializer = UserInfoSerializer(result, many=True)
     return Response(serializer.data)
+
+
+class ECardCategoryViewSet(viewsets.ModelViewSet):
+    queryset = ECardCategory.objects.none()
+    serializer_class = ECardCategorySerializer
+    permission_classes = [permissions.IsAdminUser, ]
+
+    def get_queryset(self):
+        user = self.request.user
+        queryset = ECardCategory.objects.filter(organization=user.organization)
+        return queryset
+
+
+class ECardViewSet(viewsets.ModelViewSet):
+    queryset = ECard.objects.none()
+    serializer_class = ECardSerializer
+    permission_classes = [permissions.IsAdminUser, ]
+
+    def get_queryset(self):
+        user = self.request.user
+        queryset = ECard.objects.filter(category__organization=user.organization)
+        category = self.request.query_params.get('category')
+        if category:
+            queryset = queryset.filter(category_id=category)
+        search = self.request.query_params.get('search')
+        if search:
+            queryset = queryset.filter(name__icontains=search)
+        return queryset

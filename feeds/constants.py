@@ -3,7 +3,8 @@ from model_helpers import Choices
 
 SHARED_WITH = Choices({
     "SELF_DEPARTMENT": 10,
-    "ALL_DEPARTMENTS": 20
+    "ALL_DEPARTMENTS": 20,
+    "ADMIN_ONLY": 30,
 })
 
 POST_TYPE = Choices({
@@ -12,4 +13,16 @@ POST_TYPE = Choices({
     "SYSTEM_CREATED_POST": 3,
     "MOST_LIKED": 4,
     "MOST_APPRECIATED": 5,
+    "USER_CREATED_APPRECIATION": 6,
+    "USER_CREATED_NOMINATION": 7,
+    "FEEDBACK_POST": 8,
+})
+
+REACTION_TYPE = Choices({
+    "LIKE": 0,
+    "CELEBRATE": 1,
+    "SUPPORT": 2,
+    "LOVE": 3,
+    "INSIGHTFUL": 4,
+    "CURIOUS": 5,
 })

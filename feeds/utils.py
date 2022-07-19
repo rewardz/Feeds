@@ -24,12 +24,16 @@ NOTIF_OBJECT_ID_FIELD_NAME = settings.NOTIF_OBJECT_ID_FIELD_NAME
 USER_DEPARTMENT_RELATED_NAME = settings.USER_DEPARTMENT_RELATED_NAME
 
 
-def accessible_posts_by_user(user, organization):
+def accessible_posts_by_user(user, organization, allow_feedback=False):
     if not isinstance(organization, (list, tuple)):
         organization = [organization]
     if user.is_staff:
         result = Post.objects.filter(organizations__in=organization)
         result = result.filter(mark_delete=False)
+        if not allow_feedback:
+            result = result.exclude(post_type=POST_TYPE.FEEDBACK_POST)
+        else:
+            result = result.filter(post_type=POST_TYPE.FEEDBACK_POST)
         return result
     # non staff user
     # get the departments to which this user belongs
@@ -37,6 +41,10 @@ def accessible_posts_by_user(user, organization):
     result = Post.objects.filter(organizations__in=organization)
     result = result.filter(Q(departments__in=user_depts) | Q(departments__isnull=True))
     result = result.filter(mark_delete=False)
+    if not allow_feedback:
+        result = result.exclude(post_type=POST_TYPE.FEEDBACK_POST)
+    else:
+        result = result.filter(post_type=POST_TYPE.FEEDBACK_POST)
     return result
 
 

@@ -17,13 +17,15 @@ from easy_thumbnails.files import get_thumbnailer
 from model_helpers import upload_to
 from taggit.managers import TaggableManager
 
-from .constants import POST_TYPE, SHARED_WITH
+from .constants import POST_TYPE, REACTION_TYPE, SHARED_WITH
 
 logger = logging.getLogger(__name__)
 
 CustomUser = settings.AUTH_USER_MODEL
 Organization = import_string(settings.ORGANIZATION_MODEL)
 Department = import_string(settings.DEPARTMENT_MODEL)
+Transaction = import_string(settings.TRANSACTION_MODEL)
+Nominations = import_string(settings.NOMINATIONS_MODEL)
 
 
 def post_upload_to_path(instance, filename):
@@ -31,10 +33,73 @@ def post_upload_to_path(instance, filename):
     fmt = '%Y/%m/%d'
     dc = now.strftime(fmt)
     inst_verbose = instance._meta.verbose_name
-    inst_id = str(instance.post.pk)
+    if instance._meta.model_name == 'ecard':
+        inst_id = str(instance.category.pk)
+    else:
+        inst_id = str(instance.post.pk)
     return 'post/{inst_name}/{dc}/{id}/{name}'.format(
         inst_name=inst_verbose, dc=dc, id=inst_id, name=filename
     )
+
+
+class CIImageModel(models.Model):
+    IMAGE_SIZES = {
+        "thumbnail": (150, 150),
+        "display": (960, 720),
+        "large": (1024, 2048)
+    }
+    image = CIImageField(upload_to=post_upload_to_path, blank=True, null=True)
+    img_large = CIThumbnailField('image', (1, 1), blank=True, null=True)
+    img_display = CIThumbnailField('image', (1, 1), blank=True, null=True)
+    img_thumbnail = CIThumbnailField('image', (1, 1), blank=True, null=True)
+
+    def __init__(self, *args, **kwargs):
+        for key in self.IMAGE_SIZES:
+            field = self._meta.get_field('img_%s' % key)
+            field.size = self.IMAGE_SIZES[key]
+        super(CIImageModel, self).__init__(*args, **kwargs)
+
+    def get_thumbnail(self, size_name, default_url=""):
+        if not self.image:
+            return default_url
+        try:
+            return get_thumbnailer(self.image).get_thumbnail({
+                'size': self.IMAGE_SIZES[size_name],
+                'ci_box': getattr(self, "img_%s" % size_name),
+            }).url
+        except InvalidImageFormatError as ex:
+            logger.error("Error generating thumbnail for %s (pk=%d) :  %s", self, self.pk, ex)
+            return default_url
+
+    @property
+    def thumbnail_img_url(self):
+        try:
+            thumbnail_img_url = self.get_thumbnail("thumbnail")
+            return thumbnail_img_url
+        except ValueError as ex:
+            logger.error("Error generating thumbnail for %s (pk=%d) :  %s", self, self.pk, ex)
+            return ""
+
+    @property
+    def display_img_url(self):
+        try:
+            display_img_url = self.get_thumbnail("display")
+            return display_img_url
+        except ValueError as ex:
+            logger.error("Error generating display for %s (pk=%d) :  %s", self, self.pk, ex)
+            return ""
+
+    @property
+    def large_img_url(self):
+        try:
+            large_img_url = self.get_thumbnail("large")
+            return large_img_url
+        except ValueError as ex:
+            logger.error("Error generating large for %s (pk=%d) :  %s", self, self.pk, ex)
+            return ""
+    
+    class Meta:
+        abstract = True
 
 
 class UserInfo(models.Model):
@@ -45,10 +110,44 @@ class UserInfo(models.Model):
         abstract = True
 
 
+class ReportAbuse(models.Model):
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    reason = models.TextField()
+    is_active = models.BooleanField(default=True)
+    created_on = models.DateTimeField(auto_now_add=True)
+    modified_on = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        abstract = True
+
+
+class ECardCategory(models.Model):
+    name = models.CharField(max_length=100, blank=False)
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
+
+    def __unicode__(self):
+        return "{}: {}".format(self.organization.name, self.name)
+
+
+class ECard(CIImageModel):
+    name = models.CharField(max_length=100, blank=False)
+    category = models.ForeignKey(ECardCategory, on_delete=models.CASCADE)
+    tags = TaggableManager()
+
+    def __unicode__(self):
+        return "{}: {}".format(self.category.name, self.image)
+
+
 class Post(UserInfo):
     organizations = models.ManyToManyField(Organization, related_name="posts")
     title = models.CharField(max_length=200, null=True, blank=True)
     description = models.TextField(null=True, blank=True)
+    user = models.ForeignKey(CustomUser, related_name="appreciated_user", on_delete=models.CASCADE, null=True, blank=True)
+    transaction = models.ForeignKey(Transaction, on_delete=models.CASCADE, null=True, blank=True)
+    nomination = models.ForeignKey(Nominations, on_delete=models.CASCADE, null=True, blank=True)
+    ecard = models.ForeignKey(ECard, on_delete=models.CASCADE, null=True, blank=True)
+    gif = models.URLField(null=True, blank=True)
+    cc_users = models.ManyToManyField(CustomUser, related_name="cc_users", blank=True)
     published_date = models.DateTimeField(blank=True, null=True)
     priority = models.BooleanField(default=False)
     prior_till = models.DateTimeField(blank=True, null=True)
@@ -170,62 +269,8 @@ class Post(UserInfo):
         ordering = ("-pk",)
 
 
-class Images(models.Model):
-    IMAGE_SIZES = {
-        "thumbnail": (150, 150),
-        "display": (960, 720),
-        "large": (1024, 2048)
-    }
+class Images(CIImageModel):
     post = models.ForeignKey(Post, on_delete=models.CASCADE)
-    image = CIImageField(upload_to=post_upload_to_path, blank=True, null=True)
-    img_large = CIThumbnailField('image', (1, 1), blank=True, null=True)
-    img_display = CIThumbnailField('image', (1, 1), blank=True, null=True)
-    img_thumbnail = CIThumbnailField('image', (1, 1), blank=True, null=True)
-
-    def __init__(self, *args, **kwargs):
-        for key in self.IMAGE_SIZES:
-            field = self._meta.get_field('img_%s' % key)
-            field.size = self.IMAGE_SIZES[key]
-        super(Images, self).__init__(*args, **kwargs)
-
-    def get_thumbnail(self, size_name, default_url=""):
-        if not self.image:
-            return default_url
-        try:
-            return get_thumbnailer(self.image).get_thumbnail({
-                'size': self.IMAGE_SIZES[size_name],
-                'ci_box': getattr(self, "img_%s" % size_name),
-            }).url
-        except InvalidImageFormatError as ex:
-            logger.error("Error generating thumbnail for %s (pk=%d) :  %s", self, self.pk, ex)
-            return default_url
-
-    @property
-    def thumbnail_img_url(self):
-        try:
-            thumbnail_img_url = self.get_thumbnail("thumbnail")
-            return thumbnail_img_url
-        except ValueError as ex:
-            logger.error("Error generating thumbnail for %s (pk=%d) :  %s", self, self.pk, ex)
-            return ""
-
-    @property
-    def display_img_url(self):
-        try:
-            display_img_url = self.get_thumbnail("display")
-            return display_img_url
-        except ValueError as ex:
-            logger.error("Error generating display for %s (pk=%d) :  %s", self, self.pk, ex)
-            return ""
-
-    @property
-    def large_img_url(self):
-        try:
-            large_img_url = self.get_thumbnail("large")
-            return large_img_url
-        except ValueError as ex:
-            logger.error("Error generating display for %s (pk=%d) :  %s", self, self.pk, ex)
-            return ""
 
 
 class Videos(models.Model):
@@ -266,6 +311,7 @@ class Comment(UserInfo):
 
 class PostLiked(UserInfo):
     post = models.ForeignKey(Post, on_delete=models.CASCADE)
+    reaction_type = models.SmallIntegerField(choices=REACTION_TYPE(), default=REACTION_TYPE.LIKE)
 
     def __unicode__(self):
         return "%s like post %s" % (self.created_by, self.post)
@@ -273,9 +319,24 @@ class PostLiked(UserInfo):
 
 class CommentLiked(UserInfo):
     comment = models.ForeignKey(Comment, on_delete=models.CASCADE)
+    reaction_type = models.SmallIntegerField(choices=REACTION_TYPE(), default=REACTION_TYPE.LIKE)
 
     def __unicode__(self):
         return "%s like comment %s" % (self.created_by, self.comment)
+
+
+class PostReportAbuse(ReportAbuse):
+    post = models.ForeignKey(Post, on_delete=models.CASCADE)
+
+    def __unicode__(self):
+        return "User {user} has reported the post {post}".format(user=self.user, post=self.post)
+
+
+class CommentReportAbuse(ReportAbuse):
+    comment = models.ForeignKey(Comment, on_delete=models.CASCADE)
+
+    def __unicode__(self):
+        return "User {user} has reported the comment {comment}".format(user=self.user, comment=self.comment)
 
 
 class PollsAnswer(models.Model):
