@@ -10,6 +10,7 @@ class PostFilter(django_filters.FilterSet):
     user_strength = django_filters.BaseInFilter(name="user_strength", method="user_strength_filter")
     created_on_after = django_filters.DateFilter(name="created_on__gte", method="date_range_filter")
     created_on_before = django_filters.DateFilter(name="created_on__lte", method="date_range_filter")
+    nom_status = django_filters.BaseInFilter(name="nom_status", method="nom_status_filter")
 
     class Meta:
         model = Post
@@ -20,3 +21,6 @@ class PostFilter(django_filters.FilterSet):
 
     def date_range_filter(self, queryset, name, value):
         return queryset.filter(**{name: value})
+
+    def nom_status_filter(self, queryset, name, value):
+        return queryset.filter(nomination__nom_status__in=value)
