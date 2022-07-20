@@ -308,11 +308,16 @@ class PostViewSet(viewsets.ModelViewSet):
             raise ValidationError(_('You do not have access to this post'))
         reaction_type = self.request.data.get('type')
         object_type = NOTIFICATION_OBJECT_TYPE
-        if PostLiked.objects.filter(post_id=post_id, created_by=user, reaction_type=reaction_type).exists():
-            PostLiked.objects.filter(post_id=post_id, created_by=user, reaction_type=reaction_type).delete()
-            liked = False
-            message = "Successfully Removed Reaction"
-            PostLiked.objects.filter(post_id=post_id, created_by=user).update(reaction_type=reaction_type)
+        if PostLiked.objects.filter(post_id=post_id, created_by=user).exists():
+            user_reactions = PostLiked.objects.filter(post_id=post_id, created_by=user, reaction_type=reaction_type)
+            if user_reactions.exists():
+                user_reactions.delete()
+                liked = False
+                message = "Successfully Removed Reaction"
+            else:
+                liked = True
+                message = "Successfully Added Reaction"
+                PostLiked.objects.filter(post_id=post_id, created_by=user).update(reaction_type=reaction_type)
             post_object = PostLiked.objects.filter(post_id=post_id, created_by=user).first()
             response_status = status.HTTP_200_OK
         else:
@@ -575,17 +580,22 @@ class CommentViewset(viewsets.ModelViewSet):
         comment_id = int(comment_id)
         if comment_id not in accessible_comments:
             raise ValidationError(_('Not allowed to like the comment'))
-        message = None
-        liked = False
         response_status = status.HTTP_304_NOT_MODIFIED
-
+        reaction_type = self.request.data.get('type')
         if CommentLiked.objects.filter(comment_id=comment_id, created_by=user).exists():
-            CommentLiked.objects.filter(comment_id=comment_id, created_by=user).delete()
-            message = "Successfully UnLiked"
-            liked = False
-            response_status = status.HTTP_200_OK
+            user_reactions = CommentLiked.objects.filter(
+                comment_id=comment_id, created_by=user, reaction_type=reaction_type)
+            if user_reactions.exists():
+                user_reactions.delete()
+                message = "Successfully Removed Reaction"
+                liked = False
+                response_status = status.HTTP_200_OK
+            else:
+                liked = True
+                message = "Successfully Added Reaction"
+                CommentLiked.objects.filter(comment_id=comment_id, created_by=user).update(reaction_type=reaction_type)
         else:
-            CommentLiked.objects.create(comment_id=comment_id, created_by=user)
+            CommentLiked.objects.create(comment_id=comment_id, created_by=user, reaction_type=reaction_type)
             message = "Successfully Liked"
             liked = True
             response_status = status.HTTP_200_OK
