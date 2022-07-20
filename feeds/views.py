@@ -479,7 +479,8 @@ class PostViewSet(viewsets.ModelViewSet):
             # returns latest 5 reactions
             post_likes = post_likes[:5]
         post_reactions = PostLikedSerializer(post_likes, many=True).data
-        reaction_counts = post_likes.values('reaction_type').annotate(reaction_count=Count('reaction_type'))
+        reaction_counts = post_likes.values('reaction_type').order_by('reaction_type').annotate(
+            reaction_count=Count('reaction_type'))
         post_reactions.append({"counts": reaction_counts})
         return Response(post_reactions)
 
