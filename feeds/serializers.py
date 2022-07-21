@@ -215,6 +215,7 @@ class NominationsSerializer(DynamicFieldsModelSerializer):
     strength = serializers.SerializerMethodField()
     nominated_team_member = UserInfoSerializer()
     nom_status = serializers.SerializerMethodField()
+    nom_status_color = serializers.SerializerMethodField()
 
     class Meta:
         model = Nominations
@@ -229,7 +230,8 @@ class NominationsSerializer(DynamicFieldsModelSerializer):
                   "nominated_team_member",
                   "message_to_reviewer",
                   "strength",
-                  "nom_status")
+                  "nom_status",
+                  "nom_status_color")
 
     @staticmethod
     def get_review_level(instance):
@@ -261,6 +263,10 @@ class NominationsSerializer(DynamicFieldsModelSerializer):
         elif instance.nom_status == 3:
             return "Approved"
         return "Pending"
+
+    @staticmethod
+    def get_nom_status_color(instance):
+        return NOMINATION_STATUS_COLOR_CODE.get(instance.nom_status)
 
 
 class PostSerializer(DynamicFieldsModelSerializer):
