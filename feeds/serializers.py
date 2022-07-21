@@ -7,7 +7,7 @@ from django.db.models import Count
 
 from rest_framework import exceptions, serializers
 
-from .constants import POST_TYPE
+from .constants import POST_TYPE, NOMINATION_STATUS_COLOR_CODE
 from .models import (
     Comment, CommentLiked, Documents, ECard, ECardCategory, FlagPost,
     Post, PostLiked, PollsAnswer, Images, Videos, Voter,
