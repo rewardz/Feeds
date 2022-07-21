@@ -214,6 +214,7 @@ class NominationsSerializer(DynamicFieldsModelSerializer):
     user_strength = UserStrengthSerializer()
     strength = serializers.SerializerMethodField()
     nominated_team_member = UserInfoSerializer()
+    nom_status = serializers.SerializerMethodField()
 
     class Meta:
         model = Nominations
@@ -227,7 +228,8 @@ class NominationsSerializer(DynamicFieldsModelSerializer):
                   "user_strength",
                   "nominated_team_member",
                   "message_to_reviewer",
-                  "strength")
+                  "strength",
+                  "nom_status")
 
     @staticmethod
     def get_review_level(instance):
@@ -251,6 +253,14 @@ class NominationsSerializer(DynamicFieldsModelSerializer):
     @staticmethod
     def get_strength(instance):
         return instance.user_strength.name
+
+    @staticmethod
+    def get_nom_status(instance):
+        if instance.nom_status == 4:
+            return "Rejected"
+        elif instance.nom_status == 3:
+            return "Approved"
+        return "Pending"
 
 
 class PostSerializer(DynamicFieldsModelSerializer):
