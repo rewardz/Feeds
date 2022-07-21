@@ -483,9 +483,12 @@ class PostViewSet(viewsets.ModelViewSet):
             reaction_count=Count('reaction_type'))
         if reaction_type:
             post_likes = post_likes.filter(reaction_type=reaction_type)
-        post_reactions = PostLikedSerializer(post_likes, many=True).data
-        post_reactions.append({"counts": reaction_counts})
-        return Response(post_reactions)
+        page = self.paginate_queryset(post_likes)
+        serializer = PostLikedSerializer(page, post_likes, many=True)
+        serializer.is_valid()
+        post_reactions = self.get_paginated_response(serializer.data)
+        post_reactions.data['counts'] = reaction_counts
+        return post_reactions
 
 
 class ImagesView(views.APIView):
