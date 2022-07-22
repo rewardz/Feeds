@@ -476,17 +476,20 @@ class PostViewSet(viewsets.ModelViewSet):
         reaction_type = request.query_params.get("reaction_type", None)
         post = Post.objects.get(id=post_id)
         post_likes = post.postliked_set.all().order_by("-id")
+        all_reaction_count = post_likes.count()
         if recent:
             # returns latest 5 reactions
-            post_likes = post_likes[:5]
-        reaction_counts = post_likes.values('reaction_type').order_by('reaction_type').annotate(
-            reaction_count=Count('reaction_type'))
+            post_ids = post_likes.values_list('id', flat=True)[:5]
+            post_likes = post_likes.filter(id__in=post_ids)
+        reaction_counts = list(post_likes.values('reaction_type').order_by('reaction_type').annotate(
+            reaction_count=Count('reaction_type')))
         if reaction_type:
             post_likes = post_likes.filter(reaction_type=reaction_type)
         page = self.paginate_queryset(post_likes)
         serializer = PostLikedSerializer(page, post_likes, many=True)
         serializer.is_valid()
         post_reactions = self.get_paginated_response(serializer.data)
+        reaction_counts.append({"all_reactions": all_reaction_count})
         post_reactions.data['counts'] = reaction_counts
         return post_reactions
 
@@ -719,6 +722,21 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         else:
             feeds = feeds.filter(Q(nomination__nominator=user) | Q(user=user) | Q(nomination__assigned_reviewer=user))
         return feeds.distinct()
+
+    def list(self, request, *args, **kwargs):
+        show_approvals = False
+        page = self.paginate_queryset(self.get_queryset())
+        serializer = PostSerializer(page, context={"request": request}, many=True)
+
+        approvals_count = Post.objects.filter(post_type=POST_TYPE.USER_CREATED_NOMINATION,
+                                              nomination__assigned_reviewer=request.user).exclude(
+            nomination__nom_status__in=[NOMINATION_STATUS.approved, NOMINATION_STATUS.rejected]).count()
+        if request.user.userdesignation_set.count() > 0 or request.user.reviewer_users.count() > 0:
+            show_approvals = True
+        feeds = self.get_paginated_response(serializer.data)
+        feeds.data['approvals_count'] = approvals_count
+        feeds.data['show_approvals'] = show_approvals
+        return feeds
 
     @list_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
     def appreciated_by(self, request, *args, **kwargs):
