@@ -489,7 +489,7 @@ class PostViewSet(viewsets.ModelViewSet):
         serializer = PostLikedSerializer(page, post_likes, many=True)
         serializer.is_valid()
         post_reactions = self.get_paginated_response(serializer.data)
-        reaction_counts.append({"reaction_type": "all", "reaction_count": all_reaction_count})
+        reaction_counts.insert(0, {"reaction_type": 7, "reaction_count": all_reaction_count})
         post_reactions.data['counts'] = reaction_counts
         return post_reactions
 
