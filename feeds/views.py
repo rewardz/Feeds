@@ -334,9 +334,16 @@ class PostViewSet(viewsets.ModelViewSet):
                                   object_type=object_type, object_id=post.id)
         count = PostLiked.objects.filter(post_id=post_id).count()
         user_info = UserInfoSerializer(user).data
+
+        post_reactions = list()
+        post_likes = PostLiked.objects.filter(post_id=post_id)
+        if post_likes.exists():
+            post_reactions = post_likes.values('reaction_type').annotate(
+                reaction_count=Count('reaction_type')).order_by('-reaction_count')[:2]
+
         return Response({
             "message": message, "liked": liked, "count": count, "user_info": user_info,
-            "reaction_type": post_object.reaction_type if post_object else None},
+            "reaction_type": post_object.reaction_type if post_object else None, "post_reactions": post_reactions},
             status=response_status)
 
     @detail_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
