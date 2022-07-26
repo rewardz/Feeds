@@ -712,10 +712,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         feeds = Post.objects.filter(post_type__in=[POST_TYPE.USER_CREATED_APPRECIATION,
                                                    POST_TYPE.USER_CREATED_NOMINATION])
         feeds = PostFilter(self.request.GET, queryset=feeds).qs
-        if search:
-            feeds = feeds.filter(Q(user__first_name__startswith=search) | Q(user__last_name__startswith=search) |
-                                 Q(created_by__first_name__startswith=search) |
-                                 Q(created_by__last_name__startswith=search))
+
         if feed_flag == "received":
             feeds = feeds.filter(user=user)
         elif feed_flag == "given":
@@ -726,6 +723,10 @@ class UserFeedViewSet(viewsets.ModelViewSet):
                     NOMINATION_STATUS.approved, NOMINATION_STATUS.rejected])
         else:
             feeds = feeds.filter(Q(nomination__nominator=user) | Q(user=user) | Q(nomination__assigned_reviewer=user))
+        if search:
+            feeds = feeds.filter(Q(user__first_name__startswith=search) | Q(user__last_name__startswith=search) |
+                                 Q(created_by__first_name__startswith=search) |
+                                 Q(created_by__last_name__startswith=search))
         return feeds.distinct()
 
     def list(self, request, *args, **kwargs):
