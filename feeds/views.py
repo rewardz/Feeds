@@ -707,10 +707,13 @@ class UserFeedViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         feed_flag = self.request.query_params.get("feed", None)
+        search = self.request.query_params.get("search", None)
         user = self.request.user
         feeds = Post.objects.filter(post_type__in=[POST_TYPE.USER_CREATED_APPRECIATION,
                                                    POST_TYPE.USER_CREATED_NOMINATION])
         feeds = PostFilter(self.request.GET, queryset=feeds).qs
+        if search:
+            feeds = feeds.filter(Q(user__first_name__startswith=search) | Q(user__last_name__startswith=search))
         if feed_flag == "received":
             feeds = feeds.filter(user=user)
         elif feed_flag == "given":
