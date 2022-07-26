@@ -713,7 +713,9 @@ class UserFeedViewSet(viewsets.ModelViewSet):
                                                    POST_TYPE.USER_CREATED_NOMINATION])
         feeds = PostFilter(self.request.GET, queryset=feeds).qs
         if search:
-            feeds = feeds.filter(Q(user__first_name__startswith=search) | Q(user__last_name__startswith=search))
+            feeds = feeds.filter(Q(user__first_name__startswith=search) | Q(user__last_name__startswith=search) |
+                                 Q(created_by__first_name__startswith=search) |
+                                 Q(created_by__last_name__startswith=search))
         if feed_flag == "received":
             feeds = feeds.filter(user=user)
         elif feed_flag == "given":
