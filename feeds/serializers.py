@@ -293,6 +293,7 @@ class PostSerializer(DynamicFieldsModelSerializer):
     ecard = EcardSerializer()
     points = serializers.SerializerMethodField()
     time_left = serializers.SerializerMethodField()
+    images_with_ecard = serializers.SerializerMethodField()
 
     class Meta:
         model = Post
@@ -305,6 +306,7 @@ class PostSerializer(DynamicFieldsModelSerializer):
             "is_owner", "can_edit", "can_delete", "has_appreciated",
             "appreciation_count", "comments_count", "tagged_users", "is_admin", "tags", "reaction_type", "nomination",
             "feed_type", "user_strength", "user", "user_reaction_type", "gif", "ecard", "points", "time_left",
+            "images_with_ecard",
         )
 
     def get_tags(self, obj):
@@ -446,6 +448,16 @@ class PostSerializer(DynamicFieldsModelSerializer):
             else:
                 return "{}h Left".format(int(time_left_in_hours))
         return ""
+
+    @staticmethod
+    def get_images_with_ecard(instance):
+        all_images = list()
+        if not instance.post_type == POST_TYPE.USER_CREATED_POLL:
+            images = Images.objects.filter(post=instance.id)
+            all_images = ImagesSerializer(images, many=True, read_only=True).data
+        if instance.ecard:
+            all_images.append(EcardSerializer(instance.ecard).data)
+        return all_images
 
 
 class CommentsLikedSerializer(serializers.ModelSerializer):
