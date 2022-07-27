@@ -1,5 +1,5 @@
 import django_filters
-
+from django.db.models import Q
 from .models import Post
 
 
@@ -8,6 +8,7 @@ class PostFilter(django_filters.FilterSet):
     shared_with = django_filters.BaseInFilter(name="shared_with")
     organization = django_filters.BaseInFilter(name="organization")
     user_strength = django_filters.BaseInFilter(name="user_strength", method="user_strength_filter")
+    department = django_filters.BaseInFilter(name="department", method="department_filter")
     created_on_after = django_filters.DateFilter(name="created_on__gte", method="date_range_filter")
     created_on_before = django_filters.DateFilter(name="created_on__lte", method="date_range_filter")
     nom_status = django_filters.CharFilter(name="nom_status", method="nom_status_filter")
@@ -21,6 +22,9 @@ class PostFilter(django_filters.FilterSet):
 
     def date_range_filter(self, queryset, name, value):
         return queryset.filter(**{name: value})
+
+    def department_filter(self, queryset, name, value):
+        return queryset.filter(Q(nomination__category__department__in=value) | Q(transaction__department__in=value))
 
     def nom_status_filter(self, queryset, name, value):
         if value == "pending":
