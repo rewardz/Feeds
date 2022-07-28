@@ -296,7 +296,7 @@ class PostSerializer(DynamicFieldsModelSerializer):
     user = UserInfoSerializer()
     reaction_type = serializers.SerializerMethodField()
     user_reaction_type = serializers.SerializerMethodField()
-    ecard = EcardSerializer()
+    ecard = ECardSerializer()
     points = serializers.SerializerMethodField()
     time_left = serializers.SerializerMethodField()
     images_with_ecard = serializers.SerializerMethodField()
@@ -462,7 +462,7 @@ class PostSerializer(DynamicFieldsModelSerializer):
             images = Images.objects.filter(post=instance.id)
             all_images = ImagesSerializer(images, many=True, read_only=True).data
         if instance.ecard:
-            all_images.insert(0, EcardSerializer(instance.ecard).data)
+            all_images.insert(0, ECardSerializer(instance.ecard).data)
         return all_images
 
 
