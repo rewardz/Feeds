@@ -1,5 +1,5 @@
 from __future__ import division, print_function, unicode_literals
-
+import logging
 from feeds.constants import POST_TYPE
 from feeds.models import Post
 from feeds.serializers import DocumentsSerializer, ImagesSerializer
@@ -30,7 +30,7 @@ def create_feedback_post(user, title, description, **kwargs):
                 data = {"post": post.pk}
                 data['image'] = img
                 image_serializer = ImagesSerializer(data=data)
-                if image_serializer.is_valid():
+                if image_serializer.is_valid(raise_exception=True):
                     image_serializer.save()
                 else:
                     return False
@@ -40,7 +40,7 @@ def create_feedback_post(user, title, description, **kwargs):
                 data = {'post': post.pk}
                 data['document'] = doc
                 document_serializer = DocumentsSerializer(data=data)
-                if document_serializer.is_valid():
+                if document_serializer.is_valid(raise_exception=True):
                     document_serializer.save()
                 else:
                     return False
