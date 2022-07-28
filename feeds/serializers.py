@@ -199,11 +199,17 @@ class UserStrengthSerializer(serializers.ModelSerializer):
         return str(points)
 
 
-class EcardSerializer(serializers.ModelSerializer):
+class ECardSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source="category.name", read_only=True)
+    tags = serializers.SerializerMethodField()
 
     class Meta:
         model = ECard
-        fields = ('id', 'name', 'image')
+        fields = ('pk', 'name', 'image', 'tags', 'category', 'category_name',  'thumbnail_img_url', 'display_img_url',
+                  'large_img_url')
+
+    def get_tags(self, obj):
+        return list(obj.tags.values_list("name", flat=True))
 
 
 class NominationsSerializer(DynamicFieldsModelSerializer):
@@ -456,7 +462,7 @@ class PostSerializer(DynamicFieldsModelSerializer):
             images = Images.objects.filter(post=instance.id)
             all_images = ImagesSerializer(images, many=True, read_only=True).data
         if instance.ecard:
-            all_images.append(EcardSerializer(instance.ecard).data)
+            all_images.insert(0, EcardSerializer(instance.ecard).data)
         return all_images
 
 
@@ -669,14 +675,3 @@ class ECardCategorySerializer(serializers.ModelSerializer):
         model = ECardCategory
         fields = ('pk', 'name', 'organization')
 
-
-class ECardSerializer(serializers.ModelSerializer):
-    category_name = serializers.CharField(source="category.name", read_only=True)
-    tags = serializers.SerializerMethodField()
-
-    class Meta:
-        model = ECard
-        fields = ('pk', 'name', 'image', 'tags', 'category', 'category_name')
-
-    def get_tags(self, obj):
-        return list(obj.tags.values_list("name", flat=True))
