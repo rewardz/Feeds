@@ -731,7 +731,9 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         feeds = PostFilter(self.request.GET, queryset=feeds).qs
 
         if feed_flag == "received":
-            feeds = feeds.filter(user=user)
+            # returning only approved nominations with all the received appreciations
+            feeds = feeds.filter(user=user).filter(Q(nomination__nom_status=NOMINATION_STATUS.approved) |
+                                                   Q(post_type=POST_TYPE.USER_CREATED_APPRECIATION))
         elif feed_flag == "given":
             feeds = feeds.filter(Q(nomination__nominator=user) | Q(created_by=user))
         elif feed_flag == "approvals":
@@ -743,9 +745,9 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         else:
             feeds = feeds.filter(Q(nomination__nominator=user) | Q(user=user) | Q(nomination__assigned_reviewer=user))
         if search:
-            feeds = feeds.filter(Q(user__first_name__startswith=search) | Q(user__last_name__startswith=search) |
-                                 Q(created_by__first_name__startswith=search) |
-                                 Q(created_by__last_name__startswith=search))
+            feeds = feeds.filter(Q(user__first_name__istartswith=search) | Q(user__last_name__istartswith=search) |
+                                 Q(created_by__first_name__istartswith=search) |
+                                 Q(created_by__last_name__istartswith=search))
         return feeds.distinct()
 
     def list(self, request, *args, **kwargs):
