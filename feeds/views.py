@@ -739,8 +739,8 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             feeds = feeds.filter(user=user).filter(Q(nomination__nom_status=NOMINATION_STATUS.approved) |
                                                    Q(post_type=POST_TYPE.USER_CREATED_APPRECIATION))
         elif feed_flag == "given":
-            feeds = feeds.filter(Q(nomination__nominator=user) | Q(created_by=user)).exclude(
-                nomination__nom_status__in=[NOMINATION_STATUS.approved, NOMINATION_STATUS.rejected])
+            feeds = feeds.filter(Q(created_by=user, post_type=POST_TYPE.USER_CREATED_APPRECIATION) |
+                                 Q(nomination__nominator=user, nomination__nom_status=NOMINATION_STATUS.approved))
         elif feed_flag == "approvals":
             feeds = feeds.filter(nomination__assigned_reviewer=user).exclude(
                 post_type=POST_TYPE.USER_CREATED_NOMINATION, nomination__nom_status__in=[
