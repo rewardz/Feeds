@@ -739,7 +739,8 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             feeds = feeds.filter(user=user).filter(Q(nomination__nom_status=NOMINATION_STATUS.approved) |
                                                    Q(post_type=POST_TYPE.USER_CREATED_APPRECIATION))
         elif feed_flag == "given":
-            feeds = feeds.filter(Q(nomination__nominator=user) | Q(created_by=user))
+            feeds = feeds.filter(Q(nomination__nominator=user) | Q(created_by=user)).exclude(
+                nomination__nom_status__in=[NOMINATION_STATUS.approved, NOMINATION_STATUS.rejected])
         elif feed_flag == "approvals":
             feeds = feeds.filter(nomination__assigned_reviewer=user).exclude(
                 post_type=POST_TYPE.USER_CREATED_NOMINATION, nomination__nom_status__in=[
@@ -762,7 +763,8 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         approvals_count = Post.objects.filter(post_type=POST_TYPE.USER_CREATED_NOMINATION,
                                               nomination__assigned_reviewer=request.user).exclude(
             nomination__nom_status__in=[NOMINATION_STATUS.approved, NOMINATION_STATUS.rejected]).count()
-        if request.user.userdesignation_set.count() > 0 or request.user.reviewer_users.count() > 0:
+        if (request.user.userdesignation_set.count() > 0 or request.user.reviewer_users.count() > 0) and \
+                approvals_count > 0:
             show_approvals = True
         feeds = self.get_paginated_response(serializer.data)
         feeds.data['approvals_count'] = approvals_count
@@ -794,7 +796,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             except ValueError:
                 raise ValidationError(_('badge should be numeric value.'))
             my_appreciations_user = request.user.nominated_user.filter(
-                category__badge=badge_id).values_list('nominator', flat=True)
+                category__badge=badge_id, nom_status=NOMINATION_STATUS.approved).values_list('nominator', flat=True)
 
         users = CustomUser.objects.filter(id__in=my_appreciations_user)
         serializer = UserInfoSerializer(users, many=True, fields=["pk", "email", "first_name", "last_name",
