@@ -608,7 +608,11 @@ class CommentViewset(viewsets.ModelViewSet):
         if comment_id not in accessible_comments:
             raise ValidationError(_('Not allowed to like the comment'))
         response_status = status.HTTP_304_NOT_MODIFIED
-        reaction_type = self.request.data.get('type')
+
+        reaction_type = self.request.data.get('type', None)
+        if reaction_type is None:  # to handle existing workflow
+            reaction_type = 0
+
         if CommentLiked.objects.filter(comment_id=comment_id, created_by=user).exists():
             user_reactions = CommentLiked.objects.filter(
                 comment_id=comment_id, created_by=user, reaction_type=reaction_type)
@@ -840,7 +844,8 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             except ValueError:
                 raise ValidationError(_('badge should be numeric value.'))
         queryset = self.get_queryset().filter(post_type=POST_TYPE.USER_CREATED_NOMINATION,
-                                              nomination__category__badge_id=badge_id)
+                                              nomination__category__badge_id=badge_id,
+                                              nomination__nom_status=NOMINATION_STATUS.approved)
         user = CustomUser.objects.filter(id=user_id)
         if user.exists():
             user = user.first()
