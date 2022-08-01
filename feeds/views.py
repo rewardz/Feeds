@@ -829,7 +829,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             transaction.get('transaction__context')).get('strength_id') == strength_id]
         queryset = queryset.filter(id__in=posts)
         serializer = PostSerializer(queryset, many=True, context={"request": request}, fields=[
-            "id", "ecard", "gif", "images", "description", "points"])
+            "id", "ecard", "gif", "images", "description", "points", "images_with_ecard"])
         return Response({"strengths": serializer.data})
 
     @list_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
