@@ -217,6 +217,7 @@ class NominationsSerializer(serializers.ModelSerializer):
     class Meta:
         model = Nominations
         fields = ("id",
+                  "category",
                   "nomination_icon",
                   "review_level",
                   "nominator_name",
