@@ -209,9 +209,14 @@ class PostViewSet(viewsets.ModelViewSet):
         return serializer_class(*args, **kwargs)
 
     def get_queryset(self):
+        feedback = self.request.query_params.get('feedback', None)
+        if feedback and feedback == "true":
+            allow_feedback = True
+        else:
+            allow_feedback = False
         user = self.request.user
         org = self.request.user.organization
-        result = accessible_posts_by_user(user, org)
+        result = accessible_posts_by_user(user, org, allow_feedback=allow_feedback)
         result = result.order_by('-priority', '-modified_on', '-created_on')
         return result
 
@@ -249,14 +254,19 @@ class PostViewSet(viewsets.ModelViewSet):
         """
         List of all the comments related to the post
         """
+        feedback = self.request.query_params.get('feedback', None)
+        if feedback and feedback == "true":
+            allow_feedback = True
+        else:
+            allow_feedback = False
         user = self.request.user
         organization = user.organization
         post_id = self.kwargs.get("pk", None)
         if not post_id:
             raise ValidationError(_('Post ID required to retrieve all the related comments'))
         post_id = int(post_id)
-        accessible_posts = accessible_posts_by_user(user, organization). \
-            values_list('id', flat=True)
+        accessible_posts = accessible_posts_by_user(
+            user, organization, allow_feedback=allow_feedback).values_list('id', flat=True)
         if post_id not in accessible_posts:
             raise ValidationError(_('You do not have access to comment on this post'))
         if self.request.method == "GET":
@@ -308,11 +318,16 @@ class PostViewSet(viewsets.ModelViewSet):
             raise ValidationError(_('You do not have access to this post'))
         reaction_type = self.request.data.get('type')
         object_type = NOTIFICATION_OBJECT_TYPE
-        if PostLiked.objects.filter(post_id=post_id, created_by=user, reaction_type=reaction_type).exists():
-            PostLiked.objects.filter(post_id=post_id, created_by=user, reaction_type=reaction_type).delete()
-            liked = False
-            message = "Successfully Removed Reaction"
-            PostLiked.objects.filter(post_id=post_id, created_by=user).update(reaction_type=reaction_type)
+        if PostLiked.objects.filter(post_id=post_id, created_by=user).exists():
+            user_reactions = PostLiked.objects.filter(post_id=post_id, created_by=user, reaction_type=reaction_type)
+            if user_reactions.exists():
+                user_reactions.delete()
+                liked = False
+                message = "Successfully Removed Reaction"
+            else:
+                liked = True
+                message = "Successfully Added Reaction"
+                PostLiked.objects.filter(post_id=post_id, created_by=user).update(reaction_type=reaction_type)
             post_object = PostLiked.objects.filter(post_id=post_id, created_by=user).first()
             response_status = status.HTTP_200_OK
         else:
@@ -329,9 +344,16 @@ class PostViewSet(viewsets.ModelViewSet):
                                   object_type=object_type, object_id=post.id)
         count = PostLiked.objects.filter(post_id=post_id).count()
         user_info = UserInfoSerializer(user).data
+
+        post_reactions = list()
+        post_likes = PostLiked.objects.filter(post_id=post_id)
+        if post_likes.exists():
+            post_reactions = post_likes.values('reaction_type').annotate(
+                reaction_count=Count('reaction_type')).order_by('-reaction_count')[:2]
+
         return Response({
             "message": message, "liked": liked, "count": count, "user_info": user_info,
-            "reaction_type": post_object.reaction_type if post_object else None},
+            "reaction_type": post_object.reaction_type if post_object else None, "post_reactions": post_reactions},
             status=response_status)
 
     @detail_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
@@ -468,15 +490,25 @@ class PostViewSet(viewsets.ModelViewSet):
     def post_appreciations(self, request, *args, **kwargs):
         post_id = self.kwargs.get("pk", None)
         recent = request.query_params.get("recent", None)
+        reaction_type = request.query_params.get("reaction_type", None)
         post = Post.objects.get(id=post_id)
         post_likes = post.postliked_set.all().order_by("-id")
+        all_reaction_count = post_likes.count()
         if recent:
             # returns latest 5 reactions
-            post_likes = post_likes[:5]
-        post_reactions = PostLikedSerializer(post_likes, many=True).data
-        reaction_counts = post_likes.values('reaction_type').annotate(reaction_count=Count('reaction_type'))
-        post_reactions.append({"counts": reaction_counts})
-        return Response(post_reactions)
+            post_ids = post_likes.values_list('id', flat=True)[:5]
+            post_likes = post_likes.filter(id__in=post_ids)
+        reaction_counts = list(post_likes.values('reaction_type').order_by('reaction_type').annotate(
+            reaction_count=Count('reaction_type')))
+        if reaction_type:
+            post_likes = post_likes.filter(reaction_type=reaction_type)
+        page = self.paginate_queryset(post_likes)
+        serializer = PostLikedSerializer(page, post_likes, many=True)
+        serializer.is_valid()
+        post_reactions = self.get_paginated_response(serializer.data)
+        reaction_counts.insert(0, {"reaction_type": 7, "reaction_count": all_reaction_count})
+        post_reactions.data['counts'] = reaction_counts
+        return post_reactions
 
 
 class ImagesView(views.APIView):
@@ -575,17 +607,26 @@ class CommentViewset(viewsets.ModelViewSet):
         comment_id = int(comment_id)
         if comment_id not in accessible_comments:
             raise ValidationError(_('Not allowed to like the comment'))
-        message = None
-        liked = False
         response_status = status.HTTP_304_NOT_MODIFIED
 
+        reaction_type = self.request.data.get('type', None)
+        if reaction_type is None:  # to handle existing workflow
+            reaction_type = 0
+
         if CommentLiked.objects.filter(comment_id=comment_id, created_by=user).exists():
-            CommentLiked.objects.filter(comment_id=comment_id, created_by=user).delete()
-            message = "Successfully UnLiked"
-            liked = False
-            response_status = status.HTTP_200_OK
+            user_reactions = CommentLiked.objects.filter(
+                comment_id=comment_id, created_by=user, reaction_type=reaction_type)
+            if user_reactions.exists():
+                user_reactions.delete()
+                message = "Successfully Removed Reaction"
+                liked = False
+                response_status = status.HTTP_200_OK
+            else:
+                liked = True
+                message = "Successfully Added Reaction"
+                CommentLiked.objects.filter(comment_id=comment_id, created_by=user).update(reaction_type=reaction_type)
         else:
-            CommentLiked.objects.create(comment_id=comment_id, created_by=user)
+            CommentLiked.objects.create(comment_id=comment_id, created_by=user, reaction_type=reaction_type)
             message = "Successfully Liked"
             liked = True
             response_status = status.HTTP_200_OK
@@ -687,32 +728,74 @@ class UserFeedViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         feed_flag = self.request.query_params.get("feed", None)
+        search = self.request.query_params.get("search", None)
         user = self.request.user
         feeds = Post.objects.filter(post_type__in=[POST_TYPE.USER_CREATED_APPRECIATION,
                                                    POST_TYPE.USER_CREATED_NOMINATION])
         feeds = PostFilter(self.request.GET, queryset=feeds).qs
+
         if feed_flag == "received":
-            feeds = feeds.filter(user=user)
+            # returning only approved nominations with all the received appreciations
+            feeds = feeds.filter(user=user).filter(Q(nomination__nom_status=NOMINATION_STATUS.approved) |
+                                                   Q(post_type=POST_TYPE.USER_CREATED_APPRECIATION))
         elif feed_flag == "given":
             feeds = feeds.filter(Q(nomination__nominator=user) | Q(created_by=user))
         elif feed_flag == "approvals":
             feeds = feeds.filter(nomination__assigned_reviewer=user).exclude(
-                post_type=[POST_TYPE.USER_CREATED_NOMINATION], nomination__nom_status__in=[
+                post_type=POST_TYPE.USER_CREATED_NOMINATION, nomination__nom_status__in=[
                     NOMINATION_STATUS.approved, NOMINATION_STATUS.rejected])
+        elif feed_flag == "my_nomination":
+            feeds = feeds.filter(nomination__nominator=user)
         else:
             feeds = feeds.filter(Q(nomination__nominator=user) | Q(user=user) | Q(nomination__assigned_reviewer=user))
+        if search:
+            feeds = feeds.filter(Q(user__first_name__istartswith=search) | Q(user__last_name__istartswith=search) |
+                                 Q(created_by__first_name__istartswith=search) |
+                                 Q(created_by__last_name__istartswith=search))
         return feeds.distinct()
+
+    def list(self, request, *args, **kwargs):
+        show_approvals = False
+        page = self.paginate_queryset(self.get_queryset())
+        serializer = PostSerializer(page, context={"request": request}, many=True)
+
+        approvals_count = Post.objects.filter(post_type=POST_TYPE.USER_CREATED_NOMINATION,
+                                              nomination__assigned_reviewer=request.user).exclude(
+            nomination__nom_status__in=[NOMINATION_STATUS.approved, NOMINATION_STATUS.rejected]).count()
+        if request.user.userdesignation_set.count() > 0 or request.user.reviewer_users.count() > 0:
+            show_approvals = True
+        feeds = self.get_paginated_response(serializer.data)
+        feeds.data['approvals_count'] = approvals_count
+        feeds.data['show_approvals'] = show_approvals
+        return feeds
 
     @list_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
     def appreciated_by(self, request, *args, **kwargs):
-        my_appreciations_user = list(Post.objects.filter(
-            user=request.user, post_type=POST_TYPE.USER_CREATED_APPRECIATION).values_list(
-            'transaction__creator', flat=True))
-        my_nom_user = list(Post.objects.filter(
-            user=request.user, post_type=POST_TYPE.USER_CREATED_NOMINATION).values_list(
-            'nomination__nominator', flat=True))
+        strength_id = request.query_params.get("strength", None)
+        badge_id = request.query_params.get("badge", None)
+        if strength_id is None and badge_id is None:
+            raise ValidationError(_('You need to pass either strength or badge parameter.'))
+        if strength_id:
+            try:
+                strength_id = int(strength_id)
+            except ValueError:
+                raise ValidationError(_('strength should be numeric value.'))
+            user_appreciations = Post.objects.filter(
+                user=request.user, post_type=POST_TYPE.USER_CREATED_APPRECIATION).values(
+                'transaction__context', 'transaction__creator')
 
-        my_appreciations_user.extend(my_nom_user)
+            my_appreciations_user = [user_appreciation.get('transaction__creator') for user_appreciation in
+                                     user_appreciations if loads(user_appreciation.get('transaction__context')).get(
+                'strength_id') == strength_id]
+
+        if badge_id:
+            try:
+                badge_id = int(badge_id)
+            except ValueError:
+                raise ValidationError(_('badge should be numeric value.'))
+            my_appreciations_user = request.user.nominated_user.filter(
+                category__badge=badge_id).values_list('nominator', flat=True)
+
         users = CustomUser.objects.filter(id__in=my_appreciations_user)
         serializer = UserInfoSerializer(users, many=True, fields=["pk", "email", "first_name", "last_name",
                                                                   "profile_pic_url", "profile_img"])
@@ -721,15 +804,55 @@ class UserFeedViewSet(viewsets.ModelViewSet):
     @list_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
     def strengths(self, request, *args, **kwargs):
         user_id = request.query_params.get("user_id", None)
-        queryset = self.get_queryset()
+        strength_id = request.query_params.get("strength", None)
+        if strength_id is None:
+            raise ValidationError(_('strength is a required parameter.'))
         if user_id is None:
             raise ValidationError(_('user_id is a required parameter.'))
+        if strength_id:
+            try:
+                strength_id = int(strength_id)
+            except ValueError:
+                raise ValidationError(_('strength should be numeric value.'))
+
+        queryset = self.get_queryset().filter(post_type=POST_TYPE.USER_CREATED_APPRECIATION)
         user = CustomUser.objects.filter(id=user_id)
         if user.exists():
             user = user.first()
             queryset = queryset.filter(created_by=user)
         else:
             raise ValidationError(_('User does not exist'))
+        transactions = queryset.values('id', 'transaction__context')
+        posts = [transaction.get('id') for transaction in transactions if loads(
+            transaction.get('transaction__context')).get('strength_id') == strength_id]
+        queryset = queryset.filter(id__in=posts)
         serializer = PostSerializer(queryset, many=True, context={"request": request}, fields=[
-            "id", "user_strength", "feed_type", "nomination"])
+            "id", "ecard", "gif", "images", "description", "points"])
         return Response({"strengths": serializer.data})
+
+    @list_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
+    def badges(self, request, *args, **kwargs):
+        user_id = request.query_params.get("user_id", None)
+        badge_id = request.query_params.get("badge", None)
+        if user_id is None:
+            raise ValidationError(_('user_id is a required parameter.'))
+        if badge_id is None:
+            raise ValidationError(_('badge is a required parameter.'))
+        if badge_id:
+            try:
+                badge_id = int(badge_id)
+            except ValueError:
+                raise ValidationError(_('badge should be numeric value.'))
+        queryset = self.get_queryset().filter(post_type=POST_TYPE.USER_CREATED_NOMINATION,
+                                              nomination__category__badge_id=badge_id,
+                                              nomination__nom_status=NOMINATION_STATUS.approved)
+        user = CustomUser.objects.filter(id=user_id)
+        if user.exists():
+            user = user.first()
+            queryset = queryset.filter(created_by=user)
+        else:
+            raise ValidationError(_('User does not exist'))
+        serializer = PostSerializer(queryset, many=True, context={
+            "request": request, "nomination_fields": ["badges", "strength"]}, fields=[
+            "id", "description", "nomination"])
+        return Response({"badges": serializer.data})

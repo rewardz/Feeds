@@ -15,6 +15,7 @@ POST_TYPE = Choices({
     "MOST_APPRECIATED": 5,
     "USER_CREATED_APPRECIATION": 6,
     "USER_CREATED_NOMINATION": 7,
+    "FEEDBACK_POST": 8,
 })
 
 REACTION_TYPE = Choices({
@@ -24,6 +25,7 @@ REACTION_TYPE = Choices({
     "LOVE": 3,
     "INSIGHTFUL": 4,
     "CURIOUS": 5,
+    "APPLAUSE": 6,
 })
 
 NOMINATION_STATUS = Choices({
@@ -33,3 +35,11 @@ NOMINATION_STATUS = Choices({
     "approved": 3,
     "rejected": 4
 })
+
+NOMINATION_STATUS_COLOR_CODE = {
+    0: "#FFA412",
+    1: "#FFA412",
+    2: "#FFA412",
+    3: "#40CB57",
+    4: "#FF3838",
+}
