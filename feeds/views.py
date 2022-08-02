@@ -666,7 +666,7 @@ def search_user(request):
         result = result.filter(
             Q(email__istartswith=search_term) |
             Q(first_name__istartswith=search_term))
-    serializer = UserInfoSerializer(result, many=True)
+    serializer = UserInfoSerializer(result, many=True, context={'request': request})
     return Response(serializer.data)
 
 

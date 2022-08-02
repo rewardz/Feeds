@@ -79,6 +79,9 @@ class UserInfoSerializer(DynamicFieldsModelSerializer):
         return DepartmentDetailSerializer(departments, many=True, read_only=True).data
 
     def get_profile_img(self, instance):
+        request = self.context.get('request')
+        if request and request.version >= 12 and not instance.img:
+            return None
         profile_image_url = get_profile_image(instance)
         return profile_image_url
 
@@ -355,9 +358,10 @@ class PostSerializer(DynamicFieldsModelSerializer):
         return VideosSerializer(videos, many=True, read_only=True).data
 
     def get_created_by_user_info(self, instance):
+        request = self.context.get('request')
         created_by = instance.created_by
         user_detail = get_user_detail(created_by.id)
-        return UserInfoSerializer(user_detail).data
+        return UserInfoSerializer(user_detail, context={'request': request}).data
 
     def get_is_owner(self, instance):
         request = self.context['request']
