@@ -673,7 +673,7 @@ def search_user(request):
 class ECardCategoryViewSet(viewsets.ModelViewSet):
     queryset = ECardCategory.objects.none()
     serializer_class = ECardCategorySerializer
-    permission_classes = [permissions.IsAdminUser, ]
+    permission_classes = [permissions.IsAuthenticated, ]
 
     def get_queryset(self):
         user = self.request.user
@@ -684,7 +684,7 @@ class ECardCategoryViewSet(viewsets.ModelViewSet):
 class ECardViewSet(viewsets.ModelViewSet):
     queryset = ECard.objects.none()
     serializer_class = ECardSerializer
-    permission_classes = [permissions.IsAdminUser, ]
+    permission_classes = [permissions.IsAuthenticated, ]
 
     def get_queryset(self):
         user = self.request.user
