@@ -2,12 +2,11 @@ from __future__ import division, print_function, unicode_literals
 
 from django.conf import settings
 from django.utils.module_loading import import_string
-from django.utils.translation import ugettext as _
 from django.db.models import Count
 
-from rest_framework import exceptions, serializers
+from rest_framework import serializers
 
-from .constants import POST_TYPE, NOMINATION_STATUS_COLOR_CODE
+from .constants import POST_TYPE
 from .models import (
     Comment, CommentLiked, Documents, ECard, ECardCategory, FlagPost,
     Post, PostLiked, PollsAnswer, Images, Videos, Voter,
@@ -22,6 +21,7 @@ UserModel = import_string(settings.CUSTOM_USER_MODEL)
 Nominations = import_string(settings.NOMINATIONS_MODEL)
 TrophyBadge = import_string(settings.TROPHY_BADGE_MODEL)
 UserStrength = import_string(settings.USER_STRENGTH_MODEL)
+NOMINATION_STATUS_COLOR_CODE = import_string(settings.NOMINATION_STATUS_COLOR_CODE)
 
 
 def get_user_detail(user_id):
@@ -208,7 +208,7 @@ class ECardSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ECard
-        fields = ('pk', 'name', 'image', 'tags', 'category', 'category_name',  'thumbnail_img_url', 'display_img_url',
+        fields = ('pk', 'name', 'image', 'tags', 'category', 'category_name', 'thumbnail_img_url', 'display_img_url',
                   'large_img_url')
 
     def get_tags(self, obj):
@@ -418,8 +418,6 @@ class PostSerializer(DynamicFieldsModelSerializer):
         return None
 
     def get_reaction_type(self, instance):
-        request = self.context['request']
-        user = request.user
         post_likes = PostLiked.objects.filter(post=instance)
         if post_likes.exists():
             return post_likes.values('reaction_type').annotate(
@@ -679,4 +677,3 @@ class ECardCategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = ECardCategory
         fields = ('pk', 'name', 'organization')
-

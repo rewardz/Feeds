@@ -27,19 +27,3 @@ REACTION_TYPE = Choices({
     "CURIOUS": 5,
     "APPLAUSE": 6,
 })
-
-NOMINATION_STATUS = Choices({
-    "NONE": 0,
-    "in_review_approver1": 1,
-    "in_review_approver2": 2,
-    "approved": 3,
-    "rejected": 4
-})
-
-NOMINATION_STATUS_COLOR_CODE = {
-    0: "#FFA412",
-    1: "#FFA412",
-    2: "#FFA412",
-    3: "#40CB57",
-    4: "#FF3838",
-}

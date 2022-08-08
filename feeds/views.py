@@ -11,22 +11,22 @@ from django.utils.translation import ugettext as _
 from rest_framework import permissions, viewsets, serializers, status, views, filters
 from rest_framework.decorators import api_view, detail_route, list_route, permission_classes
 from rest_framework.exceptions import ValidationError
-from rest_framework.parsers import MultiPartParser, FormParser, FileUploadParser, JSONParser
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
 
 from .filters import PostFilter
-from .constants import POST_TYPE, NOMINATION_STATUS
+from .constants import POST_TYPE
 from .models import (
-    Comment, Documents, ECard, ECardCategory, FlagPost,
+    Comment, Documents, ECard, ECardCategory,
     Post, PostLiked, PollsAnswer, Images, CommentLiked,
 )
 from .paginator import FeedsResultsSetPagination
 from .serializers import (
     CommentDetailSerializer, CommentSerializer, CommentCreateSerializer,
-    DocumentsSerializer, ECardCategorySerializer, ECardSerializer, 
+    DocumentsSerializer, ECardCategorySerializer, ECardSerializer,
     FlagPostSerializer, PostLikedSerializer, PostSerializer,
     PostDetailSerializer, PollsAnswerSerializer, ImagesSerializer,
-    UserInfoSerializer, VideosSerializer, UserStrengthSerializer,
+    UserInfoSerializer, VideosSerializer,
 )
 from .utils import (
     accessible_posts_by_user, extract_tagged_users, get_user_name, notify_new_comment,
@@ -38,6 +38,7 @@ CustomUser = import_string(settings.CUSTOM_USER_MODEL)
 DEPARTMENT_MODEL = import_string(settings.DEPARTMENT_MODEL)
 NOTIFICATION_OBJECT_TYPE = import_string(settings.POST_NOTIFICATION_OBJECT_TYPE).Posts
 UserStrength = import_string(settings.USER_STRENGTH_MODEL)
+NOMINATION_STATUS = import_string(settings.NOMINATION_STATUS)
 
 
 class PostViewSet(viewsets.ModelViewSet):
@@ -428,9 +429,9 @@ class PostViewSet(viewsets.ModelViewSet):
         try:
             poll = Post.objects.get(id=post_id)
             poll.vote(user, answer_id)
-        except Post.DoesNotExist as exp:
+        except Post.DoesNotExist:
             raise ValidationError(_('Poll does not exist.'))
-        except PollsAnswer.DoesNotExist as exp:
+        except PollsAnswer.DoesNotExist:
             raise ValidationError(_('This is not a correct answer.'))
         serializer = self.get_serializer(poll)
         return Response(serializer.data)
@@ -465,7 +466,6 @@ class PostViewSet(viewsets.ModelViewSet):
         user = self.request.user
         organization = user.organization
         payload = self.request.data
-        priority = payload.get("priority", True)
         prior_till = payload.get("prior_till", None)
         post_id = payload.get("post_id", None)
         if not post_id:
@@ -483,7 +483,7 @@ class PostViewSet(viewsets.ModelViewSet):
             else:
                 post.pinned(user, prior_till=prior_till)
             return Response(self.get_serializer(post).data)
-        except Post.DoesNotExist as exp:
+        except Post.DoesNotExist:
             raise ValidationError(_('Post does not exist.'))
 
     @detail_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
@@ -663,10 +663,8 @@ def search_user(request):
         result = result.filter(id__in=dept_users)
     result = result.exclude(id=user.id)
     if search_term:
-        result = result.filter(
-            Q(email__istartswith=search_term) |
-            Q(first_name__istartswith=search_term))
-    serializer = UserInfoSerializer(result, many=True, context={'request': request})
+        result = result.filter(Q(email__istartswith=search_term) | Q(first_name__istartswith=search_term))
+    serializer = UserInfoSerializer(result, many=True)
     return Response(serializer.data)
 
 
@@ -699,7 +697,6 @@ class ECardViewSet(viewsets.ModelViewSet):
 
     @transaction.atomic
     def create(self, request):
-        user = self.request.user
         data = request.data
         serializer = ECardSerializer(data=data)
         serializer.is_valid(raise_exception=True)
@@ -710,7 +707,6 @@ class ECardViewSet(viewsets.ModelViewSet):
     @transaction.atomic
     def partial_update(self, request, pk=None):
         ecard = self.get_object()
-        user = self.request.user
         data = request.data
         serializer = ECardSerializer(ecard, data=data, partial=True)
         serializer.is_valid(raise_exception=True)
@@ -736,11 +732,11 @@ class UserFeedViewSet(viewsets.ModelViewSet):
 
         if feed_flag == "received":
             # returning only approved nominations with all the received appreciations
-            feeds = feeds.filter(user=user).filter(Q(nomination__nom_status=NOMINATION_STATUS.approved) |
-                                                   Q(post_type=POST_TYPE.USER_CREATED_APPRECIATION))
+            feeds = feeds.filter(user=user).filter(Q(nomination__nom_status=NOMINATION_STATUS.approved) | Q(
+                post_type=POST_TYPE.USER_CREATED_APPRECIATION))
         elif feed_flag == "given":
-            feeds = feeds.filter(Q(created_by=user, post_type=POST_TYPE.USER_CREATED_APPRECIATION) |
-                                 Q(nomination__nominator=user, nomination__nom_status=NOMINATION_STATUS.approved))
+            feeds = feeds.filter(Q(created_by=user, post_type=POST_TYPE.USER_CREATED_APPRECIATION) | Q(
+                nomination__nominator=user, nomination__nom_status=NOMINATION_STATUS.approved))
         elif feed_flag == "approvals":
             feeds = feeds.filter(nomination__assigned_reviewer=user).exclude(
                 post_type=POST_TYPE.USER_CREATED_NOMINATION, nomination__nom_status__in=[
@@ -750,9 +746,9 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         else:
             feeds = feeds.filter(Q(nomination__nominator=user) | Q(user=user) | Q(nomination__assigned_reviewer=user))
         if search:
-            feeds = feeds.filter(Q(user__first_name__istartswith=search) | Q(user__last_name__istartswith=search) |
-                                 Q(created_by__first_name__istartswith=search) |
-                                 Q(created_by__last_name__istartswith=search))
+            feeds = feeds.filter(Q(user__first_name__istartswith=search) | Q(
+                user__last_name__istartswith=search) | Q(created_by__first_name__istartswith=search) | Q(
+                created_by__last_name__istartswith=search))
         return feeds.distinct()
 
     def list(self, request, *args, **kwargs):
