@@ -1,26 +1,29 @@
 from __future__ import division, print_function, unicode_literals
 
+from json import loads
 from django.conf import settings
-from django.db.models import Q
+from django.db import transaction
+from django.db.models import Q, Count
 from django.http import Http404
 from django.utils.module_loading import import_string
 from django.utils.translation import ugettext as _
 
-from rest_framework import permissions, viewsets, serializers, status, views
+from rest_framework import permissions, viewsets, serializers, status, views, filters
 from rest_framework.decorators import api_view, detail_route, list_route, permission_classes
 from rest_framework.exceptions import ValidationError
-from rest_framework.parsers import MultiPartParser, FormParser, FileUploadParser, JSONParser
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
 
-from .constants import POST_TYPE, SHARED_WITH
+from .filters import PostFilter
+from .constants import POST_TYPE
 from .models import (
-    Comment, Documents, ECard, ECardCategory, FlagPost,
+    Comment, Documents, ECard, ECardCategory,
     Post, PostLiked, PollsAnswer, Images, CommentLiked,
 )
 from .paginator import FeedsResultsSetPagination
 from .serializers import (
     CommentDetailSerializer, CommentSerializer, CommentCreateSerializer,
-    DocumentsSerializer, ECardCategorySerializer, ECardSerializer, 
+    DocumentsSerializer, ECardCategorySerializer, ECardSerializer,
     FlagPostSerializer, PostLikedSerializer, PostSerializer,
     PostDetailSerializer, PollsAnswerSerializer, ImagesSerializer,
     UserInfoSerializer, VideosSerializer,
@@ -34,6 +37,8 @@ from .utils import (
 CustomUser = import_string(settings.CUSTOM_USER_MODEL)
 DEPARTMENT_MODEL = import_string(settings.DEPARTMENT_MODEL)
 NOTIFICATION_OBJECT_TYPE = import_string(settings.POST_NOTIFICATION_OBJECT_TYPE).Posts
+UserStrength = import_string(settings.USER_STRENGTH_MODEL)
+NOMINATION_STATUS = import_string(settings.NOMINATION_STATUS)
 
 
 class PostViewSet(viewsets.ModelViewSet):
@@ -312,33 +317,44 @@ class PostViewSet(viewsets.ModelViewSet):
         accessible_posts = accessible_posts_by_user(user, organization).values_list('id', flat=True)
         if post_id not in accessible_posts:
             raise ValidationError(_('You do not have access to this post'))
-        apreciation_type = self.request.query_params.get("type", "like")
-        message = None
-        liked = False
-        response_status = status.HTTP_304_NOT_MODIFIED
+        reaction_type = self.request.data.get('type')
         object_type = NOTIFICATION_OBJECT_TYPE
-        if apreciation_type.lower() == "like":
-            if PostLiked.objects.filter(post_id=post_id, created_by=user).exists():
-                PostLiked.objects.filter(post_id=post_id, created_by=user).delete()
-                message = "Successfully unliked"
+        if PostLiked.objects.filter(post_id=post_id, created_by=user).exists():
+            user_reactions = PostLiked.objects.filter(post_id=post_id, created_by=user, reaction_type=reaction_type)
+            if user_reactions.exists():
+                user_reactions.delete()
                 liked = False
-                response_status = status.HTTP_200_OK
+                message = "Successfully Removed Reaction"
             else:
-                data = PostLiked.objects.create(post_id=post_id, created_by=user)
-                message = "Successfully Liked"
                 liked = True
-                response_status = status.HTTP_201_CREATED
-                post = Post.objects.filter(id=post_id).first()
-                user_name = get_user_name(user)
-                post_string = post.title[:20] + "..." if post.title else ""
-                if post:
-                    notif_message = _("'%s' likes your post %s" % (user_name, post_string))
-                    push_notification(user, notif_message, post.created_by,
-                                      object_type=object_type, object_id=post.id)
+                message = "Successfully Added Reaction"
+                PostLiked.objects.filter(post_id=post_id, created_by=user).update(reaction_type=reaction_type)
+            post_object = PostLiked.objects.filter(post_id=post_id, created_by=user).first()
+            response_status = status.HTTP_200_OK
+        else:
+            post_object = PostLiked.objects.create(post_id=post_id, created_by=user, reaction_type=reaction_type)
+            message = "Successfully Added Reaction"
+            liked = True
+            response_status = status.HTTP_201_CREATED
+            post = Post.objects.filter(id=post_id).first()
+            user_name = get_user_name(user)
+            post_string = post.title[:20] + "..." if post.title else ""
+            if post:
+                notif_message = _("'%s' likes your post %s" % (user_name, post_string))
+                push_notification(user, notif_message, post.created_by,
+                                  object_type=object_type, object_id=post.id)
         count = PostLiked.objects.filter(post_id=post_id).count()
         user_info = UserInfoSerializer(user).data
+
+        post_reactions = list()
+        post_likes = PostLiked.objects.filter(post_id=post_id)
+        if post_likes.exists():
+            post_reactions = post_likes.values('reaction_type').annotate(
+                reaction_count=Count('reaction_type')).order_by('-reaction_count')[:2]
+
         return Response({
-            "message": message, "liked": liked, "count": count, "user_info": user_info},
+            "message": message, "liked": liked, "count": count, "user_info": user_info,
+            "reaction_type": post_object.reaction_type if post_object else None, "post_reactions": post_reactions},
             status=response_status)
 
     @detail_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
@@ -413,9 +429,9 @@ class PostViewSet(viewsets.ModelViewSet):
         try:
             poll = Post.objects.get(id=post_id)
             poll.vote(user, answer_id)
-        except Post.DoesNotExist as exp:
+        except Post.DoesNotExist:
             raise ValidationError(_('Poll does not exist.'))
-        except PollsAnswer.DoesNotExist as exp:
+        except PollsAnswer.DoesNotExist:
             raise ValidationError(_('This is not a correct answer.'))
         serializer = self.get_serializer(poll)
         return Response(serializer.data)
@@ -450,7 +466,6 @@ class PostViewSet(viewsets.ModelViewSet):
         user = self.request.user
         organization = user.organization
         payload = self.request.data
-        priority = payload.get("priority", True)
         prior_till = payload.get("prior_till", None)
         post_id = payload.get("post_id", None)
         if not post_id:
@@ -468,8 +483,32 @@ class PostViewSet(viewsets.ModelViewSet):
             else:
                 post.pinned(user, prior_till=prior_till)
             return Response(self.get_serializer(post).data)
-        except Post.DoesNotExist as exp:
+        except Post.DoesNotExist:
             raise ValidationError(_('Post does not exist.'))
+
+    @detail_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
+    def post_appreciations(self, request, *args, **kwargs):
+        post_id = self.kwargs.get("pk", None)
+        recent = request.query_params.get("recent", None)
+        reaction_type = request.query_params.get("reaction_type", None)
+        post = Post.objects.get(id=post_id)
+        post_likes = post.postliked_set.all().order_by("-id")
+        all_reaction_count = post_likes.count()
+        if recent:
+            # returns latest 5 reactions
+            post_ids = post_likes.values_list('id', flat=True)[:5]
+            post_likes = post_likes.filter(id__in=post_ids)
+        reaction_counts = list(post_likes.values('reaction_type').order_by('reaction_type').annotate(
+            reaction_count=Count('reaction_type')))
+        if reaction_type:
+            post_likes = post_likes.filter(reaction_type=reaction_type)
+        page = self.paginate_queryset(post_likes)
+        serializer = PostLikedSerializer(page, post_likes, many=True)
+        serializer.is_valid()
+        post_reactions = self.get_paginated_response(serializer.data)
+        reaction_counts.insert(0, {"reaction_type": 7, "reaction_count": all_reaction_count})
+        post_reactions.data['counts'] = reaction_counts
+        return post_reactions
 
 
 class ImagesView(views.APIView):
@@ -568,17 +607,26 @@ class CommentViewset(viewsets.ModelViewSet):
         comment_id = int(comment_id)
         if comment_id not in accessible_comments:
             raise ValidationError(_('Not allowed to like the comment'))
-        message = None
-        liked = False
         response_status = status.HTTP_304_NOT_MODIFIED
 
+        reaction_type = self.request.data.get('type', None)
+        if reaction_type is None:  # to handle existing workflow
+            reaction_type = 0
+
         if CommentLiked.objects.filter(comment_id=comment_id, created_by=user).exists():
-            CommentLiked.objects.filter(comment_id=comment_id, created_by=user).delete()
-            message = "Successfully UnLiked"
-            liked = False
-            response_status = status.HTTP_200_OK
+            user_reactions = CommentLiked.objects.filter(
+                comment_id=comment_id, created_by=user, reaction_type=reaction_type)
+            if user_reactions.exists():
+                user_reactions.delete()
+                message = "Successfully Removed Reaction"
+                liked = False
+                response_status = status.HTTP_200_OK
+            else:
+                liked = True
+                message = "Successfully Added Reaction"
+                CommentLiked.objects.filter(comment_id=comment_id, created_by=user).update(reaction_type=reaction_type)
         else:
-            CommentLiked.objects.create(comment_id=comment_id, created_by=user)
+            CommentLiked.objects.create(comment_id=comment_id, created_by=user, reaction_type=reaction_type)
             message = "Successfully Liked"
             liked = True
             response_status = status.HTTP_200_OK
@@ -615,9 +663,7 @@ def search_user(request):
         result = result.filter(id__in=dept_users)
     result = result.exclude(id=user.id)
     if search_term:
-        result = result.filter(
-            Q(email__istartswith=search_term) |
-            Q(first_name__istartswith=search_term))
+        result = result.filter(Q(email__istartswith=search_term) | Q(first_name__istartswith=search_term))
     serializer = UserInfoSerializer(result, many=True)
     return Response(serializer.data)
 
@@ -625,7 +671,7 @@ def search_user(request):
 class ECardCategoryViewSet(viewsets.ModelViewSet):
     queryset = ECardCategory.objects.none()
     serializer_class = ECardCategorySerializer
-    permission_classes = [permissions.IsAdminUser, ]
+    permission_classes = [permissions.IsAuthenticated, ]
 
     def get_queryset(self):
         user = self.request.user
@@ -636,7 +682,7 @@ class ECardCategoryViewSet(viewsets.ModelViewSet):
 class ECardViewSet(viewsets.ModelViewSet):
     queryset = ECard.objects.none()
     serializer_class = ECardSerializer
-    permission_classes = [permissions.IsAdminUser, ]
+    permission_classes = [permissions.IsAuthenticated, ]
 
     def get_queryset(self):
         user = self.request.user
@@ -648,3 +694,163 @@ class ECardViewSet(viewsets.ModelViewSet):
         if search:
             queryset = queryset.filter(name__icontains=search)
         return queryset
+
+    @transaction.atomic
+    def create(self, request):
+        data = request.data
+        serializer = ECardSerializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        ecard = serializer.save()
+        ecard.tags.add(*eval(data["tags"]))
+        return Response(data=serializer.data, status=status.HTTP_201_CREATED)
+
+    @transaction.atomic
+    def partial_update(self, request, pk=None):
+        ecard = self.get_object()
+        data = request.data
+        serializer = ECardSerializer(ecard, data=data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        ecard = serializer.save()
+        ecard.tags.clear()
+        ecard.tags.add(*eval(data["tags"]))
+        return Response(data=serializer.data, status=status.HTTP_200_OK)
+
+
+class UserFeedViewSet(viewsets.ModelViewSet):
+    parser_classes = (JSONParser,)
+    permission_classes = (permissions.IsAuthenticated,)
+    serializer_class = PostSerializer
+    filter_backends = (filters.DjangoFilterBackend,)
+
+    def get_queryset(self):
+        feed_flag = self.request.query_params.get("feed", None)
+        search = self.request.query_params.get("search", None)
+        user = self.request.user
+        feeds = Post.objects.filter(post_type__in=[POST_TYPE.USER_CREATED_APPRECIATION,
+                                                   POST_TYPE.USER_CREATED_NOMINATION])
+        feeds = PostFilter(self.request.GET, queryset=feeds).qs
+
+        if feed_flag == "received":
+            # returning only approved nominations with all the received appreciations
+            feeds = feeds.filter(user=user).filter(Q(nomination__nom_status=NOMINATION_STATUS.approved) | Q(
+                post_type=POST_TYPE.USER_CREATED_APPRECIATION))
+        elif feed_flag == "given":
+            feeds = feeds.filter(Q(created_by=user, post_type=POST_TYPE.USER_CREATED_APPRECIATION) | Q(
+                nomination__nominator=user, nomination__nom_status=NOMINATION_STATUS.approved))
+        elif feed_flag == "approvals":
+            feeds = feeds.filter(nomination__assigned_reviewer=user).exclude(
+                post_type=POST_TYPE.USER_CREATED_NOMINATION, nomination__nom_status__in=[
+                    NOMINATION_STATUS.approved, NOMINATION_STATUS.rejected])
+        elif feed_flag == "my_nomination":
+            feeds = feeds.filter(nomination__nominator=user)
+        else:
+            feeds = feeds.filter(Q(nomination__nominator=user) | Q(user=user) | Q(nomination__assigned_reviewer=user))
+        if search:
+            feeds = feeds.filter(Q(user__first_name__istartswith=search) | Q(
+                user__last_name__istartswith=search) | Q(created_by__first_name__istartswith=search) | Q(
+                created_by__last_name__istartswith=search))
+        return feeds.distinct()
+
+    def list(self, request, *args, **kwargs):
+        show_approvals = False
+        page = self.paginate_queryset(self.get_queryset())
+        serializer = PostSerializer(page, context={"request": request}, many=True)
+
+        approvals_count = Post.objects.filter(post_type=POST_TYPE.USER_CREATED_NOMINATION,
+                                              nomination__assigned_reviewer=request.user).exclude(
+            nomination__nom_status__in=[NOMINATION_STATUS.approved, NOMINATION_STATUS.rejected]).count()
+        if (request.user.userdesignation_set.count() > 0 or request.user.reviewer_users.count() > 0) and \
+                approvals_count > 0:
+            show_approvals = True
+        feeds = self.get_paginated_response(serializer.data)
+        feeds.data['approvals_count'] = approvals_count
+        feeds.data['show_approvals'] = show_approvals
+        return feeds
+
+    @list_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
+    def appreciated_by(self, request, *args, **kwargs):
+        strength_id = request.query_params.get("strength", None)
+        badge_id = request.query_params.get("badge", None)
+        if strength_id is None and badge_id is None:
+            raise ValidationError(_('You need to pass either strength or badge parameter.'))
+        if strength_id:
+            try:
+                strength_id = int(strength_id)
+            except ValueError:
+                raise ValidationError(_('strength should be numeric value.'))
+            user_appreciations = Post.objects.filter(
+                user=request.user, post_type=POST_TYPE.USER_CREATED_APPRECIATION).values(
+                'transaction__context', 'transaction__creator')
+
+            my_appreciations_user = [user_appreciation.get('transaction__creator') for user_appreciation in
+                                     user_appreciations if loads(user_appreciation.get('transaction__context')).get(
+                'strength_id') == strength_id]
+
+        if badge_id:
+            try:
+                badge_id = int(badge_id)
+            except ValueError:
+                raise ValidationError(_('badge should be numeric value.'))
+            my_appreciations_user = request.user.nominated_user.filter(
+                category__badge=badge_id, nom_status=NOMINATION_STATUS.approved).values_list('nominator', flat=True)
+
+        users = CustomUser.objects.filter(id__in=my_appreciations_user)
+        serializer = UserInfoSerializer(users, many=True, fields=["pk", "email", "first_name", "last_name",
+                                                                  "profile_pic_url", "profile_img"])
+        return Response({"users": serializer.data})
+
+    @list_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
+    def strengths(self, request, *args, **kwargs):
+        user_id = request.query_params.get("user_id", None)
+        strength_id = request.query_params.get("strength", None)
+        if strength_id is None:
+            raise ValidationError(_('strength is a required parameter.'))
+        if user_id is None:
+            raise ValidationError(_('user_id is a required parameter.'))
+        if strength_id:
+            try:
+                strength_id = int(strength_id)
+            except ValueError:
+                raise ValidationError(_('strength should be numeric value.'))
+
+        queryset = self.get_queryset().filter(post_type=POST_TYPE.USER_CREATED_APPRECIATION)
+        user = CustomUser.objects.filter(id=user_id)
+        if user.exists():
+            user = user.first()
+            queryset = queryset.filter(created_by=user)
+        else:
+            raise ValidationError(_('User does not exist'))
+        transactions = queryset.values('id', 'transaction__context')
+        posts = [transaction.get('id') for transaction in transactions if loads(
+            transaction.get('transaction__context')).get('strength_id') == strength_id]
+        queryset = queryset.filter(id__in=posts)
+        serializer = PostSerializer(queryset, many=True, context={"request": request}, fields=[
+            "id", "ecard", "gif", "images", "description", "points", "images_with_ecard"])
+        return Response({"strengths": serializer.data})
+
+    @list_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
+    def badges(self, request, *args, **kwargs):
+        user_id = request.query_params.get("user_id", None)
+        badge_id = request.query_params.get("badge", None)
+        if user_id is None:
+            raise ValidationError(_('user_id is a required parameter.'))
+        if badge_id is None:
+            raise ValidationError(_('badge is a required parameter.'))
+        if badge_id:
+            try:
+                badge_id = int(badge_id)
+            except ValueError:
+                raise ValidationError(_('badge should be numeric value.'))
+        queryset = self.get_queryset().filter(post_type=POST_TYPE.USER_CREATED_NOMINATION,
+                                              nomination__category__badge_id=badge_id,
+                                              nomination__nom_status=NOMINATION_STATUS.approved)
+        user = CustomUser.objects.filter(id=user_id)
+        if user.exists():
+            user = user.first()
+            queryset = queryset.filter(created_by=user)
+        else:
+            raise ValidationError(_('User does not exist'))
+        serializer = PostSerializer(queryset, many=True, context={
+            "request": request, "nomination_fields": ["badges", "strength"]}, fields=[
+            "id", "description", "nomination"])
+        return Response({"badges": serializer.data})
