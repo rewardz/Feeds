@@ -31,7 +31,7 @@ from .serializers import (
 from .utils import (
     accessible_posts_by_user, extract_tagged_users, get_user_name, notify_new_comment,
     notify_new_poll_created, notify_flagged_post, push_notification, tag_users_to_comment,
-    tag_users_to_post, user_can_delete, user_can_edit,
+    tag_users_to_post, user_can_delete, user_can_edit, get_date_range, since_last_appreciation,
 )
 
 CustomUser = import_string(settings.CUSTOM_USER_MODEL)
