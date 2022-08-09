@@ -1,8 +1,7 @@
 import django_filters
 from django.db.models import Q
-from django.utils import timezone
-from datetime import timedelta
 from .models import Post
+from .utils import get_date_range
 
 
 class PostFilter(django_filters.FilterSet):
@@ -20,11 +19,6 @@ class PostFilter(django_filters.FilterSet):
         model = Post
         fields = ['post_type', 'organization', 'shared_with']
 
-    def get_date_range(self, days):
-        end_date = timezone.now()
-        start_date = end_date - timedelta(days=days)
-        return [start_date, end_date]
-
     def user_strength_filter(self, queryset, name, value):
         return queryset.filter(nomination__user_strength__in=value)
 
@@ -36,7 +30,7 @@ class PostFilter(django_filters.FilterSet):
             days = int(value)
         except ValueError:
             return queryset
-        start_date, end_date = self.get_date_range(days)
+        start_date, end_date = get_date_range(days)
         return queryset.filter(created_on__gte=start_date, created_on__lte=end_date)
 
     def department_filter(self, queryset, name, value):

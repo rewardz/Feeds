@@ -6,7 +6,8 @@ from django.conf import settings
 from django.db.models import Q
 from django.utils.translation import ugettext as _
 from django.utils.module_loading import import_string
-
+from django.utils import timezone
+from datetime import timedelta
 
 from rest_framework import exceptions
 
@@ -306,3 +307,14 @@ def extract_user_info(user_detail):
         user_id = user_id_detail.group(1)
     user_info['user_id'] = user_id
     return user_info
+
+
+def get_date_range(days):
+    end_date = timezone.now()
+    start_date = end_date - timedelta(days=days)
+    return [start_date, end_date]
+
+
+def since_last_appreciation(last_appreciation_date):
+    current_date = timezone.now()
+    return (current_date - last_appreciation_date).days
