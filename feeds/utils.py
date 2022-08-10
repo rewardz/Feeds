@@ -8,6 +8,7 @@ from django.utils.translation import ugettext as _
 from django.utils.module_loading import import_string
 from django.utils import timezone
 from datetime import timedelta
+import calendar
 
 from rest_framework import exceptions
 
@@ -318,3 +319,9 @@ def get_date_range(days):
 def since_last_appreciation(last_appreciation_date):
     current_date = timezone.now()
     return (current_date - last_appreciation_date).days
+
+
+def get_current_month_end_date():
+    current_date = timezone.now()
+    days = calendar.monthrange(current_date.year, current_date.month)[1]
+    return "{} {}, {}".format(current_date.strftime("%B"), days, current_date.year)

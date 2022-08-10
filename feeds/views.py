@@ -32,6 +32,7 @@ from .utils import (
     accessible_posts_by_user, extract_tagged_users, get_user_name, notify_new_comment,
     notify_new_poll_created, notify_flagged_post, push_notification, tag_users_to_comment,
     tag_users_to_post, user_can_delete, user_can_edit, get_date_range, since_last_appreciation,
+    get_current_month_end_date,
 )
 
 CustomUser = import_string(settings.CUSTOM_USER_MODEL)
@@ -721,6 +722,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
     permission_classes = (permissions.IsAuthenticated,)
     serializer_class = PostSerializer
     filter_backends = (filters.DjangoFilterBackend,)
+    pagination_class = FeedsResultsSetPagination
 
     def get_queryset(self):
         feed_flag = self.request.query_params.get("feed", None)
@@ -871,9 +873,11 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             days_passed = since_last_appreciation(user_appreciation.created_on)
             if 3 <= days_passed <= 120:
                 feeds.data['show_cheer_msg'] = True
+                feeds.data['days_passed'] = days_passed
             else:
                 feeds.data['show_cheer_msg'] = False
         feeds.data['points_left'] = request.user.appreciation_left_in_month
+        feeds.data['date'] = get_current_month_end_date()
         return feeds
 
     @list_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
