@@ -880,6 +880,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         feeds.data['show_cheer_msg'] = show_cheer_msg
         feeds.data['points_left'] = request.user.appreciation_left_in_month
         feeds.data['date'] = get_current_month_end_date()
+        feeds.data['notification_count'] = 2
         return feeds
 
     @list_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
