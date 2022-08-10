@@ -859,6 +859,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
 
     @list_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
     def recent_recognitions(self, request, *args, **kwargs):
+        show_cheer_msg = False
         feeds = Post.objects.filter(Q(post_type=POST_TYPE.USER_CREATED_APPRECIATION) |
                                     Q(nomination__nom_status=NOMINATION_STATUS.approved),
                                     created_by=request.user).distinct()
@@ -868,14 +869,15 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         page = self.paginate_queryset(feeds)
         serializer = PostSerializer(page, context={"request": request}, many=True)
         feeds = self.get_paginated_response(serializer.data)
-        user_appreciation = request.user.appreciated_user.filter(post_type=POST_TYPE.USER_CREATED_APPRECIATION).first()
+        user_appreciation = Post.objects.filter(post_type=POST_TYPE.USER_CREATED_APPRECIATION,
+                                                created_by=request.user).first()
         if user_appreciation:
             days_passed = since_last_appreciation(user_appreciation.created_on)
             if 3 <= days_passed <= 120:
-                feeds.data['show_cheer_msg'] = True
                 feeds.data['days_passed'] = days_passed
-            else:
-                feeds.data['show_cheer_msg'] = False
+                show_cheer_msg = True
+
+        feeds.data['show_cheer_msg'] = show_cheer_msg
         feeds.data['points_left'] = request.user.appreciation_left_in_month
         feeds.data['date'] = get_current_month_end_date()
         return feeds
