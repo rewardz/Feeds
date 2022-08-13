@@ -342,3 +342,22 @@ class PushNotification(models.Model):
         verbose_name = "Notification"
         verbose_name_plural = "PushNotification"
         ordering = ("-created", )
+
+
+class UserStrength(models.Model):
+    name = models.CharField(max_length=100, blank=False)
+    slug = models.SlugField(blank=True, unique=True, null=True)
+    icon = models.ImageField(upload_to="profiles/strength/icons")
+    illustration = models.ImageField(upload_to="profiles/strength/illustrations", null=True, blank=True)
+    background_color = models.CharField(max_length=20, null=True, blank=True)
+    background_color_lite = models.CharField(max_length=20, null=True, blank=True)
+    organization = models.ForeignKey(Organization, blank=True, null=True, on_delete=models.CASCADE)
+
+
+class TrophyBadge(models.Model):
+    name = models.CharField(max_length=100)
+    description = models.TextField()
+    icon = models.ImageField(upload_to='trophy_badges/')
+    background_color = models.CharField(max_length=20, blank=True, null=True)
+    background_color_lite = models.CharField(max_length=20, blank=True, null=True)
+    points = models.DecimalField(blank=True, null=True, max_digits=12, decimal_places=2)
