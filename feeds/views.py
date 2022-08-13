@@ -26,7 +26,7 @@ from .serializers import (
     DocumentsSerializer, ECardCategorySerializer, ECardSerializer,
     FlagPostSerializer, PostLikedSerializer, PostSerializer,
     PostDetailSerializer, PollsAnswerSerializer, ImagesSerializer,
-    UserInfoSerializer, VideosSerializer,
+    UserInfoSerializer, VideosSerializer, PostFeedSerializer
 )
 from .utils import (
     accessible_posts_by_user, extract_tagged_users, get_user_name, notify_new_comment,
@@ -720,7 +720,7 @@ class ECardViewSet(viewsets.ModelViewSet):
 class UserFeedViewSet(viewsets.ModelViewSet):
     parser_classes = (JSONParser,)
     permission_classes = (permissions.IsAuthenticated,)
-    serializer_class = PostSerializer
+    serializer_class = PostFeedSerializer
     filter_backends = (filters.DjangoFilterBackend,)
     pagination_class = FeedsResultsSetPagination
 
@@ -756,7 +756,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
     def list(self, request, *args, **kwargs):
         show_approvals = False
         page = self.paginate_queryset(self.get_queryset())
-        serializer = PostSerializer(page, context={"request": request}, many=True)
+        serializer = PostFeedSerializer(page, context={"request": request}, many=True)
 
         approvals_count = Post.objects.filter(post_type=POST_TYPE.USER_CREATED_NOMINATION,
                                               nomination__assigned_reviewer=request.user).exclude(
@@ -826,7 +826,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         posts = [transaction.get('id') for transaction in transactions if loads(
             transaction.get('transaction__context')).get('strength_id') == strength_id]
         queryset = queryset.filter(id__in=posts)
-        serializer = PostSerializer(queryset, many=True, context={"request": request}, fields=[
+        serializer = PostFeedSerializer(queryset, many=True, context={"request": request}, fields=[
             "id", "ecard", "gif", "images", "description", "points", "images_with_ecard"])
         return Response({"strengths": serializer.data})
 
@@ -852,7 +852,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(created_by=user)
         else:
             raise ValidationError(_('User does not exist'))
-        serializer = PostSerializer(queryset, many=True, context={
+        serializer = PostFeedSerializer(queryset, many=True, context={
             "request": request, "nomination_fields": ["badges", "strength"]}, fields=[
             "id", "description", "nomination"])
         return Response({"badges": serializer.data})
@@ -867,7 +867,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         start_date, end_date = get_date_range(30)
         feeds = feeds.filter(created_on__gte=start_date, created_on__lte=end_date)[:5]
         page = self.paginate_queryset(feeds)
-        serializer = PostSerializer(page, context={"request": request}, many=True)
+        serializer = PostFeedSerializer(page, context={"request": request}, many=True)
         feeds = self.get_paginated_response(serializer.data)
         user_appreciation = Post.objects.filter(post_type=POST_TYPE.USER_CREATED_APPRECIATION,
                                                 created_by=request.user).first()
@@ -904,6 +904,6 @@ class UserFeedViewSet(viewsets.ModelViewSet):
                                  Q(created_by__last_name__istartswith=search))
 
         page = self.paginate_queryset(feeds)
-        serializer = PostSerializer(page, context={"request": request}, many=True)
+        serializer = PostFeedSerializer(page, context={"request": request}, many=True)
         feeds = self.get_paginated_response(serializer.data)
         return feeds

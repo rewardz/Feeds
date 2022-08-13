@@ -159,6 +159,13 @@ class CustomUser(CustomUserBase):
     def department(self):
         return self.departments.first()
 
+    @property
+    def full_name(self):
+        return self.get_full_name()
+
+    def get_full_name(self):
+        return u" ".join((self.first_name, self.last_name)).strip() or self.email
+
     def send_welcome_email(self):
         pass
 
