@@ -886,8 +886,15 @@ class UserFeedViewSet(viewsets.ModelViewSet):
     @list_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
     def organization_recognitions(self, request, *args, **kwargs):
         organization = request.user.organization
-        feeds = Post.objects.filter(Q(post_type=POST_TYPE.USER_CREATED_APPRECIATION) |
-                                    Q(nomination__nom_status=NOMINATION_STATUS.approved) | Q(organization=organization))
+        post_polls = request.query_params.get("post_polls", None)
+        if post_polls:
+            feeds = Post.objects.filter(Q(post_type=POST_TYPE.USER_CREATED_POST) |
+                                        Q(post_type=POST_TYPE.USER_CREATED_POLL) |
+                                        Q(organization=organization))
+        else:
+            feeds = Post.objects.filter(Q(post_type=POST_TYPE.USER_CREATED_APPRECIATION) |
+                                        Q(nomination__nom_status=NOMINATION_STATUS.approved) |
+                                        Q(organization=organization))
         feeds = PostFilter(self.request.GET, queryset=feeds).qs
 
         search = self.request.query_params.get("search", None)
