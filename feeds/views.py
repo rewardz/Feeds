@@ -888,18 +888,19 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         organization = request.user.organization
         post_polls = request.query_params.get("post_polls", None)
         if post_polls:
-            feeds = Post.objects.filter(Q(post_type=POST_TYPE.USER_CREATED_POST) |
-                                        Q(post_type=POST_TYPE.USER_CREATED_POLL) |
+            feeds = Post.objects.filter((Q(post_type=POST_TYPE.USER_CREATED_POST) |
+                                        Q(post_type=POST_TYPE.USER_CREATED_POLL)) &
                                         Q(organization=organization))
         else:
-            feeds = Post.objects.filter(Q(post_type=POST_TYPE.USER_CREATED_APPRECIATION) |
-                                        Q(nomination__nom_status=NOMINATION_STATUS.approved) |
+            feeds = Post.objects.filter((Q(post_type=POST_TYPE.USER_CREATED_APPRECIATION) |
+                                        Q(nomination__nom_status=NOMINATION_STATUS.approved)) &
                                         Q(organization=organization))
         feeds = PostFilter(self.request.GET, queryset=feeds).qs
 
         search = self.request.query_params.get("search", None)
         if search:
-            feeds = feeds.filter(Q(user__first_name__istartswith=search) | Q(user__last_name__istartswith=search) |
+            feeds = feeds.filter(Q(user__first_name__istartswith=search) |
+                                 Q(user__last_name__istartswith=search) |
                                  Q(created_by__first_name__istartswith=search) |
                                  Q(created_by__last_name__istartswith=search))
 
