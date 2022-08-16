@@ -728,7 +728,9 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         feed_flag = self.request.query_params.get("feed", None)
         search = self.request.query_params.get("search", None)
         user = self.request.user
-        feeds = Post.objects.filter(post_type__in=[POST_TYPE.USER_CREATED_APPRECIATION,
+        organization = user.organization
+        posts = accessible_posts_by_user(user, organization)
+        feeds = posts.filter(post_type__in=[POST_TYPE.USER_CREATED_APPRECIATION,
                                                    POST_TYPE.USER_CREATED_NOMINATION])
         feeds = PostFilter(self.request.GET, queryset=feeds).qs
 
@@ -758,7 +760,10 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         page = self.paginate_queryset(self.get_queryset())
         serializer = PostFeedSerializer(page, context={"request": request}, many=True)
 
-        approvals_count = Post.objects.filter(post_type=POST_TYPE.USER_CREATED_NOMINATION,
+        user = self.request.user
+        organization = user.organization
+        posts = accessible_posts_by_user(user, organization)
+        approvals_count = posts.filter(post_type=POST_TYPE.USER_CREATED_NOMINATION,
                                               nomination__assigned_reviewer=request.user).exclude(
             nomination__nom_status__in=[NOMINATION_STATUS.approved, NOMINATION_STATUS.rejected]).count()
         if (request.user.userdesignation_set.count() > 0 or request.user.reviewer_users.count() > 0) and \
@@ -771,6 +776,8 @@ class UserFeedViewSet(viewsets.ModelViewSet):
 
     @list_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
     def appreciated_by(self, request, *args, **kwargs):
+        user = self.request.user
+        organization = user.organization
         strength_id = request.query_params.get("strength", None)
         badge_id = request.query_params.get("badge", None)
         if strength_id is None and badge_id is None:
@@ -780,7 +787,9 @@ class UserFeedViewSet(viewsets.ModelViewSet):
                 strength_id = int(strength_id)
             except ValueError:
                 raise ValidationError(_('strength should be numeric value.'))
-            user_appreciations = Post.objects.filter(
+
+            posts = accessible_posts_by_user(user, organization)
+            user_appreciations = posts.filter(
                 user=request.user, post_type=POST_TYPE.USER_CREATED_APPRECIATION).values(
                 'transaction__context', 'transaction__creator')
 
@@ -860,7 +869,10 @@ class UserFeedViewSet(viewsets.ModelViewSet):
     @list_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
     def recent_recognitions(self, request, *args, **kwargs):
         show_cheer_msg = False
-        feeds = Post.objects.filter(Q(post_type=POST_TYPE.USER_CREATED_APPRECIATION) |
+        user = self.request.user
+        organization = user.organization
+        posts = accessible_posts_by_user(user, organization)
+        feeds = posts.filter(Q(post_type=POST_TYPE.USER_CREATED_APPRECIATION) |
                                     Q(nomination__nom_status=NOMINATION_STATUS.approved),
                                     user=request.user).distinct()
         # returns latest 5 appreciations from last 30 days
@@ -869,7 +881,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         page = self.paginate_queryset(feeds)
         serializer = PostFeedSerializer(page, context={"request": request}, many=True)
         feeds = self.get_paginated_response(serializer.data)
-        user_appreciation = Post.objects.filter(post_type=POST_TYPE.USER_CREATED_APPRECIATION,
+        user_appreciation = posts.filter(post_type=POST_TYPE.USER_CREATED_APPRECIATION,
                                                 created_by=request.user).first()
         if user_appreciation:
             days_passed = since_last_appreciation(user_appreciation.created_on)
@@ -885,14 +897,16 @@ class UserFeedViewSet(viewsets.ModelViewSet):
 
     @list_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
     def organization_recognitions(self, request, *args, **kwargs):
-        organization = request.user.organization
+        user = self.request.user
+        organization = user.organization
         post_polls = request.query_params.get("post_polls", None)
+        posts = accessible_posts_by_user(user, organization)
         if post_polls:
-            feeds = Post.objects.filter((Q(post_type=POST_TYPE.USER_CREATED_POST) |
+            feeds = posts.filter((Q(post_type=POST_TYPE.USER_CREATED_POST) |
                                         Q(post_type=POST_TYPE.USER_CREATED_POLL)) &
                                         Q(organization=organization))
         else:
-            feeds = Post.objects.filter((Q(post_type=POST_TYPE.USER_CREATED_APPRECIATION) |
+            feeds = posts.filter((Q(post_type=POST_TYPE.USER_CREATED_APPRECIATION) |
                                         Q(nomination__nom_status=NOMINATION_STATUS.approved)) &
                                         Q(organization=organization))
         feeds = PostFilter(self.request.GET, queryset=feeds).qs
