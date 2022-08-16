@@ -262,6 +262,18 @@ class Post(UserInfo):
             self.prior_till = prior_till
             self.save()
 
+    def add_organizations(self, organization_id):
+        """
+        Add organization to current object's organizations
+        """
+        self.organizations.add(organization_id)
+
+    def add_departments(self, department_id):
+        """
+        Add department to current object's departments
+        """
+        self.departments.add(department_id)
+
     def __unicode__(self):
         return self.title if self.title else str(self.pk)
 
