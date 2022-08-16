@@ -490,6 +490,8 @@ class CommentsLikedSerializer(serializers.ModelSerializer):
 class PostDetailSerializer(PostSerializer):
     comments = serializers.SerializerMethodField()
     appreciated_by = serializers.SerializerMethodField()
+    user = UserInfoSerializer(read_only=True)
+    ecard = ECardSerializer(read_only=True)
 
     class Meta:
         model = Post
