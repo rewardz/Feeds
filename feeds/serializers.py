@@ -59,7 +59,7 @@ class ImagesSerializer(serializers.ModelSerializer):
         model = Images
         fields = (
             'id', 'post', 'name', 'image', 'thumbnail_img_url', 'display_img_url',
-            'large_img_url'
+            'large_img_url', 'comment'
         )
 
     def get_name(self, instance):
@@ -72,7 +72,7 @@ class DocumentsSerializer(serializers.ModelSerializer):
     class Meta:
         model = Documents
         fields = (
-            'id', 'post', 'name', 'document'
+            'id', 'post', 'name', 'document', 'comment'
         )
 
     def get_name(self, instance):
@@ -307,12 +307,28 @@ class CommentSerializer(serializers.ModelSerializer):
     liked_by = serializers.SerializerMethodField()
     has_liked = serializers.SerializerMethodField()
     tagged_users = serializers.SerializerMethodField()
+    images = serializers.SerializerMethodField()
+    documents = serializers.SerializerMethodField()
 
     class Meta:
         model = Comment
         fields = ("id", "content", "created_by", "created_on", "modified_by",
                   "modified_on", "post", "commented_by_user_info",
-                  "liked_count", "liked_by", "has_liked", "tagged_users",)
+                  "liked_count", "liked_by", "has_liked", "tagged_users", "images", "documents")
+
+    def get_images(self, instance):
+        """
+        Get images for the comment instance
+        """
+        images = Images.objects.filter(comment=instance.id)
+        return ImagesSerializer(images, many=True, read_only=True).data
+
+    def get_documents(self, instance):
+        """
+        Get documents for the comment instance
+        """
+        documents = Documents.objects.filter(comment=instance.id)
+        return DocumentsSerializer(documents, many=True, read_only=True).data
 
     def get_commented_by_user_info(self, instance):
         created_by = instance.created_by

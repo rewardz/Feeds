@@ -2,7 +2,6 @@ import logging
 
 from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator
-from django.contrib.auth import get_user_model
 from django.db import models
 from django.db.models import Sum
 from django.utils import timezone
@@ -14,7 +13,6 @@ from rest_framework.exceptions import ValidationError
 from cropimg.fields import CIImageField, CIThumbnailField
 from easy_thumbnails.exceptions import InvalidImageFormatError
 from easy_thumbnails.files import get_thumbnailer
-from model_helpers import upload_to
 from taggit.managers import TaggableManager
 
 from .constants import POST_TYPE, REACTION_TYPE, SHARED_WITH
@@ -33,12 +31,21 @@ def post_upload_to_path(instance, filename):
     fmt = '%Y/%m/%d'
     dc = now.strftime(fmt)
     inst_verbose = instance._meta.verbose_name
+    upload_from = "post"
+
     if instance._meta.model_name == 'ecard':
         inst_id = str(instance.category.pk)
+
+    # for comment images we won't store the post.
+    elif isinstance(instance.comment, Comment) and not instance.post:
+        inst_id = str(instance.comment.pk)
+        upload_from = "comment"
+
     else:
         inst_id = str(instance.post.pk)
-    return 'post/{inst_name}/{dc}/{id}/{name}'.format(
-        inst_name=inst_verbose, dc=dc, id=inst_id, name=filename
+
+    return '{upload_from}/{inst_name}/{dc}/{id}/{name}'.format(
+        upload_from=upload_from, inst_name=inst_verbose, dc=dc, id=inst_id, name=filename
     )
 
 
@@ -281,22 +288,6 @@ class Post(UserInfo):
         ordering = ("-pk",)
 
 
-class Images(CIImageModel):
-    post = models.ForeignKey(Post, on_delete=models.CASCADE)
-
-
-class Videos(models.Model):
-    post = models.ForeignKey(Post, on_delete=models.CASCADE)
-    video = models.FileField(upload_to=post_upload_to_path)
-
-
-class Documents(models.Model):
-    post = models.ForeignKey(Post, on_delete=models.CASCADE)
-    document = models.FileField(
-        upload_to=post_upload_to_path, blank=True, null=True
-    )
-
-
 class Comment(UserInfo):
     content = models.TextField()
     parent = models.ForeignKey('self', blank=True, null=True, related_name="comment_response")
@@ -319,6 +310,24 @@ class Comment(UserInfo):
 
     def __unicode__(self):
         return "%s" % self.content
+
+
+class Images(CIImageModel):
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, blank=True, null=True)
+    comment = models.ForeignKey(Comment, on_delete=models.CASCADE, blank=True, null=True)
+
+
+class Videos(models.Model):
+    post = models.ForeignKey(Post, on_delete=models.CASCADE)
+    video = models.FileField(upload_to=post_upload_to_path)
+
+
+class Documents(models.Model):
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, blank=True, null=True)
+    comment = models.ForeignKey(Comment, on_delete=models.CASCADE, blank=True, null=True)
+    document = models.FileField(
+        upload_to=post_upload_to_path, blank=True, null=True
+    )
 
 
 class PostLiked(UserInfo):

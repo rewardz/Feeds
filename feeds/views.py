@@ -295,6 +295,25 @@ class PostViewSet(viewsets.ModelViewSet):
             serializer = CommentCreateSerializer(data=data)
             serializer.is_valid(raise_exception=True)
             inst = serializer.save()
+
+            # for feedback post, we need to allow the images and documents
+            if allow_feedback and request.FILES:
+                attach_files = dict((request.FILES).lists())
+                images = attach_files.get('images', None)
+                documents = attach_files.get('documents', None)
+
+                if images:
+                    for image in images:
+                        image_serializer = ImagesSerializer(data={"comment": inst.pk, 'image': image})
+                        image_serializer.is_valid(raise_exception=True)
+                        image_serializer.save()
+
+                if documents:
+                    for document in documents:
+                        document_serializer = DocumentsSerializer(data={"comment": inst.pk, "document": document})
+                        document_serializer.is_valid(raise_exception=True)
+                        document_serializer.save()
+
             if tag_users:
                 tag_users_to_comment(inst, tag_users)
             post = Post.objects.filter(id=post_id).first()
