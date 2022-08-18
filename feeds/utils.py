@@ -193,7 +193,7 @@ def notify_new_comment(post, creator):
         message = _("'%s' commented on your post '%s'" % (comment_creator_string, post_string))
         push_notification(
             creator, message, post_creator, object_type=object_type, object_id=post.id,
-            extra_context={"notification_type": "comment"}
+            extra_context={"reaction_type": 8}  # TODO: move to reaction types
         )
     except Exception:
         pass

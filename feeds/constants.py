@@ -26,4 +26,6 @@ REACTION_TYPE = Choices({
     "INSIGHTFUL": 4,
     "CURIOUS": 5,
     "APPLAUSE": 6,
+    # "All": 7,  # TODO: migrate to database
+    # "COMMENT": 8,  # TODO: migrate to database
 })
