@@ -192,7 +192,8 @@ def notify_new_comment(post, creator):
         post_creator = USERMODEL.objects.get(id=post.created_by.id)
         message = _("'%s' commented on your post '%s'" % (comment_creator_string, post_string))
         push_notification(
-            creator, message, post_creator, object_type=object_type, object_id=post.id
+            creator, message, post_creator, object_type=object_type, object_id=post.id,
+            extra_context={"notification_type": "comment"}
         )
     except Exception:
         pass
@@ -246,12 +247,13 @@ def add_email(to, from_user, subject, body):
         return False
 
 
-def push_notification(sender, message, recipient, object_type=None, object_id=None):
+def push_notification(sender, message, recipient, object_type=None, object_id=None, extra_context={}):
     try:
         notification = PUSH_NOTIFICATION_MODEL.objects.create(
             sender=sender,
             message=message,
             recipient=recipient,
+            extra_context=extra_context,
         )
         if object_type:
             setattr(notification, NOTIF_OBJECT_TYPE_FIELD_NAME, object_type)
