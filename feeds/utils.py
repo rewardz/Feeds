@@ -325,3 +325,12 @@ def get_current_month_end_date():
     current_date = timezone.now()
     days = calendar.monthrange(current_date.year, current_date.month)[1]
     return "{} {}, {}".format(current_date.strftime("%B"), days, current_date.year)
+
+
+def get_absolute_url(uri):
+    if "://" in uri:
+        return uri
+    else:
+        site_url = settings.SITE_URL.strip("/")
+        uri = uri.lstrip("/")
+        return "/".join([site_url, uri])

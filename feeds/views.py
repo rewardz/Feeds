@@ -32,7 +32,7 @@ from .utils import (
     accessible_posts_by_user, extract_tagged_users, get_user_name, notify_new_comment,
     notify_new_poll_created, notify_flagged_post, push_notification, tag_users_to_comment,
     tag_users_to_post, user_can_delete, user_can_edit, get_date_range, since_last_appreciation,
-    get_current_month_end_date,
+    get_current_month_end_date, get_absolute_url,
 )
 
 CustomUser = import_string(settings.CUSTOM_USER_MODEL)
@@ -893,7 +893,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         feeds.data['points_left'] = request.user.appreciation_left_in_month
         feeds.data['date'] = get_current_month_end_date()
         feeds.data['notification_count'] = request.user.unviewed_notifications_count
-        feeds.data['org_logo'] = user.organization.img.path if user.organization.img else None
+        feeds.data['org_logo'] = get_absolute_url(organization.display_img_url)
         return feeds
 
     @list_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
