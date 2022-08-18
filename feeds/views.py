@@ -893,6 +893,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         feeds.data['points_left'] = request.user.appreciation_left_in_month
         feeds.data['date'] = get_current_month_end_date()
         feeds.data['notification_count'] = request.user.unviewed_notifications_count
+        feeds.data['org_logo'] = user.organization.img.path if user.organization.img else None
         return feeds
 
     @list_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
