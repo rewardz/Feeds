@@ -891,7 +891,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
                 show_cheer_msg = True
 
         feeds.data['show_cheer_msg'] = show_cheer_msg
-        feeds.data['points_left'] = request.user.appreciation_left_in_month
+        feeds.data['points_left'] = request.user.appreciation_budget_left_in_month
         feeds.data['date'] = get_current_month_end_date()
         feeds.data['notification_count'] = request.user.unviewed_notifications_count
         feeds.data['org_logo'] = get_absolute_url(organization.display_img_url)
@@ -919,7 +919,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
                                  Q(user__last_name__istartswith=search) |
                                  Q(created_by__first_name__istartswith=search) |
                                  Q(created_by__last_name__istartswith=search))
-
+        feeds = feeds.order_by('-priority', '-id')
         page = self.paginate_queryset(feeds)
         serializer = PostFeedSerializer(page, context={"request": request}, many=True)
         feeds = self.get_paginated_response(serializer.data)
