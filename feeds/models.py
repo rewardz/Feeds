@@ -308,6 +308,9 @@ class Comment(UserInfo):
             for u in ctu:
                 u.delete()
 
+    def reaction_types(self):
+        return self.commentliked_set.values_list('reaction_type', flat=True).distinct()
+
     def __unicode__(self):
         return "%s" % self.content
 

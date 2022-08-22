@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('feeds', '0020_remove_post_organization'),
+        ('feeds', '0021_remove_post_organization'),
     ]
 
     operations = [
