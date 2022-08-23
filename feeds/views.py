@@ -318,7 +318,7 @@ class PostViewSet(viewsets.ModelViewSet):
         accessible_posts = accessible_posts_by_user(user, organization).values_list('id', flat=True)
         if post_id not in accessible_posts:
             raise ValidationError(_('You do not have access to this post'))
-        reaction_type = self.request.data.get('type', 0)
+        reaction_type = self.request.data.get('type', 0)  # to handle existing workflow
         object_type = NOTIFICATION_OBJECT_TYPE
         if PostLiked.objects.filter(post_id=post_id, created_by=user).exists():
             user_reactions = PostLiked.objects.filter(post_id=post_id, created_by=user, reaction_type=reaction_type)
