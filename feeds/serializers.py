@@ -297,10 +297,8 @@ class PostSerializer(DynamicFieldsModelSerializer):
     nomination = serializers.SerializerMethodField()
     feed_type = serializers.SerializerMethodField()
     user_strength = serializers.SerializerMethodField()
-    user = UserInfoSerializer()
     reaction_type = serializers.SerializerMethodField()
     user_reaction_type = serializers.SerializerMethodField()
-    ecard = ECardSerializer()
     points = serializers.SerializerMethodField()
     time_left = serializers.SerializerMethodField()
     images_with_ecard = serializers.SerializerMethodField()
@@ -492,6 +490,8 @@ class CommentsLikedSerializer(serializers.ModelSerializer):
 class PostDetailSerializer(PostSerializer):
     comments = serializers.SerializerMethodField()
     appreciated_by = serializers.SerializerMethodField()
+    user = UserInfoSerializer(read_only=True)
+    ecard = ECardSerializer(read_only=True)
 
     class Meta:
         model = Post
@@ -528,6 +528,25 @@ class PostDetailSerializer(PostSerializer):
         instance.modified_by = validated_data.get('modified_by', instance.modified_by)
         instance.save()
         return instance
+
+
+class PostFeedSerializer(PostSerializer):
+    user = UserInfoSerializer(read_only=True)
+    ecard = ECardSerializer(read_only=True)
+
+    class Meta:
+        model = Post
+        fields = (
+            "id", "created_by", "created_on", "modified_by", "modified_on",
+            "organization", "created_by_user_info",
+            "title", "description", "post_type", "poll_info", "active_days",
+            "priority", "prior_till",
+            "shared_with", "images", "documents", "videos",
+            "is_owner", "can_edit", "can_delete", "has_appreciated",
+            "appreciation_count", "comments_count", "tagged_users", "is_admin", "tags", "reaction_type", "nomination",
+            "feed_type", "user_strength", "user", "user_reaction_type", "gif", "ecard", "points", "time_left",
+            "images_with_ecard",
+        )
 
 
 class CommentSerializer(serializers.ModelSerializer):

@@ -26,12 +26,13 @@ from .serializers import (
     DocumentsSerializer, ECardCategorySerializer, ECardSerializer,
     FlagPostSerializer, PostLikedSerializer, PostSerializer,
     PostDetailSerializer, PollsAnswerSerializer, ImagesSerializer,
-    UserInfoSerializer, VideosSerializer,
+    UserInfoSerializer, VideosSerializer, PostFeedSerializer
 )
 from .utils import (
     accessible_posts_by_user, extract_tagged_users, get_user_name, notify_new_comment,
     notify_new_poll_created, notify_flagged_post, push_notification, tag_users_to_comment,
-    tag_users_to_post, user_can_delete, user_can_edit,
+    tag_users_to_post, user_can_delete, user_can_edit, get_date_range, since_last_appreciation,
+    get_current_month_end_date, get_absolute_url,
 )
 
 CustomUser = import_string(settings.CUSTOM_USER_MODEL)
@@ -341,8 +342,8 @@ class PostViewSet(viewsets.ModelViewSet):
             post_string = post.title[:20] + "..." if post.title else ""
             if post:
                 notif_message = _("'%s' likes your post %s" % (user_name, post_string))
-                push_notification(user, notif_message, post.created_by,
-                                  object_type=object_type, object_id=post.id)
+                push_notification(user, notif_message, post.created_by, object_type=object_type,
+                                  object_id=post.id, extra_context={"reaction_type": reaction_type})
         count = PostLiked.objects.filter(post_id=post_id).count()
         user_info = UserInfoSerializer(user).data
 
@@ -635,7 +636,8 @@ class CommentViewset(viewsets.ModelViewSet):
             comment_string = comment.content[:20] + "..." if comment.content else ""
             if comment:
                 notif_message = _("'%s' likes your comment %s" % (user_name, comment_string))
-                push_notification(user, notif_message, comment.created_by)
+                push_notification(user, notif_message, comment.created_by, None, None,
+                                  extra_context={"reaction_type": reaction_type})
         count = CommentLiked.objects.filter(comment_id=comment_id).count()
         user_info = UserInfoSerializer(user).data
         return Response({
@@ -719,14 +721,17 @@ class ECardViewSet(viewsets.ModelViewSet):
 class UserFeedViewSet(viewsets.ModelViewSet):
     parser_classes = (JSONParser,)
     permission_classes = (permissions.IsAuthenticated,)
-    serializer_class = PostSerializer
+    serializer_class = PostFeedSerializer
     filter_backends = (filters.DjangoFilterBackend,)
+    pagination_class = FeedsResultsSetPagination
 
     def get_queryset(self):
         feed_flag = self.request.query_params.get("feed", None)
         search = self.request.query_params.get("search", None)
         user = self.request.user
-        feeds = Post.objects.filter(post_type__in=[POST_TYPE.USER_CREATED_APPRECIATION,
+        organization = user.organization
+        posts = accessible_posts_by_user(user, organization)
+        feeds = posts.filter(post_type__in=[POST_TYPE.USER_CREATED_APPRECIATION,
                                                    POST_TYPE.USER_CREATED_NOMINATION])
         feeds = PostFilter(self.request.GET, queryset=feeds).qs
 
@@ -754,9 +759,12 @@ class UserFeedViewSet(viewsets.ModelViewSet):
     def list(self, request, *args, **kwargs):
         show_approvals = False
         page = self.paginate_queryset(self.get_queryset())
-        serializer = PostSerializer(page, context={"request": request}, many=True)
+        serializer = PostFeedSerializer(page, context={"request": request}, many=True)
 
-        approvals_count = Post.objects.filter(post_type=POST_TYPE.USER_CREATED_NOMINATION,
+        user = self.request.user
+        organization = user.organization
+        posts = accessible_posts_by_user(user, organization)
+        approvals_count = posts.filter(post_type=POST_TYPE.USER_CREATED_NOMINATION,
                                               nomination__assigned_reviewer=request.user).exclude(
             nomination__nom_status__in=[NOMINATION_STATUS.approved, NOMINATION_STATUS.rejected]).count()
         if (request.user.userdesignation_set.count() > 0 or request.user.reviewer_users.count() > 0) and \
@@ -769,6 +777,8 @@ class UserFeedViewSet(viewsets.ModelViewSet):
 
     @list_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
     def appreciated_by(self, request, *args, **kwargs):
+        user = self.request.user
+        organization = user.organization
         strength_id = request.query_params.get("strength", None)
         badge_id = request.query_params.get("badge", None)
         if strength_id is None and badge_id is None:
@@ -778,7 +788,9 @@ class UserFeedViewSet(viewsets.ModelViewSet):
                 strength_id = int(strength_id)
             except ValueError:
                 raise ValidationError(_('strength should be numeric value.'))
-            user_appreciations = Post.objects.filter(
+
+            posts = accessible_posts_by_user(user, organization)
+            user_appreciations = posts.filter(
                 user=request.user, post_type=POST_TYPE.USER_CREATED_APPRECIATION).values(
                 'transaction__context', 'transaction__creator')
 
@@ -824,7 +836,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         posts = [transaction.get('id') for transaction in transactions if loads(
             transaction.get('transaction__context')).get('strength_id') == strength_id]
         queryset = queryset.filter(id__in=posts)
-        serializer = PostSerializer(queryset, many=True, context={"request": request}, fields=[
+        serializer = PostFeedSerializer(queryset, many=True, context={"request": request}, fields=[
             "id", "ecard", "gif", "images", "description", "points", "images_with_ecard"])
         return Response({"strengths": serializer.data})
 
@@ -850,7 +862,65 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(created_by=user)
         else:
             raise ValidationError(_('User does not exist'))
-        serializer = PostSerializer(queryset, many=True, context={
+        serializer = PostFeedSerializer(queryset, many=True, context={
             "request": request, "nomination_fields": ["badges", "strength"]}, fields=[
             "id", "description", "nomination"])
         return Response({"badges": serializer.data})
+
+    @list_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
+    def recent_recognitions(self, request, *args, **kwargs):
+        show_cheer_msg = False
+        user = self.request.user
+        organization = user.organization
+        posts = accessible_posts_by_user(user, organization)
+        feeds = posts.filter(Q(post_type=POST_TYPE.USER_CREATED_APPRECIATION) |
+                                    Q(nomination__nom_status=NOMINATION_STATUS.approved),
+                                    user=request.user).distinct()
+        # returns latest 5 appreciations from last 30 days
+        start_date, end_date = get_date_range(30)
+        feeds = feeds.filter(created_on__gte=start_date, created_on__lte=end_date)[:5]
+        page = self.paginate_queryset(feeds)
+        serializer = PostFeedSerializer(page, context={"request": request}, many=True)
+        feeds = self.get_paginated_response(serializer.data)
+        user_appreciation = posts.filter(post_type=POST_TYPE.USER_CREATED_APPRECIATION,
+                                                created_by=request.user).first()
+        if user_appreciation:
+            days_passed = since_last_appreciation(user_appreciation.created_on)
+            if 3 <= days_passed <= 120:
+                feeds.data['days_passed'] = days_passed
+                show_cheer_msg = True
+
+        feeds.data['show_cheer_msg'] = show_cheer_msg
+        feeds.data['points_left'] = request.user.appreciation_budget_left_in_month
+        feeds.data['date'] = get_current_month_end_date()
+        feeds.data['notification_count'] = request.user.unviewed_notifications_count
+        feeds.data['org_logo'] = get_absolute_url(organization.display_img_url)
+        return feeds
+
+    @list_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
+    def organization_recognitions(self, request, *args, **kwargs):
+        user = self.request.user
+        organization = user.organization
+        post_polls = request.query_params.get("post_polls", None)
+        posts = accessible_posts_by_user(user, organization)
+        if post_polls:
+            feeds = posts.filter((Q(post_type=POST_TYPE.USER_CREATED_POST) |
+                                        Q(post_type=POST_TYPE.USER_CREATED_POLL)) &
+                                        Q(organization=organization))
+        else:
+            feeds = posts.filter((Q(post_type=POST_TYPE.USER_CREATED_APPRECIATION) |
+                                        Q(nomination__nom_status=NOMINATION_STATUS.approved)) &
+                                        Q(organization=organization))
+        feeds = PostFilter(self.request.GET, queryset=feeds).qs
+
+        search = self.request.query_params.get("search", None)
+        if search:
+            feeds = feeds.filter(Q(user__first_name__istartswith=search) |
+                                 Q(user__last_name__istartswith=search) |
+                                 Q(created_by__first_name__istartswith=search) |
+                                 Q(created_by__last_name__istartswith=search))
+        feeds = feeds.order_by('-priority', '-id')
+        page = self.paginate_queryset(feeds)
+        serializer = PostFeedSerializer(page, context={"request": request}, many=True)
+        feeds = self.get_paginated_response(serializer.data)
+        return feeds
