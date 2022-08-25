@@ -41,7 +41,7 @@ NOTIFICATION_OBJECT_TYPE = import_string(settings.POST_NOTIFICATION_OBJECT_TYPE)
 UserStrength = import_string(settings.USER_STRENGTH_MODEL)
 NOMINATION_STATUS = import_string(settings.NOMINATION_STATUS)
 ORGANIZATION_SETTINGS_MODEL = import_string(settings.ORGANIZATION_SETTINGS_MODEL)
-MULTI_ORG_POST_ENABLE_FLAG = import_string(settings.MULTI_ORG_POST_ENABLE_FLAG)
+MULTI_ORG_POST_ENABLE_FLAG = settings.MULTI_ORG_POST_ENABLE_FLAG
 
 
 class PostViewSet(viewsets.ModelViewSet):
