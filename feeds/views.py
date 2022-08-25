@@ -41,7 +41,7 @@ NOTIFICATION_OBJECT_TYPE = import_string(settings.POST_NOTIFICATION_OBJECT_TYPE)
 UserStrength = import_string(settings.USER_STRENGTH_MODEL)
 NOMINATION_STATUS = import_string(settings.NOMINATION_STATUS)
 ORGANIZATION_SETTINGS_MODEL = import_string(settings.ORGANIZATION_SETTINGS_MODEL)
-FEEDBACK_ENABLE_FLAG = import_string(settings.FEEDBACK_ENABLE_FLAG)
+MULTI_ORG_POST_ENABLE_FLAG = import_string(settings.MULTI_ORG_POST_ENABLE_FLAG)
 
 
 class PostViewSet(viewsets.ModelViewSet):
@@ -108,7 +108,7 @@ class PostViewSet(viewsets.ModelViewSet):
         data['modified_by'] = current_user.id
 
         # if feedback is not enabled then save current user organization
-        if not ORGANIZATION_SETTINGS_MODEL.objects.get_value(FEEDBACK_ENABLE_FLAG, current_user.organization):
+        if not ORGANIZATION_SETTINGS_MODEL.objects.get_value(MULTI_ORG_POST_ENABLE_FLAG, current_user.organization):
             data['organization'] = current_user.organization_id
 
         return data
