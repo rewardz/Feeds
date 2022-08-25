@@ -6,7 +6,9 @@ from django.conf import settings
 from django.db.models import Q
 from django.utils.translation import ugettext as _
 from django.utils.module_loading import import_string
-
+from django.utils import timezone
+from datetime import timedelta
+import calendar
 
 from rest_framework import exceptions
 
@@ -186,7 +188,8 @@ def notify_new_comment(post, creator):
         post_creator = USERMODEL.objects.get(id=post.created_by.id)
         message = _("'%s' commented on your post '%s'" % (comment_creator_string, post_string))
         push_notification(
-            creator, message, post_creator, object_type=object_type, object_id=post.id
+            creator, message, post_creator, object_type=object_type, object_id=post.id,
+            extra_context={"reaction_type": 8}  # TODO: move to reaction types
         )
     except Exception:
         pass
@@ -240,12 +243,13 @@ def add_email(to, from_user, subject, body):
         return False
 
 
-def push_notification(sender, message, recipient, object_type=None, object_id=None):
+def push_notification(sender, message, recipient, object_type=None, object_id=None, extra_context={}):
     try:
         notification = PUSH_NOTIFICATION_MODEL.objects.create(
             sender=sender,
             message=message,
             recipient=recipient,
+            extra_context=extra_context,
         )
         if object_type:
             setattr(notification, NOTIF_OBJECT_TYPE_FIELD_NAME, object_type)
@@ -302,3 +306,29 @@ def extract_user_info(user_detail):
         user_id = user_id_detail.group(1)
     user_info['user_id'] = user_id
     return user_info
+
+
+def get_date_range(days):
+    end_date = timezone.now()
+    start_date = end_date - timedelta(days=days)
+    return [start_date, end_date]
+
+
+def since_last_appreciation(last_appreciation_date):
+    current_date = timezone.now()
+    return (current_date - last_appreciation_date).days
+
+
+def get_current_month_end_date():
+    current_date = timezone.now()
+    days = calendar.monthrange(current_date.year, current_date.month)[1]
+    return "{} {}, {}".format(current_date.strftime("%B"), days, current_date.year)
+
+
+def get_absolute_url(uri):
+    if "://" in uri:
+        return uri
+    else:
+        site_url = settings.SITE_URL.strip("/")
+        uri = uri.lstrip("/")
+        return "/".join([site_url, uri])
