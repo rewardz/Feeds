@@ -24,7 +24,7 @@ TrophyBadge = import_string(settings.TROPHY_BADGE_MODEL)
 UserStrength = import_string(settings.USER_STRENGTH_MODEL)
 NOMINATION_STATUS_COLOR_CODE = import_string(settings.NOMINATION_STATUS_COLOR_CODE)
 ORGANIZATION_SETTINGS_MODEL = import_string(settings.ORGANIZATION_SETTINGS_MODEL)
-FEEDBACK_ENABLE_FLAG = import_string(settings.FEEDBACK_ENABLE_FLAG)
+MULTI_ORG_POST_ENABLE_FLAG = import_string(settings.MULTI_ORG_POST_ENABLE_FLAG)
 
 
 def get_user_detail(user_id):
@@ -247,7 +247,7 @@ class PostSerializer(serializers.ModelSerializer):
         organizations = validated_data.pop('organizations', None)
         user = request.user
 
-        if not organizations and not ORGANIZATION_SETTINGS_MODEL.objects.get_value(FEEDBACK_ENABLE_FLAG, user.organization):
+        if not organizations and not ORGANIZATION_SETTINGS_MODEL.objects.get_value(MULTI_ORG_POST_ENABLE_FLAG, user.organization):
             organizations = [user.organization]
 
         departments = validated_data.pop('departments', None)
