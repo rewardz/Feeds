@@ -34,6 +34,10 @@ from .utils import (
 CustomUser = import_string(settings.CUSTOM_USER_MODEL)
 DEPARTMENT_MODEL = import_string(settings.DEPARTMENT_MODEL)
 NOTIFICATION_OBJECT_TYPE = import_string(settings.POST_NOTIFICATION_OBJECT_TYPE).Posts
+UserStrength = import_string(settings.USER_STRENGTH_MODEL)
+NOMINATION_STATUS = import_string(settings.NOMINATION_STATUS)
+ORGANIZATION_SETTINGS_MODEL = import_string(settings.ORGANIZATION_SETTINGS_MODEL)
+FEEDBACK_ENABLE_FLAG = import_string(settings.FEEDBACK_ENABLE_FLAG)
 
 
 class PostViewSet(viewsets.ModelViewSet):
@@ -98,7 +102,11 @@ class PostViewSet(viewsets.ModelViewSet):
         if create:
             data['created_by'] = current_user.id
         data['modified_by'] = current_user.id
-        data['organization'] = current_user.organization_id
+
+        # if feedback is not enabled then save current user organization
+        if not ORGANIZATION_SETTINGS_MODEL.objects.get_value(FEEDBACK_ENABLE_FLAG, current_user.organization):
+            data['organization'] = current_user.organization_id
+
         return data
 
     def _upload_files(self, request, post_id):

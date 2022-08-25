@@ -22,29 +22,30 @@ NOTIFICATION_OBJECT_TYPE = import_string(settings.POST_NOTIFICATION_OBJECT_TYPE)
 NOTIF_OBJECT_TYPE_FIELD_NAME = settings.NOTIF_OBJECT_TYPE_FIELD_NAME
 NOTIF_OBJECT_ID_FIELD_NAME = settings.NOTIF_OBJECT_ID_FIELD_NAME
 USER_DEPARTMENT_RELATED_NAME = settings.USER_DEPARTMENT_RELATED_NAME
+ORGANIZATION_SETTINGS_MODEL = import_string(settings.ORGANIZATION_SETTINGS_MODEL)
+FEEDBACK_ENABLE_FLAG = import_string(settings.FEEDBACK_ENABLE_FLAG)
 
 
 def accessible_posts_by_user(user, organization, allow_feedback=False):
     if not isinstance(organization, (list, tuple)):
         organization = [organization]
-    if user.is_staff:
-        result = Post.objects.filter(organizations__in=organization)
-        result = result.filter(mark_delete=False)
-        if not allow_feedback:
-            result = result.exclude(post_type=POST_TYPE.FEEDBACK_POST)
-        else:
-            result = result.filter(post_type=POST_TYPE.FEEDBACK_POST)
-        return result
-    # non staff user
+
     # get the departments to which this user belongs
     user_depts = getattr(user, USER_DEPARTMENT_RELATED_NAME).all()
-    result = Post.objects.filter(organizations__in=organization)
-    result = result.filter(Q(departments__in=user_depts) | Q(departments__isnull=True))
-    result = result.filter(mark_delete=False)
+
+    # get the post belongs to organization
+    result = Post.objects.filter(
+        Q(mark_delete=False) & (
+            Q(organizations__in=organization) | Q(departments__in=user_depts)
+        )
+    )
+
+    # filter / exclude feedback based on the allow_feedback
     if not allow_feedback:
         result = result.exclude(post_type=POST_TYPE.FEEDBACK_POST)
     else:
         result = result.filter(post_type=POST_TYPE.FEEDBACK_POST)
+
     return result
 
 
