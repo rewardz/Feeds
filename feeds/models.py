@@ -37,7 +37,7 @@ def post_upload_to_path(instance, filename):
         inst_id = str(instance.category.pk)
 
     # for comment images we won't store the post.
-    elif isinstance(instance.comment, Comment) and not instance.post:
+    elif hasattr(instance, "comment") and isinstance(instance.comment, Comment) and not instance.post:
         inst_id = str(instance.comment.pk)
         upload_from = "comment"
 

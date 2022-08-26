@@ -47,11 +47,16 @@ class PostViewSet(viewsets.ModelViewSet):
 
     def _create_or_update(self, request, create=False):
         payload = request.data
-        # print(payload.getlist('delete_image_ids', 'Nothing'))
         current_user = self.request.user
         if not current_user:
             raise serializers.ValidationError({'created_by': _('Created by is required!')})
-        data = {k: v for k, v in payload.items()}
+        data = {}
+        for key, value in payload.items():
+            if key in ["organizations", "departments"] and isinstance(payload.get(key), unicode):
+                data.update({key: loads(value)})
+                continue
+            data.update({key: value})
+
         delete_image_ids = data.get('delete_image_ids', None)
         delete_document_ids = data.get('delete_document_ids', None)
 
