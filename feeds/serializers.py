@@ -565,8 +565,8 @@ class CommentSerializer(serializers.ModelSerializer):
     def get_commented_by_user_info(self, instance):
         created_by = instance.created_by
         user_detail = get_user_detail(created_by.id)
-        return UserInfoSerializer(user_detail,
-                                  fields=["pk", "first_name", "last_name", "profile_img", "full_name"]).data
+        return UserInfoSerializer(user_detail, fields=["pk", "first_name", "last_name", "profile_img", "full_name",
+                                                       "departments"]).data
 
     def get_liked_count(self, instance):
         return CommentLiked.objects.filter(comment=instance).count()

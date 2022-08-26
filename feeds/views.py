@@ -869,7 +869,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
 
     @list_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
     def recent_recognitions(self, request, *args, **kwargs):
-        show_cheer_msg = False
+        show_cheer_msg, show_approvals = False, False
         user = self.request.user
         organization = user.organization
         posts = accessible_posts_by_user(user, organization)
@@ -890,6 +890,14 @@ class UserFeedViewSet(viewsets.ModelViewSet):
                 feeds.data['days_passed'] = days_passed
                 show_cheer_msg = True
 
+        approvals_count = posts.filter(post_type=POST_TYPE.USER_CREATED_NOMINATION,
+                                       nomination__assigned_reviewer=request.user).exclude(
+            nomination__nom_status__in=[NOMINATION_STATUS.approved, NOMINATION_STATUS.rejected]).count()
+        if (request.user.userdesignation_set.count() > 0 or request.user.reviewer_users.count() > 0) and \
+                approvals_count > 0:
+            show_approvals = True
+        feeds.data['approvals_count'] = approvals_count
+        feeds.data['show_approvals'] = show_approvals
         feeds.data['show_cheer_msg'] = show_cheer_msg
         feeds.data['points_left'] = request.user.appreciation_budget_left_in_month
         feeds.data['date'] = get_current_month_end_date()
