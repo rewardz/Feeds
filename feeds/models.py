@@ -16,7 +16,6 @@ from easy_thumbnails.exceptions import InvalidImageFormatError
 from easy_thumbnails.files import get_thumbnailer
 from model_helpers import upload_to
 from taggit.managers import TaggableManager
-from auditlog.registry import auditlog
 
 from .constants import POST_TYPE, REACTION_TYPE, SHARED_WITH
 
@@ -403,5 +402,3 @@ class FlagPost(models.Model):
     created_on = models.DateTimeField(auto_now_add=True)
     modified_on = models.DateTimeField(auto_now=True)
     notified = models.BooleanField(default=True)
-
-auditlog.register(Post)
