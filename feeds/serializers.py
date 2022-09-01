@@ -190,7 +190,8 @@ class UserStrengthSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = UserStrength
-        fields = ('id', 'name', 'illustration', 'background_color', 'message', 'icon', 'points', 'award_points')
+        fields = ('id', 'name', 'illustration', 'background_color', 'message', 'icon', 'points', 'award_points',
+                  'background_color_lite')
 
     @staticmethod
     def get_award_points(instance):
