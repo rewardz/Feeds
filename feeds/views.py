@@ -731,8 +731,14 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         user = self.request.user
         organization = user.organization
         posts = accessible_posts_by_user(user, organization)
-        feeds = posts.filter(post_type__in=[POST_TYPE.USER_CREATED_APPRECIATION,
-                                                   POST_TYPE.USER_CREATED_NOMINATION])
+        if feed_flag == "post_polls":
+            feeds = posts.filter(post_type__in=[POST_TYPE.USER_CREATED_POST,
+                                                POST_TYPE.USER_CREATED_POLL], created_by=user)
+            feeds = PostFilter(self.request.GET, queryset=feeds).qs
+            return feeds.distinct()
+        else:
+            feeds = posts.filter(post_type__in=[POST_TYPE.USER_CREATED_APPRECIATION,
+                                                POST_TYPE.USER_CREATED_NOMINATION])
         feeds = PostFilter(self.request.GET, queryset=feeds).qs
 
         if feed_flag == "received":
