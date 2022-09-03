@@ -53,4 +53,4 @@ oauthlib==2.0.1
 
 #auditlog
 django-jsonfield==1.0.1
--e git+git@github.com:jazzband/django-auditlog.git@v0.4.8#egg=django-auditlog
+-e git+https://github.com/jazzband/django-auditlog.git@v0.4.8#egg=django-auditlog
