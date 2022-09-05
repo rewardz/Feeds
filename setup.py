@@ -64,6 +64,7 @@ setup(
         'dev': dev_requires,
     },
     dependency_links=[
-        "git+https://github.com/rewardz/cropimg-django.git@0f705fa0259dd2ab4e0c3c070ab92e50c8e9ba06#egg=cropimg-django"
+        "git+https://github.com/rewardz/cropimg-django.git@0f705fa0259dd2ab4e0c3c070ab92e50c8e9ba06#egg=cropimg-django",
+        "git+https://github.com/jazzband/django-auditlog.git@v0.4.8#egg=django-auditlog"
     ],
 )
