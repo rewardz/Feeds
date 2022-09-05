@@ -6,19 +6,21 @@ from django.conf import settings
 from django.db.models import Q
 from django.utils.translation import ugettext as _
 from django.utils.module_loading import import_string
-
-
 from rest_framework import exceptions
 
 from .constants import POST_TYPE, SHARED_WITH
 from .models import Comment, Post
+from feeds.tasks import notify_user_via_email
+
 
 DEPARTMENT_MODEL = import_string(settings.DEPARTMENT_MODEL)
 ERROR_MESSAGE = "Priority post already exists for user. Set priority to false."
 USERMODEL = import_string(settings.CUSTOM_USER_MODEL)
 PENDING_EMAIL_MODEL = import_string(settings.PENDING_EMAIL)
 PUSH_NOTIFICATION_MODEL = import_string(settings.PUSH_NOTIFICATION)
-NOTIFICATION_OBJECT_TYPE = import_string(settings.POST_NOTIFICATION_OBJECT_TYPE).Posts
+NOTIFICATION_OBJECT = import_string(settings.POST_NOTIFICATION_OBJECT_TYPE)
+NOTIFICATION_OBJECT_TYPE = NOTIFICATION_OBJECT.Posts
+NOTIFICATION_FEEDBACK_OBJECT_TYPE = NOTIFICATION_OBJECT.feedback
 NOTIF_OBJECT_TYPE_FIELD_NAME = settings.NOTIF_OBJECT_TYPE_FIELD_NAME
 NOTIF_OBJECT_ID_FIELD_NAME = settings.NOTIF_OBJECT_ID_FIELD_NAME
 USER_DEPARTMENT_RELATED_NAME = settings.USER_DEPARTMENT_RELATED_NAME
@@ -164,32 +166,44 @@ def tag_users_to_comment(comment, user_list):
                 continue
 
 
-def notify_new_comment(post, creator):
+def notify_new_comment(comment, creator):
+    post = comment.post
     commentator_ids = Comment.objects.filter(post=post).values_list('created_by__id', flat=True)
     # get all the commentators except the one currently commenting
     commentators = USERMODEL.objects.filter(id__in=commentator_ids).exclude(id=creator.id)
     # also exclude the creator of the post
     commentators = commentators.exclude(id=post.created_by.id)
+    feedback_post_type = post.post_type == POST_TYPE.FEEDBACK_POST
     object_type = NOTIFICATION_OBJECT_TYPE
-
     comment_creator_string = get_user_name(creator)
     post_string = post.title[:20] + "..." if post.title else ""
 
-    for usr in commentators:
-        message = _("'%s' commented on the post '%s'" % (comment_creator_string, post_string))
-        push_notification(
-            creator, message, usr, object_type=object_type, object_id=post.id
-        )
+    # for feedback post user won't receive the notification
+    if not feedback_post_type:
+        for usr in commentators:
+            message = _("'%s' commented on the post '%s'" % (comment_creator_string, post_string))
+            push_notification(
+                creator, message, usr, object_type=object_type, object_id=post.id
+            )
 
-    # post creator always receives a notification when a new comment is made
-    try:
-        post_creator = USERMODEL.objects.get(id=post.created_by.id)
-        message = _("'%s' commented on your post '%s'" % (comment_creator_string, post_string))
+        # post creator always receives a notification when a new comment is made
+        try:
+            post_creator = USERMODEL.objects.get(id=post.created_by.id)
+            message = _("'%s' commented on your post '%s'" % (comment_creator_string, post_string))
+            push_notification(
+                creator, message, post_creator, object_type=object_type, object_id=post.id
+            )
+        except Exception:
+            pass
+
+    # if post type is feedback post and admin has commented then notify user
+    if feedback_post_type and creator.is_staff:
+        object_type = NOTIFICATION_FEEDBACK_OBJECT_TYPE
+        message = _("'%s' commented on the '%s'" % (comment_creator_string, post_string))
         push_notification(
-            creator, message, post_creator, object_type=object_type, object_id=post.id
+            creator, message, post.created_by, object_type=object_type, object_id=post.id
         )
-    except Exception:
-        pass
+        notify_user_via_email.delay(comment.id)
 
 
 def notify_new_poll_created(poll):

@@ -331,7 +331,7 @@ class PostViewSet(viewsets.ModelViewSet):
                 tag_users_to_comment(inst, tag_users)
             post = Post.objects.filter(id=post_id).first()
             if post:
-                notify_new_comment(post, self.request.user)
+                notify_new_comment(inst, self.request.user)
             return Response(serializer.data)
 
     @detail_route(methods=["POST"], permission_classes=(permissions.IsAuthenticated,))
