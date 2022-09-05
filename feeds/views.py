@@ -903,7 +903,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         except AttributeError:
             feeds.data['points_left'] = None
         feeds.data['date'] = get_current_month_end_date()
-        feeds.data['notification_count'] = request.user.unviewed_notifications_count
+        feeds.data['notification_count'] = 0
         feeds.data['org_logo'] = get_absolute_url(organization.display_img_url)
         return feeds
 

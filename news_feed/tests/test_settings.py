@@ -13,6 +13,7 @@ EXTERNAL_APPS = (
     'image_cropping',
     'taggit',
     'ajax_select',
+    'cropimg',
 )
 
 INTERNAL_APPS = (
