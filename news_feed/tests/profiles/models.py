@@ -209,6 +209,10 @@ class CustomUser(CustomUserBase):
         """
         return not self.password_history.exists()
 
+    @property
+    def unviewed_notifications_count(self):
+        return PushNotification.objects.filter(recipient=self, is_viewed=False).count()
+
 
 class Department(models.Model):
     """
@@ -335,6 +339,7 @@ class PushNotification(models.Model):
     url = models.URLField(null=True, blank=True)
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)
+    is_viewed = models.BooleanField(default=False, editable=False)
 
     def __unicode__(self):
         return "{sender} - {recipient}".format(sender=self.sender,
@@ -368,3 +373,20 @@ class TrophyBadge(models.Model):
     background_color = models.CharField(max_length=20, blank=True, null=True)
     background_color_lite = models.CharField(max_length=20, blank=True, null=True)
     points = models.DecimalField(blank=True, null=True, max_digits=12, decimal_places=2)
+
+
+class Designation(models.Model):
+    name = models.CharField(max_length=100)
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
+
+    def __unicode__(self):
+        return "{} - {}".format(self.organization.name, self.name)
+
+
+class UserDesignation(models.Model):
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    department = models.ForeignKey(Department, blank=True, null=True, on_delete=models.CASCADE)
+    designation = models.ForeignKey(Designation, related_name="user_designations", on_delete=models.CASCADE)
+
+    def __unicode__(self):
+        return "{} - {}".format(self.user.first_name, self.designation.name)

@@ -731,8 +731,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         user = self.request.user
         organization = user.organization
         posts = accessible_posts_by_user(user, organization)
-        feeds = posts.filter(post_type__in=[POST_TYPE.USER_CREATED_APPRECIATION,
-                                                   POST_TYPE.USER_CREATED_NOMINATION])
+        feeds = posts.filter(post_type__in=[POST_TYPE.USER_CREATED_APPRECIATION, POST_TYPE.USER_CREATED_NOMINATION])
         feeds = PostFilter(self.request.GET, queryset=feeds).qs
 
         if feed_flag == "received":
@@ -899,7 +898,10 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         feeds.data['approvals_count'] = approvals_count
         feeds.data['show_approvals'] = show_approvals
         feeds.data['show_cheer_msg'] = show_cheer_msg
-        feeds.data['points_left'] = request.user.appreciation_budget_left_in_month
+        try:
+            feeds.data['points_left'] = request.user.appreciation_budget_left_in_month
+        except AttributeError:
+            feeds.data['points_left'] = None
         feeds.data['date'] = get_current_month_end_date()
         feeds.data['notification_count'] = request.user.unviewed_notifications_count
         feeds.data['org_logo'] = get_absolute_url(organization.display_img_url)
