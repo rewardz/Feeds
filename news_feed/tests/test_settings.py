@@ -11,6 +11,7 @@ EXTERNAL_APPS = (
     'rest_framework.authtoken',
     'easy_thumbnails',
     'image_cropping',
+    'taggit',
 )
 
 INTERNAL_APPS = (
@@ -59,6 +60,8 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.SessionAuthentication',
     ),
 }
+
+ALL_USER_OBJECT = 'objects'
 
 AUTH_USER_MODEL = 'profiles.CustomUser'
 CUSTOM_USER_MODEL = 'news_feed.tests.profiles.models.CustomUser'

@@ -9,3 +9,8 @@ news_feed/media/
 build/
 dist/
 .idea/
+feeds.egg-info
+tags
+env
+build/lib
+dist

@@ -9,6 +9,7 @@ class PostAdmin(admin.ModelAdmin):
         'title', 'organization', 'shared_with', 'post_type',
         'created_by', 'created_on', 'modified_on', 'modified_by', 'mark_delete',
     )
+    readonly_fields = ('created_by', 'modified_by',)
     list_filter = ('organization', 'priority', 'mark_delete',)
     search_fields = ('organization__name',)
 
@@ -16,11 +17,13 @@ class PostAdmin(admin.ModelAdmin):
 @admin.register(Comment)
 class CommentAdmin(admin.ModelAdmin):
     list_display = ('content', 'parent', 'created_by', 'created_on', 'post')
+    readonly_fields = ('created_by', 'modified_by', )
 
 
 @admin.register(PostLiked)
 class PostLikedAdmin(admin.ModelAdmin):
     list_display = ('created_by', 'created_on', 'post',)
+    readonly_fields = ('created_by',)
 
 
 @admin.register(PollsAnswer)
@@ -31,3 +34,4 @@ class PollsAnswerAdmin(admin.ModelAdmin):
 @admin.register(FlagPost)
 class FlagPostAdmin(admin.ModelAdmin):
     list_display = ('post', 'flagger', 'notes', 'accepted', 'notified')
+    readonly_fields = ('flagger',)
