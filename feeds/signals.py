@@ -8,7 +8,6 @@ from feeds.constants import POST_TYPE
 
 
 FEEDBACK_STATUS_OPTIONS = import_string(settings.FEEDBACK_STATUS_OPTIONS)
-SEND_NOTIFICATION_TO_USER = import_string(settings.SEND_NOTIFICATION_TO_USER)
 
 
 @receiver(post_save, sender=Comment)
