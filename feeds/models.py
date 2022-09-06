@@ -308,6 +308,15 @@ class Comment(UserInfo):
             for u in ctu:
                 u.delete()
 
+    def get_feedback(self):
+        """
+        Get feedback if exists
+        """
+        if self.post and self.post.post_type == POST_TYPE.FEEDBACK_POST:
+            if self.post.feedbackpost_set.exists():
+                return self.post.feedbackpost_set.first().feedback
+        return None
+
     def __unicode__(self):
         return "%s" % self.content
 
