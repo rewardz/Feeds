@@ -273,7 +273,7 @@ class PostViewSet(viewsets.ModelViewSet):
             raise ValidationError(_('You do not have access to comment on this post'))
         if self.request.method == "GET":
             serializer_context = {'request': self.request}
-            comments = Comment.objects.filter(post_id=post_id, parent=None). \
+            comments = Comment.objects.filter(post_id=post_id, parent=None, mark_delete=False). \
                 order_by('-created_on')
             page = self.paginate_queryset(comments)
             if page is not None:
@@ -592,7 +592,7 @@ class CommentViewset(viewsets.ModelViewSet):
         user = self.request.user
         org = self.request.user.organization
         posts = accessible_posts_by_user(user, org)
-        result = Comment.objects.filter(post__in=posts)
+        result = Comment.objects.filter(post__in=posts, mark_delete=False)
         return result
 
     @detail_route(methods=["POST"], permission_classes=(permissions.IsAuthenticated,))
@@ -643,6 +643,14 @@ class CommentViewset(viewsets.ModelViewSet):
         return Response({
             "message": message, "liked": liked, "count": count, "user_info": user_info},
             status=response_status)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        user = request.user
+        if not user_can_delete(user, instance):
+            raise serializers.ValidationError(_("You do not have permission to delete"))
+        instance.mark_as_delete(user)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 @api_view(['GET'])
