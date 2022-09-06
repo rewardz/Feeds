@@ -23,34 +23,30 @@ PUSH_NOTIFICATION_MODEL = import_string(settings.PUSH_NOTIFICATION)
 NOTIFICATION_OBJECT_TYPE = import_string(settings.POST_NOTIFICATION_OBJECT_TYPE).Posts
 NOTIF_OBJECT_TYPE_FIELD_NAME = settings.NOTIF_OBJECT_TYPE_FIELD_NAME
 NOTIF_OBJECT_ID_FIELD_NAME = settings.NOTIF_OBJECT_ID_FIELD_NAME
+USER_DEPARTMENT_RELATED_NAME = settings.USER_DEPARTMENT_RELATED_NAME
+ORGANIZATION_SETTINGS_MODEL = import_string(settings.ORGANIZATION_SETTINGS_MODEL)
 
 
 def accessible_posts_by_user(user, organization, allow_feedback=False):
-    if user.is_staff:
-        result = Post.objects.filter(organization=organization)
-        result = result.filter(mark_delete=False)
-        if not allow_feedback:
-            result = result.exclude(post_type=POST_TYPE.FEEDBACK_POST)
-        else:
-            result = result.filter(post_type=POST_TYPE.FEEDBACK_POST)
-        return result
-    dept_users = []
-    for dept in DEPARTMENT_MODEL.objects.filter(users=user):
-        for usr in dept.users.all():
-            dept_users.append(usr.id)
-    if not dept_users:
-        # If user does not belong to any department just show posts created by him
-        result = Post.objects.filter(Q(organization=organization,
-                                       created_by=user))
-    else:
-        result = Post.objects.filter(Q(organization=organization, \
-                                    shared_with=SHARED_WITH.ALL_DEPARTMENTS) |\
-                                 Q(created_by__in=dept_users))
-    result = result.filter(mark_delete=False)
+    if not isinstance(organization, (list, tuple)):
+        organization = [organization]
+
+    # get the departments to which this user belongs
+    user_depts = getattr(user, USER_DEPARTMENT_RELATED_NAME).all()
+
+    # get the post belongs to organization
+    result = Post.objects.filter(
+        Q(mark_delete=False) & (
+            Q(organizations__in=organization) | Q(departments__in=user_depts)
+        )
+    )
+
+    # filter / exclude feedback based on the allow_feedback
     if not allow_feedback:
         result = result.exclude(post_type=POST_TYPE.FEEDBACK_POST)
     else:
         result = result.filter(post_type=POST_TYPE.FEEDBACK_POST)
+
     return result
 
 

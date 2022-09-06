@@ -17,11 +17,14 @@ from .utils import (
 )
 
 DEPARTMENT_MODEL = import_string(settings.DEPARTMENT_MODEL)
+Organization = import_string(settings.ORGANIZATION_MODEL)
 UserModel = import_string(settings.CUSTOM_USER_MODEL)
 Nominations = import_string(settings.NOMINATIONS_MODEL)
 TrophyBadge = import_string(settings.TROPHY_BADGE_MODEL)
 UserStrength = import_string(settings.USER_STRENGTH_MODEL)
 NOMINATION_STATUS_COLOR_CODE = import_string(settings.NOMINATION_STATUS_COLOR_CODE)
+ORGANIZATION_SETTINGS_MODEL = import_string(settings.ORGANIZATION_SETTINGS_MODEL)
+MULTI_ORG_POST_ENABLE_FLAG = settings.MULTI_ORG_POST_ENABLE_FLAG
 
 
 def get_user_detail(user_id):
@@ -93,7 +96,7 @@ class ImagesSerializer(serializers.ModelSerializer):
         model = Images
         fields = (
             'id', 'post', 'name', 'image', 'thumbnail_img_url', 'display_img_url',
-            'large_img_url'
+            'large_img_url', 'comment'
         )
 
     def get_name(self, instance):
@@ -106,7 +109,7 @@ class DocumentsSerializer(serializers.ModelSerializer):
     class Meta:
         model = Documents
         fields = (
-            'id', 'post', 'name', 'document'
+            'id', 'post', 'name', 'document', 'comment'
         )
 
     def get_name(self, instance):
@@ -294,6 +297,14 @@ class PostSerializer(DynamicFieldsModelSerializer):
     tagged_users = serializers.SerializerMethodField()
     is_admin = serializers.SerializerMethodField()
     tags = serializers.SerializerMethodField()
+    departments = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=DEPARTMENT_MODEL.objects.all(),
+        required=False, allow_null=True
+    )
+    organizations = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=Organization.objects.all(),
+        required=False, allow_null=True
+    )
     nomination = serializers.SerializerMethodField()
     feed_type = serializers.SerializerMethodField()
     user_strength = serializers.SerializerMethodField()
@@ -307,12 +318,13 @@ class PostSerializer(DynamicFieldsModelSerializer):
         model = Post
         fields = (
             "id", "created_by", "created_on", "modified_by", "modified_on",
-            "organization", "created_by_user_info",
+            "organizations", "created_by_user_info",
             "title", "description", "post_type", "poll_info", "active_days",
             "priority", "prior_till",
             "shared_with", "images", "documents", "videos",
             "is_owner", "can_edit", "can_delete", "has_appreciated",
-            "appreciation_count", "comments_count", "tagged_users", "is_admin", "tags", "reaction_type", "nomination",
+            "appreciation_count", "comments_count", "tagged_users", "is_admin", "tags",
+            "departments", "reaction_type", "nomination",
             "feed_type", "user_strength", "user", "user_reaction_type", "gif", "ecard", "points", "time_left",
             "images_with_ecard",
         )
@@ -389,8 +401,23 @@ class PostSerializer(DynamicFieldsModelSerializer):
         return UserInfoSerializer(result, many=True, read_only=True).data
 
     def create(self, validated_data):
+        request = self.context.get('request', None)
         validate_priority(validated_data)
-        return super(PostSerializer, self).create(validated_data)
+        organizations = validated_data.pop('organizations', None)
+        user = request.user
+
+        if not organizations and not ORGANIZATION_SETTINGS_MODEL.objects.get_value(MULTI_ORG_POST_ENABLE_FLAG, user.organization):
+            organizations = [user.organization]
+
+        departments = validated_data.pop('departments', None)
+        post = Post.objects.create(**validated_data)
+
+        if post:
+            if organizations:
+                post.organizations.add(*organizations)
+            if departments:
+                post.departments.add(*departments)
+        return post
 
     def to_representation(self, instance):
         representation = super(PostSerializer, self).to_representation(instance)
@@ -497,7 +524,7 @@ class PostDetailSerializer(PostSerializer):
         model = Post
         fields = (
             "id", "created_by", "created_on", "modified_by", "modified_on",
-            "organization", "created_by_user_info",
+            "organizations", "created_by_user_info",
             "title", "description", "post_type", "poll_info", "active_days",
             "priority", "prior_till", "shared_with", "images", "documents", "videos",
             "is_owner", "can_edit", "can_delete", "has_appreciated",
@@ -555,12 +582,28 @@ class CommentSerializer(serializers.ModelSerializer):
     liked_by = serializers.SerializerMethodField()
     has_liked = serializers.SerializerMethodField()
     tagged_users = serializers.SerializerMethodField()
+    images = serializers.SerializerMethodField()
+    documents = serializers.SerializerMethodField()
 
     class Meta:
         model = Comment
         fields = ("id", "content", "created_by", "created_on", "modified_by",
                   "modified_on", "post", "commented_by_user_info",
-                  "liked_count", "liked_by", "has_liked", "tagged_users", "reaction_types")
+                  "liked_count", "liked_by", "has_liked", "tagged_users", "reaction_types", "images", "documents")
+
+    def get_images(self, instance):
+        """
+        Get images for the comment instance
+        """
+        images = Images.objects.filter(comment=instance.id)
+        return ImagesSerializer(images, many=True, read_only=True).data
+
+    def get_documents(self, instance):
+        """
+        Get documents for the comment instance
+        """
+        documents = Documents.objects.filter(comment=instance.id)
+        return DocumentsSerializer(documents, many=True, read_only=True).data
 
     def get_commented_by_user_info(self, instance):
         created_by = instance.created_by

@@ -24,6 +24,9 @@ class Organization(models.Model):
     name = models.CharField(max_length=100)
     slug = models.SlugField(unique=True, db_index=False, blank=True)
 
+    def __unicode__(self):
+        return self.name
+
 
 class CustomUserBase(AbstractBaseUser):
 
