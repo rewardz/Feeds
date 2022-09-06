@@ -16,7 +16,6 @@ from easy_thumbnails.exceptions import InvalidImageFormatError
 from easy_thumbnails.files import get_thumbnailer
 from model_helpers import upload_to
 from taggit.managers import TaggableManager
-from auditlog.registry import auditlog
 
 from .constants import POST_TYPE, REACTION_TYPE, SHARED_WITH
 
@@ -294,6 +293,7 @@ class Comment(UserInfo):
         CustomUser, related_name="comment_tagged_users",
         through="CommentTaggedUsers", blank=True
     )
+    mark_delete = models.BooleanField(default=False)
 
     def tag_user(self, user):
         CommentTaggedUsers.objects.create(comment=self, user=user)
@@ -306,6 +306,14 @@ class Comment(UserInfo):
 
     def reaction_types(self):
         return self.commentliked_set.values_list('reaction_type', flat=True).distinct()
+
+    def mark_as_delete(self, user):
+        try:
+            self.mark_delete = True
+            self.modified_by = user
+            self.save()
+        except Comment.DoesNotExist:
+            raise ValidationError(_("Comment does not exist"))
 
     def __unicode__(self):
         return "%s" % self.content
@@ -403,5 +411,3 @@ class FlagPost(models.Model):
     created_on = models.DateTimeField(auto_now_add=True)
     modified_on = models.DateTimeField(auto_now=True)
     notified = models.BooleanField(default=True)
-
-auditlog.register(Post)

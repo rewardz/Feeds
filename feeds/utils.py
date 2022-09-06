@@ -112,7 +112,7 @@ def user_can_edit(user, instance):
 
 def user_can_delete(user, instance):
     if not user.is_staff:
-        if instance.post_type in [POST_TYPE.SYSTEM_CREATED_POST]:
+        if hasattr(instance, "post_type") and instance.post_type in [POST_TYPE.SYSTEM_CREATED_POST]:
             return False
         return instance.created_by.id == user.id
     return True

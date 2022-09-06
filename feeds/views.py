@@ -273,7 +273,7 @@ class PostViewSet(viewsets.ModelViewSet):
             raise ValidationError(_('You do not have access to comment on this post'))
         if self.request.method == "GET":
             serializer_context = {'request': self.request}
-            comments = Comment.objects.filter(post_id=post_id, parent=None). \
+            comments = Comment.objects.filter(post_id=post_id, parent=None, mark_delete=False). \
                 order_by('-created_on')
             page = self.paginate_queryset(comments)
             if page is not None:
@@ -592,7 +592,7 @@ class CommentViewset(viewsets.ModelViewSet):
         user = self.request.user
         org = self.request.user.organization
         posts = accessible_posts_by_user(user, org)
-        result = Comment.objects.filter(post__in=posts)
+        result = Comment.objects.filter(post__in=posts, mark_delete=False)
         return result
 
     @detail_route(methods=["POST"], permission_classes=(permissions.IsAuthenticated,))
@@ -643,6 +643,14 @@ class CommentViewset(viewsets.ModelViewSet):
         return Response({
             "message": message, "liked": liked, "count": count, "user_info": user_info},
             status=response_status)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        user = request.user
+        if not user_can_delete(user, instance):
+            raise serializers.ValidationError(_("You do not have permission to delete"))
+        instance.mark_as_delete(user)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 @api_view(['GET'])
@@ -905,9 +913,12 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         feeds.data['approvals_count'] = approvals_count
         feeds.data['show_approvals'] = show_approvals
         feeds.data['show_cheer_msg'] = show_cheer_msg
-        feeds.data['points_left'] = request.user.appreciation_budget_left_in_month
+        try:
+            feeds.data['points_left'] = request.user.appreciation_budget_left_in_month
+        except AttributeError:
+            feeds.data['points_left'] = None
         feeds.data['date'] = get_current_month_end_date()
-        feeds.data['notification_count'] = request.user.unviewed_notifications_count
+        feeds.data['notification_count'] = 0
         feeds.data['org_logo'] = get_absolute_url(organization.display_img_url)
         return feeds
 
