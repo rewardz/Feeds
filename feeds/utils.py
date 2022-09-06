@@ -20,7 +20,7 @@ PENDING_EMAIL_MODEL = import_string(settings.PENDING_EMAIL)
 PUSH_NOTIFICATION_MODEL = import_string(settings.PUSH_NOTIFICATION)
 NOTIFICATION_OBJECT = import_string(settings.POST_NOTIFICATION_OBJECT_TYPE)
 NOTIFICATION_OBJECT_TYPE = NOTIFICATION_OBJECT.Posts
-NOTIFICATION_FEEDBACK_OBJECT_TYPE = NOTIFICATION_OBJECT.feedback
+# NOTIFICATION_FEEDBACK_OBJECT_TYPE = NOTIFICATION_OBJECT.feedback
 NOTIF_OBJECT_TYPE_FIELD_NAME = settings.NOTIF_OBJECT_TYPE_FIELD_NAME
 NOTIF_OBJECT_ID_FIELD_NAME = settings.NOTIF_OBJECT_ID_FIELD_NAME
 USER_DEPARTMENT_RELATED_NAME = settings.USER_DEPARTMENT_RELATED_NAME
@@ -198,7 +198,7 @@ def notify_new_comment(comment, creator):
 
     # if post type is feedback post and admin has commented then notify user
     if feedback_post_type and creator.is_staff:
-        object_type = NOTIFICATION_FEEDBACK_OBJECT_TYPE
+        # object_type = NOTIFICATION_FEEDBACK_OBJECT_TYPE
         message = _("'%s' commented on the '%s'" % (comment_creator_string, post_string))
         push_notification(
             creator, message, post.created_by, object_type=object_type, object_id=post.id
