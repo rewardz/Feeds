@@ -527,8 +527,9 @@ class PostDetailSerializer(PostSerializer):
         instance.shared_with = validated_data.get('shared_with', instance.shared_with)
         instance.priority = validated_data.get('priority', instance.priority)
         instance.modified_by = validated_data.get('modified_by', instance.modified_by)
-        instance.ecard = validated_data.get('ecard')
         instance.gif = validated_data.get('gif')
+        ecard_id = validated_data.get('ecard')
+        instance.ecard = ECard.objects.get(id=ecard_id) if ecard_id else None
         instance.save()
         return instance
 
