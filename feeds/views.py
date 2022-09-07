@@ -887,9 +887,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         user = self.request.user
         organization = user.organization
         posts = accessible_posts_by_user(user, organization)
-        feeds = posts.filter(Q(post_type=POST_TYPE.USER_CREATED_APPRECIATION) |
-                                    Q(nomination__nom_status=NOMINATION_STATUS.approved),
-                                    user=request.user).distinct()
+        feeds = posts.filter(post_type=POST_TYPE.USER_CREATED_APPRECIATION, user=request.user).distinct()
         # returns latest 5 appreciations from last 30 days
         start_date, end_date = get_date_range(30)
         feeds = feeds.filter(created_on__gte=start_date, created_on__lte=end_date)[:5]
