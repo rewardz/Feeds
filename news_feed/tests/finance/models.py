@@ -1,9 +1,10 @@
 from __future__ import division, print_function, unicode_literals
 
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 from annoying.fields import JSONField
 
-from .constants import TRANSACTION_STATUSES
+from .constants import POINT_SOURCE, TRANSACTION_STATUSES
 
 
 class Transaction(models.Model):
@@ -37,3 +38,13 @@ class Transaction(models.Model):
 
     def __unicode__(self):
         return "{transaction.points} pt".format(transaction=self)
+
+
+class PointsTable(models.Model):
+    organization = models.ForeignKey("profiles.Organization", blank=True, null=True)
+    point_source = models.PositiveIntegerField(choices=POINT_SOURCE(), null=False, default=POINT_SOURCE.custom)
+    alias = models.CharField(max_length=100, null=False, blank=True, db_index=True,
+                             help_text="If you selected 'custom' type, please name it here otherwise leave it blank")
+    points = models.DecimalField(blank=True, null=True, max_digits=12, decimal_places=4)
+    slug = models.SlugField(unique=True, blank=True, null=True)
+    is_active = models.BooleanField(default=True)

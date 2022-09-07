@@ -528,7 +528,7 @@ class PostDetailSerializer(PostSerializer):
         instance.priority = validated_data.get('priority', instance.priority)
         instance.modified_by = validated_data.get('modified_by', instance.modified_by)
         instance.gif = validated_data.get('gif')
-        ecard_id = validated_data.get('ecard')
+        ecard_id = self.initial_data.get('ecard')
         instance.ecard = ECard.objects.filter(id=ecard_id).first() if ecard_id else None
         instance.save()
         return instance
