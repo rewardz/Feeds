@@ -162,6 +162,13 @@ class CustomUser(CustomUserBase):
     def department(self):
         return self.departments.first()
 
+    @property
+    def full_name(self):
+        return self.get_full_name()
+
+    def get_full_name(self):
+        return u" ".join((self.first_name, self.last_name)).strip() or self.email
+
     def send_welcome_email(self):
         pass
 
@@ -204,6 +211,10 @@ class CustomUser(CustomUserBase):
         then he must be using default password.
         """
         return not self.password_history.exists()
+
+    @property
+    def unviewed_notifications_count(self):
+        return PushNotification.objects.filter(recipient=self, is_viewed=False).count()
 
 
 class Department(models.Model):
@@ -331,6 +342,7 @@ class PushNotification(models.Model):
     url = models.URLField(null=True, blank=True)
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)
+    is_viewed = models.BooleanField(default=False, editable=False)
 
     def __unicode__(self):
         return "{sender} - {recipient}".format(sender=self.sender,
@@ -345,3 +357,39 @@ class PushNotification(models.Model):
         verbose_name = "Notification"
         verbose_name_plural = "PushNotification"
         ordering = ("-created", )
+
+
+class UserStrength(models.Model):
+    name = models.CharField(max_length=100, blank=False)
+    slug = models.SlugField(blank=True, unique=True, null=True)
+    icon = models.ImageField(upload_to="profiles/strength/icons")
+    illustration = models.ImageField(upload_to="profiles/strength/illustrations", null=True, blank=True)
+    background_color = models.CharField(max_length=20, null=True, blank=True)
+    background_color_lite = models.CharField(max_length=20, null=True, blank=True)
+    organization = models.ForeignKey(Organization, blank=True, null=True, on_delete=models.CASCADE)
+
+
+class TrophyBadge(models.Model):
+    name = models.CharField(max_length=100)
+    description = models.TextField()
+    icon = models.ImageField(upload_to='trophy_badges/')
+    background_color = models.CharField(max_length=20, blank=True, null=True)
+    background_color_lite = models.CharField(max_length=20, blank=True, null=True)
+    points = models.DecimalField(blank=True, null=True, max_digits=12, decimal_places=2)
+
+
+class Designation(models.Model):
+    name = models.CharField(max_length=100)
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
+
+    def __unicode__(self):
+        return "{} - {}".format(self.organization.name, self.name)
+
+
+class UserDesignation(models.Model):
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    department = models.ForeignKey(Department, blank=True, null=True, on_delete=models.CASCADE)
+    designation = models.ForeignKey(Designation, related_name="user_designations", on_delete=models.CASCADE)
+
+    def __unicode__(self):
+        return "{} - {}".format(self.user.first_name, self.designation.name)

@@ -2,9 +2,9 @@ from __future__ import division, print_function, unicode_literals
 
 from django.conf import settings
 from django.utils.module_loading import import_string
-from django.utils.translation import ugettext as _
+from django.db.models import Count
 
-from rest_framework import exceptions, serializers
+from rest_framework import serializers
 
 from .constants import POST_TYPE
 from .models import (
@@ -31,6 +31,34 @@ def get_user_detail(user_id):
     return getattr(UserModel, settings.ALL_USER_OBJECT).filter(pk=user_id).first()
 
 
+class DynamicFieldsModelSerializer(serializers.ModelSerializer):
+    """
+    A ModelSerializer that takes an additional `fields` argument that
+    controls which fields should be displayed.
+    """
+
+    def __init__(self, *args, **kwargs):
+        # Don't pass the 'fields' arg up to the superclass
+        fields = kwargs.pop('fields', None)
+        self.show_repr = kwargs.pop('show_repr', True)
+
+        # Instantiate the superclass normally
+        super(DynamicFieldsModelSerializer, self).__init__(*args, **kwargs)
+
+        request = self.context.get("request")
+        if not fields:
+            if request:
+                fields = request.query_params.get('fields')
+                fields = tuple(fields.split(",")) if fields else None
+
+        if fields is not None:
+            # Drop any fields that are not specified in the `fields` argument.
+            allowed = set(fields)
+            existing = set(self.fields)
+            for field_name in existing - allowed:
+                self.fields.pop(field_name)
+
+
 class DepartmentDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = DEPARTMENT_MODEL
@@ -39,14 +67,14 @@ class DepartmentDetailSerializer(serializers.ModelSerializer):
         )
 
 
-class UserInfoSerializer(serializers.ModelSerializer):
+class UserInfoSerializer(DynamicFieldsModelSerializer):
     departments = serializers.SerializerMethodField()
     profile_img = serializers.SerializerMethodField()
 
     class Meta:
         model = UserModel
         fields = (
-            "pk", "email", "first_name", "last_name", "departments", "profile_img",
+            "pk", "email", "first_name", "last_name", "departments", "profile_img", "full_name"
         )
 
     def get_departments(self, instance):
@@ -54,6 +82,9 @@ class UserInfoSerializer(serializers.ModelSerializer):
         return DepartmentDetailSerializer(departments, many=True, read_only=True).data
 
     def get_profile_img(self, instance):
+        request = self.context.get('request')
+        if request and request.version >= 12 and not instance.img:
+            return None
         profile_image_url = get_profile_image(instance)
         return profile_image_url
 
@@ -134,7 +165,124 @@ class PollSerializer(serializers.ModelSerializer):
         return instance.total_votes()
 
 
-class PostSerializer(serializers.ModelSerializer):
+class TrophyBadgeSerializer(serializers.ModelSerializer):
+    award_points = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TrophyBadge
+        fields = ("id",
+                  "name",
+                  "description",
+                  "background_color",
+                  "icon",
+                  "points",
+                  "award_points")
+
+    @staticmethod
+    def get_award_points(instance):
+        points = instance.points
+        if points - int(points) == 0:
+            points = int(points)
+        else:
+            points = float(points)
+        return str(points)
+
+
+class UserStrengthSerializer(serializers.ModelSerializer):
+    award_points = serializers.SerializerMethodField()
+
+    class Meta:
+        model = UserStrength
+        fields = ('id', 'name', 'illustration', 'background_color', 'message', 'icon', 'points', 'award_points')
+
+    @staticmethod
+    def get_award_points(instance):
+        points = instance.points
+        if points - int(points) == 0:
+            points = int(points)
+        else:
+            points = float(points)
+        return str(points)
+
+
+class ECardSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source="category.name", read_only=True)
+    tags = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ECard
+        fields = ('pk', 'name', 'image', 'tags', 'category', 'category_name', 'thumbnail_img_url', 'display_img_url',
+                  'large_img_url')
+
+    def get_tags(self, obj):
+        return list(obj.tags.values_list("name", flat=True))
+
+
+class NominationsSerializer(DynamicFieldsModelSerializer):
+    nomination_icon = serializers.SerializerMethodField()
+    review_level = serializers.SerializerMethodField()
+    nominator_name = serializers.SerializerMethodField()
+    badges = serializers.SerializerMethodField()
+    user_strength = UserStrengthSerializer()
+    strength = serializers.SerializerMethodField()
+    nominated_team_member = UserInfoSerializer()
+    nom_status = serializers.SerializerMethodField()
+    nom_status_color = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Nominations
+        fields = ("id",
+                  "category",
+                  "nomination_icon",
+                  "review_level",
+                  "nominator_name",
+                  "comment",
+                  "created",
+                  "badges",
+                  "user_strength",
+                  "nominated_team_member",
+                  "message_to_reviewer",
+                  "strength",
+                  "nom_status",
+                  "nom_status_color")
+
+    @staticmethod
+    def get_review_level(instance):
+        return instance.category.reviewer_levels
+
+    def get_nominator_name(self, instance):
+        return instance.nominator.full_name
+
+    def get_nomination_icon(self, instance):
+        question_obj = instance.question.first()
+        try:
+            return question_obj.icon.url
+        except (ValueError, AttributeError):
+            return ""
+
+    def get_badges(self, instance):
+        if instance.category and instance.category.badge:
+            return TrophyBadgeSerializer(instance=instance.category.badge).data
+        return None
+
+    @staticmethod
+    def get_strength(instance):
+        return instance.user_strength.name
+
+    @staticmethod
+    def get_nom_status(instance):
+        if instance.nom_status == 4:
+            return "Rejected"
+        elif instance.nom_status == 3:
+            return "Approved"
+        return "Pending"
+
+    @staticmethod
+    def get_nom_status_color(instance):
+        return NOMINATION_STATUS_COLOR_CODE.get(instance.nom_status)
+
+
+class PostSerializer(DynamicFieldsModelSerializer):
     images = serializers.SerializerMethodField()
     documents = serializers.SerializerMethodField()
     videos = serializers.SerializerMethodField()
@@ -157,6 +305,14 @@ class PostSerializer(serializers.ModelSerializer):
         many=True, queryset=Organization.objects.all(),
         required=False, allow_null=True
     )
+    nomination = serializers.SerializerMethodField()
+    feed_type = serializers.SerializerMethodField()
+    user_strength = serializers.SerializerMethodField()
+    reaction_type = serializers.SerializerMethodField()
+    user_reaction_type = serializers.SerializerMethodField()
+    points = serializers.SerializerMethodField()
+    time_left = serializers.SerializerMethodField()
+    images_with_ecard = serializers.SerializerMethodField()
 
     class Meta:
         model = Post
@@ -167,8 +323,9 @@ class PostSerializer(serializers.ModelSerializer):
             "priority", "prior_till",
             "shared_with", "images", "documents", "videos",
             "is_owner", "can_edit", "can_delete", "has_appreciated",
-            "appreciation_count", "comments_count", "tagged_users", "is_admin", "tags",
-            "departments",
+            "appreciation_count", "comments_count", "tagged_users", "is_admin", "tags", "reaction_type", "nomination",
+            "feed_type", "user_strength", "user", "user_reaction_type", "gif", "ecard", "points", "time_left",
+            "images_with_ecard", "departments",
         )
 
     def get_tags(self, obj):
@@ -210,9 +367,10 @@ class PostSerializer(serializers.ModelSerializer):
         return VideosSerializer(videos, many=True, read_only=True).data
 
     def get_created_by_user_info(self, instance):
+        request = self.context.get('request')
         created_by = instance.created_by
         user_detail = get_user_detail(created_by.id)
-        return UserInfoSerializer(user_detail).data
+        return UserInfoSerializer(user_detail, context={'request': request}).data
 
     def get_is_owner(self, instance):
         request = self.context['request']
@@ -267,10 +425,99 @@ class PostSerializer(serializers.ModelSerializer):
             strftime("%Y-%m-%d") if instance.modified_on else None
         return representation
 
+    def get_feed_type(self, instance):
+        if instance.post_type == POST_TYPE.USER_CREATED_NOMINATION:
+            return "nomination"
+        elif instance.post_type == POST_TYPE.USER_CREATED_APPRECIATION:
+            return "appreciation"
+        return instance.post_type
+
+    def get_user_strength(self, instance):
+        if instance.transaction:
+            strength_id = instance.transaction.context.get('strength_id')
+            if strength_id:
+                return UserStrengthSerializer(instance=UserStrength.objects.filter(id=strength_id).first()).data
+        elif instance.nomination and instance.nomination.user_strength:
+            return UserStrengthSerializer(instance=instance.nomination.user_strength).data
+        return None
+
+    def get_reaction_type(self, instance):
+        post_likes = PostLiked.objects.filter(post=instance)
+        if post_likes.exists():
+            return post_likes.values('reaction_type').annotate(
+                reaction_count=Count('reaction_type')).order_by('-reaction_count')[:2]
+        return list()
+
+    def get_user_reaction_type(self, instance):
+        request = self.context['request']
+        user = request.user
+        post_likes = PostLiked.objects.filter(post=instance, created_by=user)
+        if post_likes.exists():
+            return post_likes.first().reaction_type
+        return None
+
+    def get_nomination(self, instance):
+        return NominationsSerializer(instance=instance.nomination, fields=self.context.get('nomination_fields')).data
+
+    @staticmethod
+    def get_points(instance):
+        points = 0
+        if instance.transaction:
+            points = instance.transaction.points
+            if points - int(points) == 0:
+                points = int(points)
+            else:
+                points = float(points)
+        return str(points)
+
+    @staticmethod
+    def get_time_left(instance):
+        if instance.nomination:
+            time_left_in_hours = instance.nomination.time_left_for_auto_action
+            if time_left_in_hours is None:
+                return ""
+            if time_left_in_hours < 1:
+                return "{}m Left".format(int(time_left_in_hours * 60))
+            else:
+                return "{}h Left".format(int(time_left_in_hours))
+        return ""
+
+    @staticmethod
+    def get_images_with_ecard(instance):
+        all_images = list()
+        if not instance.post_type == POST_TYPE.USER_CREATED_POLL:
+            images = Images.objects.filter(post=instance.id)
+            all_images = ImagesSerializer(images, many=True, read_only=True).data
+        if instance.ecard:
+            all_images.insert(0, ECardSerializer(instance.ecard).data)
+        return all_images
+
+
+class CommentsLikedSerializer(serializers.ModelSerializer):
+    user_info = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CommentLiked
+        fields = (
+            "user_info", "created_on",
+        )
+
+    def get_user_info(self, instance):
+        created_by = instance.created_by
+        user_detail = get_user_detail(created_by.id)
+        return UserInfoSerializer(user_detail).data
+
+    def to_representation(self, instance):
+        representation = super(CommentsLikedSerializer, self).to_representation(instance)
+        representation["created_on"] = instance.created_on.strftime("%Y-%m-%d")
+        return representation
+
 
 class PostDetailSerializer(PostSerializer):
     comments = serializers.SerializerMethodField()
     appreciated_by = serializers.SerializerMethodField()
+    user = UserInfoSerializer(read_only=True)
+    ecard = ECardSerializer(read_only=True)
 
     class Meta:
         model = Post
@@ -281,7 +528,8 @@ class PostDetailSerializer(PostSerializer):
             "priority", "prior_till", "shared_with", "images", "documents", "videos",
             "is_owner", "can_edit", "can_delete", "has_appreciated",
             "appreciation_count", "appreciated_by", "comments_count", "comments",
-            "tagged_users", "is_admin",
+            "tagged_users", "is_admin", "nomination", "feed_type", "user_strength", "user",
+            "gif", "ecard", "points", "user_reaction_type", "images_with_ecard"
         )
 
     def get_comments(self, instance):
@@ -308,6 +556,25 @@ class PostDetailSerializer(PostSerializer):
         return instance
 
 
+class PostFeedSerializer(PostSerializer):
+    user = UserInfoSerializer(read_only=True)
+    ecard = ECardSerializer(read_only=True)
+
+    class Meta:
+        model = Post
+        fields = (
+            "id", "created_by", "created_on", "modified_by", "modified_on",
+            "organization", "created_by_user_info",
+            "title", "description", "post_type", "poll_info", "active_days",
+            "priority", "prior_till",
+            "shared_with", "images", "documents", "videos",
+            "is_owner", "can_edit", "can_delete", "has_appreciated",
+            "appreciation_count", "comments_count", "tagged_users", "is_admin", "tags", "reaction_type", "nomination",
+            "feed_type", "user_strength", "user", "user_reaction_type", "gif", "ecard", "points", "time_left",
+            "images_with_ecard",
+        )
+
+
 class CommentSerializer(serializers.ModelSerializer):
     commented_by_user_info = serializers.SerializerMethodField()
     liked_count = serializers.SerializerMethodField()
@@ -320,7 +587,7 @@ class CommentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Comment
         fields = ("id", "content", "created_by", "created_on", "modified_by",
-                  "modified_on", "post", "commented_by_user_info",
+                  "modified_on", "post", "commented_by_user_info", "reaction_types",
                   "liked_count", "liked_by", "has_liked", "tagged_users", "images", "documents")
 
     def get_images(self, instance):
@@ -340,7 +607,8 @@ class CommentSerializer(serializers.ModelSerializer):
     def get_commented_by_user_info(self, instance):
         created_by = instance.created_by
         user_detail = get_user_detail(created_by.id)
-        return UserInfoSerializer(user_detail).data
+        return UserInfoSerializer(user_detail, fields=["pk", "first_name", "last_name", "profile_img", "full_name",
+                                                       "departments"]).data
 
     def get_liked_count(self, instance):
         return CommentLiked.objects.filter(comment=instance).count()
@@ -395,7 +663,7 @@ class PostLikedSerializer(serializers.ModelSerializer):
     class Meta:
         model = PostLiked
         fields = (
-            "user_info", "created_on",
+            "user_info", "created_on", "reaction_type"
         )
 
     def get_user_info(self, instance):
@@ -451,26 +719,6 @@ class FinalPollsAnswerSerializer(SubmittedPollsAnswerSerializer):
         )
 
 
-class CommentsLikedSerializer(serializers.ModelSerializer):
-    user_info = serializers.SerializerMethodField()
-
-    class Meta:
-        model = CommentLiked
-        fields = (
-            "user_info", "created_on",
-        )
-
-    def get_user_info(self, instance):
-        created_by = instance.created_by
-        user_detail = get_user_detail(created_by.id)
-        return UserInfoSerializer(user_detail).data
-
-    def to_representation(self, instance):
-        representation = super(CommentsLikedSerializer, self).to_representation(instance)
-        representation["created_on"] = instance.created_on.strftime("%Y-%m-%d")
-        return representation
-
-
 class FlagPostSerializer(serializers.ModelSerializer):
     user_info = serializers.SerializerMethodField()
 
@@ -490,15 +738,3 @@ class ECardCategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = ECardCategory
         fields = ('pk', 'name', 'organization')
-
-
-class ECardSerializer(serializers.ModelSerializer):
-    category_name = serializers.CharField(source="category.name", read_only=True)
-    tags = serializers.SerializerMethodField()
-
-    class Meta:
-        model = ECard
-        fields = ('pk', 'name', 'image', 'tags', 'category', 'category_name')
-
-    def get_tags(self, obj):
-        return list(obj.tags.values_list("name", flat=True))

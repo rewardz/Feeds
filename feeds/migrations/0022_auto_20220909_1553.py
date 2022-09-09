@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-from django.db import migrations, models
+from django.db import migrations
 
 
 def forward(apps, schema_editor):
@@ -13,7 +13,7 @@ def forward(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('feeds', '0018_auto_20220719_1552'),
+        ('feeds', '0021_auto_20220909_1552'),
     ]
 
     operations = [

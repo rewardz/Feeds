@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('feeds', '0017_update_department_m2m_values'),
+        ('feeds', '0020_update_department_m2m_values'),
     ]
 
     operations = [
