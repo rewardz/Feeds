@@ -341,9 +341,13 @@ class PostViewSet(viewsets.ModelViewSet):
             user_name = get_user_name(user)
             post_string = post.title[:20] + "..." if post.title else ""
             if post:
-                notif_message = _("'%s' likes your post %s" % (user_name, post_string))
-                push_notification(user, notif_message, post.created_by, object_type=object_type,
-                                  object_id=post.id, extra_context={"reaction_type": reaction_type})
+                send_notification = True
+                if request.META.get('HTTP_ORG') and user == post.created_by:
+                    send_notification = False
+                if send_notification:
+                    notif_message = _("'%s' likes your post %s" % (user_name, post_string))
+                    push_notification(user, notif_message, post.created_by, object_type=object_type,
+                                      object_id=post.id, extra_context={"reaction_type": reaction_type})
         count = PostLiked.objects.filter(post_id=post_id).count()
         user_info = UserInfoSerializer(user).data
 
@@ -635,9 +639,13 @@ class CommentViewset(viewsets.ModelViewSet):
             user_name = get_user_name(user)
             comment_string = comment.content[:20] + "..." if comment.content else ""
             if comment:
-                notif_message = _("'%s' likes your comment %s" % (user_name, comment_string))
-                push_notification(user, notif_message, comment.created_by, None, None,
-                                  extra_context={"reaction_type": reaction_type})
+                send_notification = True
+                if request.META.get('HTTP_ORG') and user == comment.created_by:
+                    send_notification = False
+                if send_notification:
+                    notif_message = _("'%s' likes your comment %s" % (user_name, comment_string))
+                    push_notification(user, notif_message, comment.created_by, None, None,
+                                      extra_context={"reaction_type": reaction_type})
         count = CommentLiked.objects.filter(comment_id=comment_id).count()
         user_info = UserInfoSerializer(user).data
         return Response({
