@@ -342,7 +342,7 @@ class PostViewSet(viewsets.ModelViewSet):
             post_string = post.title[:20] + "..." if post.title else ""
             if post:
                 send_notification = True
-                if request.META.get('HTTP_ORG') and user == post.created_by:
+                if request.version >= 12 and user == post.created_by:
                     send_notification = False
                 if send_notification:
                     notif_message = _("'%s' likes your post %s" % (user_name, post_string))
@@ -640,7 +640,7 @@ class CommentViewset(viewsets.ModelViewSet):
             comment_string = comment.content[:20] + "..." if comment.content else ""
             if comment:
                 send_notification = True
-                if request.META.get('HTTP_ORG') and user == comment.created_by:
+                if request.version >= 12 and user == comment.created_by:
                     send_notification = False
                 if send_notification:
                     notif_message = _("'%s' likes your comment %s" % (user_name, comment_string))
