@@ -30,10 +30,7 @@ def notify_user_via_email(self, comment_id):
     recipient = feedback.user if feedback else None
     organization = recipient.organization if recipient else None
 
-    template = TEMPLATE_MODEL.objects.filter(
-        name='Admin Feedback Comment',
-        title__icontains="New comment"
-    ).first()
+    template = TEMPLATE_MODEL.get_feedback_new_comment_notification_template()
 
     if not template:
         logger.error({"error": [_('Template for Admin Feedback Comment not found')]})
