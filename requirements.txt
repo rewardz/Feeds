@@ -50,3 +50,6 @@ pyasn1==0.1.9
 Unirest==1.1.6
 requests-oauthlib==0.7.0
 oauthlib==2.0.1
+
+#auditlog
+django-jsonfield==1.0.1

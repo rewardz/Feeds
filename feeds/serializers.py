@@ -190,7 +190,8 @@ class UserStrengthSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = UserStrength
-        fields = ('id', 'name', 'illustration', 'background_color', 'message', 'icon', 'points', 'award_points')
+        fields = ('id', 'name', 'illustration', 'background_color', 'message', 'icon', 'points', 'award_points',
+                  'background_color_lite')
 
     @staticmethod
     def get_award_points(instance):
@@ -526,6 +527,9 @@ class PostDetailSerializer(PostSerializer):
         instance.shared_with = validated_data.get('shared_with', instance.shared_with)
         instance.priority = validated_data.get('priority', instance.priority)
         instance.modified_by = validated_data.get('modified_by', instance.modified_by)
+        instance.gif = validated_data.get('gif')
+        ecard_id = self.initial_data.get('ecard')
+        instance.ecard = ECard.objects.filter(id=ecard_id).first() if ecard_id else None
         instance.save()
         return instance
 

@@ -23,6 +23,7 @@ class NominationCategory(models.Model):
         help_text=_("Limit of users that can be nominated in the same category")
     )
     reviewer_levels = models.SmallIntegerField(choices=REVIEWER_LEVEL(), default=0)
+    badge = models.OneToOneField("profiles.TrophyBadge", blank=True, null=True, on_delete=models.CASCADE)
     auto_action_time = models.PositiveIntegerField(blank=True, null=True, help_text="Auto Action Time in Hours")
 
     def __unicode__(self):
@@ -39,6 +40,8 @@ class Nominations(models.Model):
     nom_status = models.SmallIntegerField(choices=NOMINATION_STATUS(), default=0)
     comment = models.TextField(blank=True, null=True)
     created = models.DateTimeField(auto_now_add=True)
+    user_strength = models.ForeignKey("profiles.UserStrength", blank=True, null=True, on_delete=models.CASCADE)
+    message_to_reviewer = models.TextField(blank=True, null=True)
 
     def __unicode__(self):
         return self.nominator.email

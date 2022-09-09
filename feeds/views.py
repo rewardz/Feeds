@@ -341,9 +341,13 @@ class PostViewSet(viewsets.ModelViewSet):
             user_name = get_user_name(user)
             post_string = post.title[:20] + "..." if post.title else ""
             if post:
-                notif_message = _("'%s' likes your post %s" % (user_name, post_string))
-                push_notification(user, notif_message, post.created_by, object_type=object_type,
-                                  object_id=post.id, extra_context={"reaction_type": reaction_type})
+                send_notification = True
+                if request.META.get('HTTP_ORG') and user == post.created_by:
+                    send_notification = False
+                if send_notification:
+                    notif_message = _("'%s' likes your post %s" % (user_name, post_string))
+                    push_notification(user, notif_message, post.created_by, object_type=object_type,
+                                      object_id=post.id, extra_context={"reaction_type": reaction_type})
         count = PostLiked.objects.filter(post_id=post_id).count()
         user_info = UserInfoSerializer(user).data
 
@@ -635,9 +639,13 @@ class CommentViewset(viewsets.ModelViewSet):
             user_name = get_user_name(user)
             comment_string = comment.content[:20] + "..." if comment.content else ""
             if comment:
-                notif_message = _("'%s' likes your comment %s" % (user_name, comment_string))
-                push_notification(user, notif_message, comment.created_by, None, None,
-                                  extra_context={"reaction_type": reaction_type})
+                send_notification = True
+                if request.META.get('HTTP_ORG') and user == comment.created_by:
+                    send_notification = False
+                if send_notification:
+                    notif_message = _("'%s' likes your comment %s" % (user_name, comment_string))
+                    push_notification(user, notif_message, comment.created_by, None, None,
+                                      extra_context={"reaction_type": reaction_type})
         count = CommentLiked.objects.filter(comment_id=comment_id).count()
         user_info = UserInfoSerializer(user).data
         return Response({
@@ -739,7 +747,14 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         user = self.request.user
         organization = user.organization
         posts = accessible_posts_by_user(user, organization)
-        feeds = posts.filter(post_type__in=[POST_TYPE.USER_CREATED_APPRECIATION, POST_TYPE.USER_CREATED_NOMINATION])
+        if feed_flag == "post_polls":
+            feeds = posts.filter(post_type__in=[POST_TYPE.USER_CREATED_POST,
+                                                POST_TYPE.USER_CREATED_POLL], created_by=user)
+            feeds = PostFilter(self.request.GET, queryset=feeds).qs
+            return feeds.distinct()
+        else:
+            feeds = posts.filter(post_type__in=[POST_TYPE.USER_CREATED_APPRECIATION,
+                                                POST_TYPE.USER_CREATED_NOMINATION])
         feeds = PostFilter(self.request.GET, queryset=feeds).qs
 
         if feed_flag == "received":
@@ -880,9 +895,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         user = self.request.user
         organization = user.organization
         posts = accessible_posts_by_user(user, organization)
-        feeds = posts.filter(Q(post_type=POST_TYPE.USER_CREATED_APPRECIATION) |
-                                    Q(nomination__nom_status=NOMINATION_STATUS.approved),
-                                    user=request.user).distinct()
+        feeds = posts.filter(post_type=POST_TYPE.USER_CREATED_APPRECIATION, user=request.user).distinct()
         # returns latest 5 appreciations from last 30 days
         start_date, end_date = get_date_range(30)
         feeds = feeds.filter(created_on__gte=start_date, created_on__lte=end_date)[:5]

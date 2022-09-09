@@ -364,6 +364,11 @@ class UserStrength(models.Model):
     background_color = models.CharField(max_length=20, null=True, blank=True)
     background_color_lite = models.CharField(max_length=20, null=True, blank=True)
     organization = models.ForeignKey(Organization, blank=True, null=True, on_delete=models.CASCADE)
+    message = models.TextField(blank=True, null=True)
+
+    @property
+    def points(self):
+        return 0
 
 
 class TrophyBadge(models.Model):
