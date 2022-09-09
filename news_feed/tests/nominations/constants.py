@@ -15,3 +15,11 @@ NOMINATION_STATUS = Choices({
     "approved": 3,
     "rejected": 4
 })
+
+NOMINATION_STATUS_COLOR_CODE = {
+    0: "#FFA412",
+    1: "#FFA412",
+    2: "#FFA412",
+    3: "#40CB57",
+    4: "#FF3838",
+}

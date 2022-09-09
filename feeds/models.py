@@ -298,6 +298,7 @@ class Comment(UserInfo):
         CustomUser, related_name="comment_tagged_users",
         through="CommentTaggedUsers", blank=True
     )
+    mark_delete = models.BooleanField(default=False)
 
     def tag_user(self, user):
         CommentTaggedUsers.objects.create(comment=self, user=user)
@@ -316,6 +317,17 @@ class Comment(UserInfo):
             if self.post.feedbackpost_set.exists():
                 return self.post.feedbackpost_set.first().feedback
         return None
+
+    def reaction_types(self):
+        return self.commentliked_set.values_list('reaction_type', flat=True).distinct()
+
+    def mark_as_delete(self, user):
+        try:
+            self.mark_delete = True
+            self.modified_by = user
+            self.save()
+        except Comment.DoesNotExist:
+            raise ValidationError(_("Comment does not exist"))
 
     def __unicode__(self):
         return "%s" % self.content

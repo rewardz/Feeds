@@ -13,6 +13,7 @@ EXTERNAL_APPS = (
     'image_cropping',
     'taggit',
     'ajax_select',
+    'cropimg',
 )
 
 INTERNAL_APPS = (
@@ -72,6 +73,10 @@ ORGANIZATION_MODEL = 'news_feed.tests.profiles.models.Organization'
 DEPARTMENT_MODEL = 'news_feed.tests.profiles.models.Department'
 TRANSACTION_MODEL = "news_feed.tests.finance.models.Transaction"
 NOMINATIONS_MODEL = "news_feed.tests.nominations.models.Nominations"
+USER_STRENGTH_MODEL = 'news_feed.tests.profiles.models.UserStrength'
+TROPHY_BADGE_MODEL = 'news_feed.tests.profiles.models.TrophyBadge'
+NOMINATION_STATUS = 'news_feed.tests.nominations.constants.NOMINATION_STATUS'
+NOMINATION_STATUS_COLOR_CODE = 'news_feed.tests.nominations.constants.NOMINATION_STATUS_COLOR_CODE'
 PROFILE_IMAGE_PROPERTY = 'thumbnail_img_url'
 NO_PROFILE_IMAGE = ''
 PENDING_EMAIL = 'news_feed.tests.profiles.models.PendingEmail'

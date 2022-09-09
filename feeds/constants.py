@@ -25,4 +25,7 @@ REACTION_TYPE = Choices({
     "LOVE": 3,
     "INSIGHTFUL": 4,
     "CURIOUS": 5,
+    "APPLAUSE": 6,
+    # "All": 7,  # Reserved reactions, use other numbers for new reaction not required at DB levels
+    # "COMMENT": 8,  # Reserved reactions, use other numbers for new reaction not required at DB levels
 })
