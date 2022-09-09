@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-from django.db import migrations, models
+from django.db import migrations
 
 
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('feeds', '0019_auto_20220719_1553'),
+        ('feeds', '0022_auto_20220909_1553'),
     ]
 
     operations = [

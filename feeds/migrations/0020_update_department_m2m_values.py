@@ -43,7 +43,7 @@ def update_department_values(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('feeds', '0016_post_departments'),
+        ('feeds', '0019_post_departments'),
     ]
 
     operations = [
