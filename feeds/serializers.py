@@ -504,7 +504,7 @@ class PostDetailSerializer(PostSerializer):
             "is_owner", "can_edit", "can_delete", "has_appreciated",
             "appreciation_count", "appreciated_by", "comments_count", "comments",
             "tagged_users", "is_admin", "nomination", "feed_type", "user_strength", "user",
-            "gif", "ecard", "points", "user_reaction_type", "images_with_ecard"
+            "gif", "ecard", "points", "user_reaction_type", "images_with_ecard", "reaction_type"
         )
 
     def get_comments(self, instance):
