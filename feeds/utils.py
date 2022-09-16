@@ -181,6 +181,7 @@ def notify_new_comment(comment, creator):
     object_type = NOTIFICATION_OBJECT_TYPE
     comment_creator_string = get_user_name(creator)
     post_string = post.title[:20] + "..." if post.title else ""
+    post_creator = USERMODEL.objects.get(id=post.created_by.id)
 
     # for feedback post user won't receive the notification
     if not feedback_post_type:
@@ -192,7 +193,6 @@ def notify_new_comment(comment, creator):
 
         # post creator always receives a notification when a new comment is made
         try:
-            post_creator = USERMODEL.objects.get(id=post.created_by.id)
             message = _("'%s' commented on your post '%s'" % (comment_creator_string, post_string))
             push_notification(
                 creator, message, post_creator, object_type=object_type, object_id=post.id

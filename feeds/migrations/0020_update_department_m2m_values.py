@@ -22,9 +22,9 @@ def update_department_values(apps, schema_editor):
     all the departments available with the organization of the created user
     """
     # get post model
-    post_model = apps.get_model("feeds", "Post")
+    posts = apps.get_model("feeds", "Post").objects.filter(mark_delete=False).iterator()
 
-    for post in post_model.objects.filter(mark_delete=False):
+    for post in posts:
         try:
             created_by_user = post.created_by
             if created_by_user:

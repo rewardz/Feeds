@@ -23,7 +23,7 @@ def update_feedback_for_first_staff_comment(sender, instance, created, **kwargs)
 
         # if first staff comment then change the status
         if not staff_comments:
-            feedback_post = post.feedbackpost_set.all().first()
+            feedback_post = post.feedbackpost_set.first()
 
             if feedback_post:
                 feedback = feedback_post.feedback

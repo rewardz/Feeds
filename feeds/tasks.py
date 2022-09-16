@@ -25,7 +25,7 @@ def notify_user_via_email(self, comment_id):
     """
     comment = Comment.objects.get(id=comment_id)
     post = comment.post
-    feedback_post = post.feedbackpost_set.all().first() if post else None
+    feedback_post = post.feedbackpost_set.first() if post else None
     feedback = feedback_post.feedback if feedback_post else None
     recipient = feedback.user if feedback else None
     organization = recipient.organization if recipient else None
