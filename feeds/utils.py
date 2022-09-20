@@ -51,7 +51,12 @@ def accessible_posts_by_user(user, organization, allow_feedback=False):
     else:
         result = result.filter(post_type=POST_TYPE.FEEDBACK_POST)
 
-    return result
+    # possible that result might contains duplicate posts due to OR query
+    # we can not apply distinct over here since order by is used at some places
+    # after calling this method
+    post_ids = list(set(result.values_list("id", flat=True)))
+
+    return Post.objects.filter(id__in=post_ids)
 
 
 def validate_priority(data):
