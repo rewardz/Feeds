@@ -314,8 +314,9 @@ class Comment(UserInfo):
         Get feedback if exists
         """
         if self.post and self.post.post_type == POST_TYPE.FEEDBACK_POST:
-            if self.post.feedbackpost_set.exists():
-                return self.post.feedbackpost_set.first().feedback
+            feedbackpost = self.post.feedbackpost_set.first()
+            return feedbackpost.feedback if feedbackpost else None
+
         return None
 
     def reaction_types(self):
