@@ -342,7 +342,7 @@ class PostViewSet(viewsets.ModelViewSet):
             post_string = post.title[:20] + "..." if post.title else ""
             if post:
                 send_notification = True
-                if request.META.get('HTTP_ORG') and user == post.created_by:
+                if request.version >= 12 and user == post.created_by:
                     send_notification = False
                 if send_notification:
                     notif_message = _("'%s' likes your post %s" % (user_name, post_string))
@@ -640,7 +640,7 @@ class CommentViewset(viewsets.ModelViewSet):
             comment_string = comment.content[:20] + "..." if comment.content else ""
             if comment:
                 send_notification = True
-                if request.META.get('HTTP_ORG') and user == comment.created_by:
+                if request.version >= 12 and user == comment.created_by:
                     send_notification = False
                 if send_notification:
                     notif_message = _("'%s' likes your comment %s" % (user_name, comment_string))
@@ -924,7 +924,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         except AttributeError:
             feeds.data['points_left'] = None
         feeds.data['date'] = get_current_month_end_date()
-        feeds.data['notification_count'] = 0
+        feeds.data['notification_count'] = request.user.unviewed_notifications_count
         feeds.data['org_logo'] = get_absolute_url(organization.display_img_url)
         return feeds
 
