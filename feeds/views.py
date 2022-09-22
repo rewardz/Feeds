@@ -795,6 +795,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         feeds = self.get_paginated_response(serializer.data)
         feeds.data['approvals_count'] = approvals_count
         feeds.data['show_approvals'] = show_approvals
+        feeds.data['supervisor_remaining_budget'] = user.supervisor_remaining_budget
         return feeds
 
     @list_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
