@@ -213,6 +213,11 @@ class CustomUser(CustomUserBase):
     def unviewed_notifications_count(self):
         return PushNotification.objects.filter(recipient=self, is_viewed=False).count()
 
+    @property
+    def supervisor_remaining_budget(self):
+        supervisor = SuperVisor.objects.filter(supervisor=self).first()
+        return supervisor.budget if supervisor else None
+
 
 class Department(models.Model):
     """
@@ -395,3 +400,14 @@ class UserDesignation(models.Model):
 
     def __unicode__(self):
         return "{} - {}".format(self.user.first_name, self.designation.name)
+
+
+class SuperVisor(models.Model):
+    is_approver = models.BooleanField(default=False)
+    supervisor = models.ForeignKey(CustomUser, related_name="user",)
+    budget = models.IntegerField(null=True, blank=False, verbose_name="remaining budget")
+    allocated_budget = models.IntegerField(null=True, blank=False, help_text=_("Initial allocated budget"))
+    department = models.ForeignKey(Department, related_name="supervisor", blank=False, null=True)
+
+    def __unicode__(self):
+        return "%s" % (self.supervisor.email)
