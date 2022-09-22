@@ -793,7 +793,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         if (request.user.userdesignation_set.count() > 0 or request.user.reviewer_users.count() > 0) and \
                 approvals_count > 0:
             show_approvals = True
-        if user.supervisor_remaining_budget:
+        if user.supervisor_remaining_budget is not None:
             supervisor_remaining_budget = str(user.supervisor_remaining_budget)
         feeds = self.get_paginated_response(serializer.data)
         feeds.data['approvals_count'] = approvals_count
