@@ -780,6 +780,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         show_approvals = False
+        supervisor_remaining_budget = ""
         page = self.paginate_queryset(self.get_queryset())
         serializer = PostFeedSerializer(page, context={"request": request}, many=True)
 
@@ -792,10 +793,12 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         if (request.user.userdesignation_set.count() > 0 or request.user.reviewer_users.count() > 0) and \
                 approvals_count > 0:
             show_approvals = True
+        if user.supervisor_remaining_budget:
+            supervisor_remaining_budget = str(user.supervisor_remaining_budget)
         feeds = self.get_paginated_response(serializer.data)
         feeds.data['approvals_count'] = approvals_count
         feeds.data['show_approvals'] = show_approvals
-        feeds.data['supervisor_remaining_budget'] = user.supervisor_remaining_budget
+        feeds.data['supervisor_remaining_budget'] = supervisor_remaining_budget
         return feeds
 
     @list_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
