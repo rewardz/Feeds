@@ -257,7 +257,7 @@ class Post(UserInfo):
     def pinned(self, user, prior_till=None):
         is_admin = user.is_staff
         if is_admin:
-            earlier_pinned = Post.objects.filter(organization=user.organization, priority=True)
+            earlier_pinned = Post.objects.filter(organizations__in=[user.organization], priority=True)
             if prior_till:
                 try:
                     prior_till = int(prior_till)
