@@ -130,7 +130,7 @@ def tag_users_to_post(post, user_list):
             try:
                 user = USERMODEL.objects.get(id=user_id)
                 post.tag_user(user)
-                message = _("'%s' has mentioned you in post '%s'" % (created_by_user_name, post_str))
+                message = _("'%s' has mentioned you in '%s'" % (created_by_user_name, post_str))
                 push_notification(post.created_by, message, user,
                                   object_type=object_type, object_id=post.id)
             except Exception:
