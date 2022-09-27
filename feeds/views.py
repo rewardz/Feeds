@@ -268,7 +268,8 @@ class PostViewSet(viewsets.ModelViewSet):
         """
         List of all the comments related to the post
         """
-        feedback = self.request.query_params.get('feedback', None)
+        query_params = self.request.query_params
+        feedback = query_params.get('feedback', None)
         if feedback and feedback == "true":
             allow_feedback = True
         else:
@@ -285,8 +286,21 @@ class PostViewSet(viewsets.ModelViewSet):
             raise ValidationError(_('You do not have access to comment on this post'))
         if self.request.method == "GET":
             serializer_context = {'request': self.request}
-            comments = Comment.objects.filter(post_id=post_id, parent=None, mark_delete=False). \
-                order_by('-created_on')
+
+            # prepare a query dict
+            query_dict = {
+                "post_id": post_id,
+                "parent": None,
+                "mark_delete": False
+            }
+
+            # if comment id provided then pass only comments which are created after this one
+            # this is used by progressive web app to fetch the latest comments
+            last_comment_id = query_params.get("comment_id", 0)
+            if last_comment_id:
+                query_dict.update({"pk__gt": last_comment_id})
+
+            comments = Comment.objects.filter(**query_dict).order_by('-created_on')
             page = self.paginate_queryset(comments)
             if page is not None:
                 serializer = CommentSerializer(
