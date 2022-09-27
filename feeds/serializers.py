@@ -12,8 +12,8 @@ from .models import (
     Post, PostLiked, PollsAnswer, Images, Videos, Voter,
 )
 from .utils import (
-    get_departments, get_profile_image, validate_priority,
-    user_can_delete, user_can_edit
+    extract_tagged_users, get_departments, get_profile_image, tag_users_to_comment, 
+    validate_priority, user_can_delete, user_can_edit
 )
 
 DEPARTMENT_MODEL = import_string(settings.DEPARTMENT_MODEL)
@@ -617,6 +617,14 @@ class CommentDetailSerializer(CommentSerializer):
             "modified_on", "post", "commented_by_user_info",
             "liked_count", "liked_by", "has_liked", "tagged_users",
         )
+
+    def update(self, instance, validated_data):
+        content = validated_data.get('content', None)
+        if content:
+            tag_users = extract_tagged_users(content)
+            if tag_users:
+                tag_users_to_comment(instance, tag_users)
+        return super(CommentDetailSerializer, self).update(instance, validated_data)
 
 
 class PostLikedSerializer(serializers.ModelSerializer):
