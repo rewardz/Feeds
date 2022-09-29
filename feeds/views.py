@@ -166,6 +166,7 @@ class PostViewSet(viewsets.ModelViewSet):
             tag_users_to_post(instance, tag_users)
 
         if tags:
+            tags = list(tags.split(","))
             self.save_custom_tags(tags, instance.organization)
             instance.tags.set(*tags)
 
@@ -187,6 +188,7 @@ class PostViewSet(viewsets.ModelViewSet):
         if tag_users:
             tag_users_to_post(instance, tag_users)
         if tags:
+            tags = list(tags.split(","))
             self.save_custom_tags(tags, instance.organization)
             instance.tags.set(*tags)
         if request.FILES:
