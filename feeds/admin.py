@@ -1,4 +1,6 @@
 from django.contrib import admin
+from django.contrib.admin.widgets import FilteredSelectMultiple
+from django.db import models
 
 from ajax_select import make_ajax_form
 
@@ -9,16 +11,21 @@ from feeds.models import (
 @admin.register(Post)
 class PostAdmin(admin.ModelAdmin):
     form = make_ajax_form(Post, {
-        'organization': 'Organization',
         'user': 'CustomUser',
     })
     list_display = (
-        'title', 'organization', 'shared_with', 'post_type',
+        'title', 'shared_with', 'post_type',
         'created_by', 'created_on', 'modified_on', 'modified_by', 'mark_delete',
     )
     readonly_fields = ('transaction', 'nomination', 'cc_users', 'created_by', 'modified_by',)
-    list_filter = ('organization', 'priority', 'mark_delete',)
-    search_fields = ('organization__name',)
+    list_filter = ('priority', 'mark_delete',)
+
+    formfield_overrides = {
+        # Make many to many field user FilteredSelectMultiple widget instead of the default
+        models.ManyToManyField: {
+            "widget": FilteredSelectMultiple("", is_stacked=False)
+        }
+    }
 
 
 @admin.register(Comment)

@@ -20,9 +20,12 @@ def create_feedback_post(user, title, description, **kwargs):
     """
     try:
         post = Post.objects.create(
-            created_by=user, organization=user.organization, title=title,
+            created_by=user, title=title,
             description=description, post_type=POST_TYPE.FEEDBACK_POST
         )
+
+        post.add_organizations(user.organization.id)
+
         images = kwargs.get("images", None)
         documents = kwargs.get("documents", None)
         if images:

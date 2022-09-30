@@ -40,6 +40,8 @@ DEPARTMENT_MODEL = import_string(settings.DEPARTMENT_MODEL)
 NOTIFICATION_OBJECT_TYPE = import_string(settings.POST_NOTIFICATION_OBJECT_TYPE).Posts
 UserStrength = import_string(settings.USER_STRENGTH_MODEL)
 NOMINATION_STATUS = import_string(settings.NOMINATION_STATUS)
+ORGANIZATION_SETTINGS_MODEL = import_string(settings.ORGANIZATION_SETTINGS_MODEL)
+MULTI_ORG_POST_ENABLE_FLAG = settings.MULTI_ORG_POST_ENABLE_FLAG
 
 
 class PostViewSet(viewsets.ModelViewSet):
@@ -49,11 +51,16 @@ class PostViewSet(viewsets.ModelViewSet):
 
     def _create_or_update(self, request, create=False):
         payload = request.data
-        # print(payload.getlist('delete_image_ids', 'Nothing'))
         current_user = self.request.user
         if not current_user:
             raise serializers.ValidationError({'created_by': _('Created by is required!')})
-        data = {k: v for k, v in payload.items()}
+        data = {}
+        for key, value in payload.items():
+            if key in ["organizations", "departments"] and isinstance(payload.get(key), unicode):
+                data.update({key: loads(value)})
+                continue
+            data.update({key: value})
+
         delete_image_ids = data.get('delete_image_ids', None)
         delete_document_ids = data.get('delete_document_ids', None)
 
@@ -104,7 +111,11 @@ class PostViewSet(viewsets.ModelViewSet):
         if create:
             data['created_by'] = current_user.id
         data['modified_by'] = current_user.id
-        data['organization'] = current_user.organization_id
+
+        # if feedback is not enabled then save current user organization
+        if not ORGANIZATION_SETTINGS_MODEL.objects.get_value(MULTI_ORG_POST_ENABLE_FLAG, current_user.organization):
+            data['organization'] = current_user.organization_id
+
         return data
 
     def _upload_files(self, request, post_id):
@@ -226,6 +237,7 @@ class PostViewSet(viewsets.ModelViewSet):
 
     @list_route(methods=["POST"], permission_classes=(permissions.IsAuthenticated,))
     def create_poll(self, request, *args, **kwargs):
+        context = {'request': request}
         user = self.request.user
         organization = user.organization
         payload = self.request.data
@@ -240,7 +252,7 @@ class PostViewSet(viewsets.ModelViewSet):
         data['created_by'] = user.pk
         data['modified_by'] = user.pk
         data['organization'] = organization.pk
-        question_serializer = PostSerializer(data=data)
+        question_serializer = PostSerializer(data=data, context=context)
         question_serializer.is_valid(raise_exception=True)
         poll = question_serializer.save()
         for answer in answers:
@@ -258,7 +270,8 @@ class PostViewSet(viewsets.ModelViewSet):
         """
         List of all the comments related to the post
         """
-        feedback = self.request.query_params.get('feedback', None)
+        query_params = self.request.query_params
+        feedback = query_params.get('feedback', None)
         if feedback and feedback == "true":
             allow_feedback = True
         else:
@@ -275,8 +288,21 @@ class PostViewSet(viewsets.ModelViewSet):
             raise ValidationError(_('You do not have access to comment on this post'))
         if self.request.method == "GET":
             serializer_context = {'request': self.request}
-            comments = Comment.objects.filter(post_id=post_id, parent=None, mark_delete=False). \
-                order_by('-created_on')
+
+            # prepare a query dict
+            query_dict = {
+                "post_id": post_id,
+                "parent": None,
+                "mark_delete": False
+            }
+
+            # if comment id provided then pass only comments which are created after this one
+            # this is used by progressive web app to fetch the latest comments
+            last_comment_id = query_params.get("comment_id", 0)
+            if last_comment_id:
+                query_dict.update({"pk__gt": last_comment_id})
+
+            comments = Comment.objects.filter(**query_dict).order_by('-created_on')
             page = self.paginate_queryset(comments)
             if page is not None:
                 serializer = CommentSerializer(
@@ -302,11 +328,30 @@ class PostViewSet(viewsets.ModelViewSet):
             serializer = CommentCreateSerializer(data=data)
             serializer.is_valid(raise_exception=True)
             inst = serializer.save()
+
+            # for feedback post, we need to allow the images and documents
+            if allow_feedback and request.FILES:
+                attach_files = dict((request.FILES).lists())
+                images = attach_files.get('images', None)
+                documents = attach_files.get('documents', None)
+
+                if images:
+                    for image in images:
+                        image_serializer = ImagesSerializer(data={"comment": inst.pk, 'image': image})
+                        image_serializer.is_valid(raise_exception=True)
+                        image_serializer.save()
+
+                if documents:
+                    for document in documents:
+                        document_serializer = DocumentsSerializer(data={"comment": inst.pk, "document": document})
+                        document_serializer.is_valid(raise_exception=True)
+                        document_serializer.save()
+
             if tag_users:
                 tag_users_to_comment(inst, tag_users)
             post = Post.objects.filter(id=post_id).first()
             if post:
-                notify_new_comment(post, self.request.user)
+                notify_new_comment(inst, self.request.user)
             return Response(serializer.data)
 
     @detail_route(methods=["POST"], permission_classes=(permissions.IsAuthenticated,))

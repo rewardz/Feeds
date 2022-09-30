@@ -14,44 +14,49 @@ from rest_framework import exceptions
 
 from .constants import POST_TYPE, SHARED_WITH
 from .models import Comment, Post
+from feeds.tasks import notify_user_via_email
+
 
 DEPARTMENT_MODEL = import_string(settings.DEPARTMENT_MODEL)
 ERROR_MESSAGE = "Priority post already exists for user. Set priority to false."
 USERMODEL = import_string(settings.CUSTOM_USER_MODEL)
 PENDING_EMAIL_MODEL = import_string(settings.PENDING_EMAIL)
 PUSH_NOTIFICATION_MODEL = import_string(settings.PUSH_NOTIFICATION)
-NOTIFICATION_OBJECT_TYPE = import_string(settings.POST_NOTIFICATION_OBJECT_TYPE).Posts
+NOTIFICATION_OBJECT = import_string(settings.POST_NOTIFICATION_OBJECT_TYPE)
+NOTIFICATION_OBJECT_TYPE = NOTIFICATION_OBJECT.Posts
+# NOTIFICATION_FEEDBACK_OBJECT_TYPE = NOTIFICATION_OBJECT.feedback
 NOTIF_OBJECT_TYPE_FIELD_NAME = settings.NOTIF_OBJECT_TYPE_FIELD_NAME
 NOTIF_OBJECT_ID_FIELD_NAME = settings.NOTIF_OBJECT_ID_FIELD_NAME
+USER_DEPARTMENT_RELATED_NAME = settings.USER_DEPARTMENT_RELATED_NAME
+ORGANIZATION_SETTINGS_MODEL = import_string(settings.ORGANIZATION_SETTINGS_MODEL)
 
 
 def accessible_posts_by_user(user, organization, allow_feedback=False):
-    if user.is_staff:
-        result = Post.objects.filter(organization=organization)
-        result = result.filter(mark_delete=False)
-        if not allow_feedback:
-            result = result.exclude(post_type=POST_TYPE.FEEDBACK_POST)
-        else:
-            result = result.filter(post_type=POST_TYPE.FEEDBACK_POST)
-        return result
-    dept_users = []
-    for dept in DEPARTMENT_MODEL.objects.filter(users=user):
-        for usr in dept.users.all():
-            dept_users.append(usr.id)
-    if not dept_users:
-        # If user does not belong to any department just show posts created by him
-        result = Post.objects.filter(Q(organization=organization,
-                                       created_by=user))
-    else:
-        result = Post.objects.filter(Q(organization=organization, \
-                                    shared_with=SHARED_WITH.ALL_DEPARTMENTS) |\
-                                 Q(created_by__in=dept_users))
-    result = result.filter(mark_delete=False)
+    if not isinstance(organization, (list, tuple)):
+        organization = [organization]
+
+    # get the departments to which this user belongs
+    user_depts = getattr(user, USER_DEPARTMENT_RELATED_NAME).all()
+
+    # get the post belongs to organization
+    result = Post.objects.filter(
+        Q(mark_delete=False) & (
+            Q(organizations__in=organization) | Q(departments__in=user_depts)
+        )
+    )
+
+    # filter / exclude feedback based on the allow_feedback
     if not allow_feedback:
         result = result.exclude(post_type=POST_TYPE.FEEDBACK_POST)
     else:
         result = result.filter(post_type=POST_TYPE.FEEDBACK_POST)
-    return result
+
+    # possible that result might contains duplicate posts due to OR query
+    # we can not apply distinct over here since order by is used at some places
+    # after calling this method
+    post_ids = list(set(result.values_list("id", flat=True)))
+
+    return Post.objects.filter(id__in=post_ids)
 
 
 def validate_priority(data):
@@ -174,33 +179,45 @@ def tag_users_to_comment(comment, user_list):
                 continue
 
 
-def notify_new_comment(post, creator):
+def notify_new_comment(comment, creator):
+    post = comment.post
     commentator_ids = Comment.objects.filter(post=post).values_list('created_by__id', flat=True)
     # get all the commentators except the one currently commenting
     commentators = USERMODEL.objects.filter(id__in=commentator_ids).exclude(id=creator.id)
     # also exclude the creator of the post
     commentators = commentators.exclude(id=post.created_by.id)
+    feedback_post_type = post.post_type == POST_TYPE.FEEDBACK_POST
     object_type = NOTIFICATION_OBJECT_TYPE
-
     comment_creator_string = get_user_name(creator)
     post_string = post.title[:20] + "..." if post.title else ""
+    post_creator = USERMODEL.objects.get(id=post.created_by.id)
 
-    for usr in commentators:
-        message = _("'%s' commented on the post '%s'" % (comment_creator_string, post_string))
-        push_notification(
-            creator, message, usr, object_type=object_type, object_id=post.id
-        )
+    # for feedback post user won't receive the notification
+    if not feedback_post_type:
+        for usr in commentators:
+            message = _("'%s' commented on the post '%s'" % (comment_creator_string, post_string))
+            push_notification(
+                creator, message, usr, object_type=object_type, object_id=post.id
+            )
 
-    # post creator always receives a notification when a new comment is made
-    try:
-        post_creator = USERMODEL.objects.get(id=post.created_by.id)
-        message = _("'%s' commented on your post '%s'" % (comment_creator_string, post_string))
+        # post creator always receives a notification when a new comment is made
+        try:
+            message = _("'%s' commented on your post '%s'" % (comment_creator_string, post_string))
+            push_notification(
+                creator, message, post_creator, object_type=object_type, object_id=post.id
+            )
+        except Exception:
+            pass
+
+    # if post type is feedback post and admin has commented then notify user
+    if feedback_post_type and creator.is_staff:
+        # object_type = NOTIFICATION_FEEDBACK_OBJECT_TYPE
+        message = _("'%s' commented on the '%s'" % (comment_creator_string, post_string))
         push_notification(
             creator, message, post_creator, object_type=object_type, object_id=post.id,
             extra_context={"reaction_type": 8}  # TODO: move to reaction types
         )
-    except Exception:
-        pass
+        notify_user_via_email.delay(comment.id)
 
 
 def notify_new_poll_created(poll):
