@@ -988,11 +988,11 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         if post_polls:
             feeds = posts.filter((Q(post_type=POST_TYPE.USER_CREATED_POST) |
                                         Q(post_type=POST_TYPE.USER_CREATED_POLL)) &
-                                        Q(organization=organization))
+                                        Q(organizations=organization))
         else:
             feeds = posts.filter((Q(post_type=POST_TYPE.USER_CREATED_APPRECIATION) |
                                         Q(nomination__nom_status=NOMINATION_STATUS.approved)) &
-                                        Q(organization=organization))
+                                        Q(organizations=organization))
         feeds = PostFilter(self.request.GET, queryset=feeds).qs
 
         search = self.request.query_params.get("search", None)
