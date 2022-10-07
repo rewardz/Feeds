@@ -124,6 +124,7 @@ class CustomUser(CustomUserBase):
     # img_large = CIThumbnailField('image', (1, 1), blank=True, null=True)
     # img_display = CIThumbnailField('image', (1, 1), blank=True, null=True)
     # img_thumbnail = CIThumbnailField('image', (1, 1), blank=True, null=True)
+    hide_appreciation = models.BooleanField(default=False, help_text="Hide appreciations from other users")
 
     objects = DefaultCustomUserManager()
 
