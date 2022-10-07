@@ -642,7 +642,7 @@ class CommentCreateSerializer(CommentSerializer):
     class Meta:
         model = Comment
         fields = ("id", "count", "content", "created_by", "created_on",
-                  "modified_by", "post", "commented_by_user_info",)
+                  "modified_by", "post", "commented_by_user_info", "images", "documents")
 
     def get_count(self, instance):
         return Comment.objects.filter(post=instance.post).count()
