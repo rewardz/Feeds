@@ -992,7 +992,9 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         else:
             feeds = posts.filter((Q(post_type=POST_TYPE.USER_CREATED_APPRECIATION) |
                                         Q(nomination__nom_status=NOMINATION_STATUS.approved)) &
-                                        Q(organizations=organization))
+                                        Q(organizations=organization)).exclude(
+                                        transaction__user__hide_appreciation=True)
+
         feeds = PostFilter(self.request.GET, queryset=feeds).qs
 
         search = self.request.query_params.get("search", None)
