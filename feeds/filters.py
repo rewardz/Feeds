@@ -7,7 +7,7 @@ from .utils import get_date_range
 class PostFilter(django_filters.FilterSet):
     post_type = django_filters.BaseInFilter(name="post_type")
     shared_with = django_filters.BaseInFilter(name="shared_with")
-    organization = django_filters.BaseInFilter(name="organization")
+    organizations = django_filters.BaseInFilter(name="organizations")
     user_strength = django_filters.BaseInFilter(name="user_strength", method="user_strength_filter")
     department = django_filters.BaseInFilter(name="department", method="department_filter")
     created_on_after = django_filters.DateFilter(name="created_on__gte", method="date_range_filter")
@@ -17,7 +17,7 @@ class PostFilter(django_filters.FilterSet):
 
     class Meta:
         model = Post
-        fields = ['post_type', 'organization', 'shared_with']
+        fields = ['post_type', 'organizations', 'shared_with']
 
     def user_strength_filter(self, queryset, name, value):
         return queryset.filter(nomination__user_strength__in=value)
