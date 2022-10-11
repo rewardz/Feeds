@@ -993,7 +993,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             feeds = posts.filter((Q(post_type=POST_TYPE.USER_CREATED_APPRECIATION) |
                                         Q(nomination__nom_status=NOMINATION_STATUS.approved)) &
                                         Q(organizations=organization)).exclude(
-                                        transaction__user__hide_appreciation=True)
+                                        user__hide_appreciation=True)
 
         feeds = PostFilter(self.request.GET, queryset=feeds).qs
 
