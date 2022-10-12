@@ -386,13 +386,12 @@ class PostViewSet(viewsets.ModelViewSet):
             response_status = status.HTTP_201_CREATED
             post = Post.objects.filter(id=post_id).first()
             user_name = get_user_name(user)
-            post_string = post.title[:20] + "..." if post.title else ""
             if post:
                 send_notification = True
                 if request.version >= 12 and user == post.created_by:
                     send_notification = False
                 if send_notification:
-                    notif_message = _("'%s' likes your post %s" % (user_name, post_string))
+                    notif_message = _("'%s' likes your post %s" % (user_name))
                     push_notification(user, notif_message, post.created_by, object_type=object_type,
                                       object_id=post.id, extra_context={"reaction_type": reaction_type})
         count = PostLiked.objects.filter(post_id=post_id).count()
@@ -684,13 +683,12 @@ class CommentViewset(viewsets.ModelViewSet):
             response_status = status.HTTP_200_OK
             comment = Comment.objects.filter(id=comment_id).first()
             user_name = get_user_name(user)
-            comment_string = comment.content[:20] + "..." if comment.content else ""
             if comment:
                 send_notification = True
                 if request.version >= 12 and user == comment.created_by:
                     send_notification = False
                 if send_notification:
-                    notif_message = _("'%s' likes your comment %s" % (user_name, comment_string))
+                    notif_message = _("'%s' likes your comment %s" % (user_name))
                     push_notification(user, notif_message, comment.created_by, None, None,
                                       extra_context={"reaction_type": reaction_type})
         count = CommentLiked.objects.filter(comment_id=comment_id).count()

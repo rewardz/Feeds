@@ -129,13 +129,12 @@ def tag_users_to_post(post, user_list):
     new_users_tagged = list(set(user_list).difference(existing_tagged_users))
     object_type = NOTIFICATION_OBJECT_TYPE
     created_by_user_name = get_user_name(post.created_by)
-    post_str = post.title[:20] + "..." if post.title else ""
     if new_users_tagged:
         for user_id in new_users_tagged:
             try:
                 user = USERMODEL.objects.get(id=user_id)
                 post.tag_user(user)
-                message = _("'%s' has mentioned you in post '%s'" % (created_by_user_name, post_str))
+                message = _("'%s' has mentioned you in post" % (created_by_user_name))
                 if post.post_type == POST_TYPE.USER_CREATED_APPRECIATION:
                     message = _("'%s' has mentioned you in appreciation" % (created_by_user_name))
                 if post.post_type == POST_TYPE.USER_CREATED_NOMINATION:
@@ -159,13 +158,12 @@ def tag_users_to_comment(comment, user_list):
     new_users_tagged = list(set(user_list).difference(existing_tagged_users))
     object_type = NOTIFICATION_OBJECT_TYPE
     created_by_user_name = get_user_name(comment.created_by)
-    comment_str = comment.content[:20] + "..." if comment.content else ""
     if new_users_tagged:
         for user_id in new_users_tagged:
             try:
                 user = USERMODEL.objects.get(id=user_id)
                 comment.tag_user(user)
-                message = _("'%s' has mentioned you in comment '%s'" % (created_by_user_name, comment_str))
+                message = _("'%s' has mentioned you in comment" % (created_by_user_name))
                 push_notification(comment.created_by, message, user,
                                   object_type=object_type, object_id=comment.id)
             except Exception:
@@ -189,20 +187,19 @@ def notify_new_comment(comment, creator):
     feedback_post_type = post.post_type == POST_TYPE.FEEDBACK_POST
     object_type = NOTIFICATION_OBJECT_TYPE
     comment_creator_string = get_user_name(creator)
-    post_string = post.title[:20] + "..." if post.title else ""
     post_creator = USERMODEL.objects.get(id=post.created_by.id)
 
     # for feedback post user won't receive the notification
     if not feedback_post_type:
         for usr in commentators:
-            message = _("'%s' commented on the post '%s'" % (comment_creator_string, post_string))
+            message = _("'%s' commented on the post" % (comment_creator_string))
             push_notification(
                 creator, message, usr, object_type=object_type, object_id=post.id
             )
 
         # post creator always receives a notification when a new comment is made
         try:
-            message = _("'%s' commented on your post '%s'" % (comment_creator_string, post_string))
+            message = _("'%s' commented on your post" % (comment_creator_string))
             push_notification(
                 creator, message, post_creator, object_type=object_type, object_id=post.id
             )
@@ -212,7 +209,7 @@ def notify_new_comment(comment, creator):
     # if post type is feedback post and admin has commented then notify user
     if feedback_post_type and creator.is_staff:
         # object_type = NOTIFICATION_FEEDBACK_OBJECT_TYPE
-        message = _("'%s' commented on the '%s'" % (comment_creator_string, post_string))
+        message = _("'%s' commented on the post" % (comment_creator_string))
         push_notification(
             creator, message, post_creator, object_type=object_type, object_id=post.id,
             extra_context={"reaction_type": 8}  # TODO: move to reaction types
@@ -242,8 +239,7 @@ def notify_flagged_post(post, user, reason):
         organization=user.organization, is_staff=True
     )
     user_name = get_user_name(user)
-    post_string = post.title[:20] if post.title else ""
-    message = _("'%s' has reported the post '%s'" % (user_name, post_string))
+    message = _("'%s' has reported the post" % (user_name))
     subject = _("Inappropriate post")
     body = _(
         "User has marked the post in-appropriate due to the following reason"
