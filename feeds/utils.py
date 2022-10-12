@@ -187,7 +187,7 @@ def notify_new_comment(comment, creator):
     # also exclude the creator of the post
     commentators = commentators.exclude(id=post.created_by.id)
     feedback_post_type = post.post_type == POST_TYPE.FEEDBACK_POST
-    object_type = NOTIFICATION_OBJECT_TYPE
+    object_type = NOTIFICATION_OBJECT.feedback if feedback_post_type else NOTIFICATION_OBJECT.Posts
     comment_creator_string = get_user_name(creator)
     post_string = post.title[:20] + "..." if post.title else ""
     post_creator = USERMODEL.objects.get(id=post.created_by.id)
