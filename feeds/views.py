@@ -20,7 +20,7 @@ from .models import (
     Comment, Documents, ECard, ECardCategory,
     Post, PostLiked, PollsAnswer, Images, CommentLiked,
 )
-from .paginator import FeedsResultsSetPagination
+from .paginator import FeedsResultsSetPagination, FeedsCommentsSetPagination
 from .serializers import (
     CommentDetailSerializer, CommentSerializer, CommentCreateSerializer,
     DocumentsSerializer, ECardCategorySerializer, ECardSerializer,
@@ -42,6 +42,7 @@ UserStrength = import_string(settings.USER_STRENGTH_MODEL)
 NOMINATION_STATUS = import_string(settings.NOMINATION_STATUS)
 ORGANIZATION_SETTINGS_MODEL = import_string(settings.ORGANIZATION_SETTINGS_MODEL)
 MULTI_ORG_POST_ENABLE_FLAG = settings.MULTI_ORG_POST_ENABLE_FLAG
+Organization = import_string(settings.ORGANIZATION_MODEL)
 
 
 class PostViewSet(viewsets.ModelViewSet):
@@ -265,6 +266,29 @@ class PostViewSet(viewsets.ModelViewSet):
         notify_new_poll_created(poll)
         return Response(result.data)
 
+    def get_ordering_field(self, default_order):
+        """
+        Returns allowed_ordering_fields in asc/desc order
+        :param: default_order: str
+        """
+        allowed_ordering_fields = ("created_on", "id")
+        order_by = self.request.query_params.get("orderBy", default_order)
+        if order_by.replace("-", "") not in allowed_ordering_fields:
+            order_by = default_order
+        return order_by
+
+    def user_allowed_to_comment(self, accessible_posts_queryset):
+        """
+        Allow Owner or if user is admin
+        """
+        user = self.request.user
+        feedback_post_creators = list(accessible_posts_queryset.values_list("created_by_id", flat=True))
+        # Allow if user is creator or admin
+        if user.id in feedback_post_creators or user.is_staff:
+            return True
+
+        raise ValidationError(_('You do not have access to comment on this post'))
+
     @detail_route(methods=["GET", "POST"], permission_classes=(permissions.IsAuthenticated,))
     def comments(self, request, *args, **kwargs):
         """
@@ -274,6 +298,7 @@ class PostViewSet(viewsets.ModelViewSet):
         feedback = query_params.get('feedback', None)
         if feedback and feedback == "true":
             allow_feedback = True
+            self.pagination_class = FeedsCommentsSetPagination
         else:
             allow_feedback = False
         user = self.request.user
@@ -282,8 +307,8 @@ class PostViewSet(viewsets.ModelViewSet):
         if not post_id:
             raise ValidationError(_('Post ID required to retrieve all the related comments'))
         post_id = int(post_id)
-        accessible_posts = accessible_posts_by_user(
-            user, organization, allow_feedback=allow_feedback).values_list('id', flat=True)
+        accessible_posts_queryset = accessible_posts_by_user(user, organization, allow_feedback=allow_feedback)
+        accessible_posts = accessible_posts_queryset.values_list('id', flat=True)
         if post_id not in accessible_posts:
             raise ValidationError(_('You do not have access to comment on this post'))
         if self.request.method == "GET":
@@ -302,7 +327,9 @@ class PostViewSet(viewsets.ModelViewSet):
             if last_comment_id:
                 query_dict.update({"pk__gt": last_comment_id})
 
-            comments = Comment.objects.filter(**query_dict).order_by('-created_on')
+            comments = Comment.objects.filter(**query_dict).order_by(
+                self.get_ordering_field(default_order="created_on")
+            )
             page = self.paginate_queryset(comments)
             if page is not None:
                 serializer = CommentSerializer(
@@ -312,6 +339,9 @@ class PostViewSet(viewsets.ModelViewSet):
                 comments, many=True, read_only=True, context=serializer_context)
             return Response(serializer.data)
         elif self.request.method == "POST":
+            if allow_feedback:
+                self.user_allowed_to_comment(accessible_posts_queryset=accessible_posts_queryset)
+
             payload = self.request.data
             data = {k: v for k, v in payload.items()}
 
