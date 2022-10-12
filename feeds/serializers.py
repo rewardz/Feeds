@@ -314,6 +314,8 @@ class PostSerializer(DynamicFieldsModelSerializer):
     points = serializers.SerializerMethodField()
     time_left = serializers.SerializerMethodField()
     images_with_ecard = serializers.SerializerMethodField()
+    organization = serializers.SerializerMethodField()
+    department = serializers.SerializerMethodField()
 
     class Meta:
         model = Post
@@ -326,8 +328,16 @@ class PostSerializer(DynamicFieldsModelSerializer):
             "is_owner", "can_edit", "can_delete", "has_appreciated",
             "appreciation_count", "comments_count", "tagged_users", "is_admin", "tags", "reaction_type", "nomination",
             "feed_type", "user_strength", "user", "user_reaction_type", "gif", "ecard", "points", "time_left",
-            "images_with_ecard", "departments",
+            "images_with_ecard", "departments", "organization", "department"
         )
+
+    def get_organization(self, instance):
+        organization = instance.organizations.first()
+        return organization.id if organization else organization
+
+    def get_department(self, instance):
+        department = instance.departments.first()
+        return department.id if department else department
 
     def get_tags(self, obj):
         return list(obj.tags.values_list("name", flat=True))
@@ -404,12 +414,20 @@ class PostSerializer(DynamicFieldsModelSerializer):
         request = self.context.get('request', None)
         validate_priority(validated_data)
         organizations = validated_data.pop('organizations', None)
+        if not organizations:
+            organization = self.initial_data.pop('organization', None)
+            organizations = [organization] if organization else organization
+
         user = request.user
 
         if not organizations and not ORGANIZATION_SETTINGS_MODEL.objects.get_value(MULTI_ORG_POST_ENABLE_FLAG, user.organization):
             organizations = [user.organization]
 
         departments = validated_data.pop('departments', None)
+        if not departments:
+            department = self.initial_data.pop('department', None)
+            departments = [department] if department else department
+
         post = Post.objects.create(**validated_data)
 
         if post:
