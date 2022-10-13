@@ -431,8 +431,8 @@ class PostSerializer(DynamicFieldsModelSerializer):
                     departments = user.departments.all()
                 elif int(shared_with) == SHARED_WITH.ALL_DEPARTMENTS:
                     departments = DEPARTMENT_MODEL.objects.filter(
-                        organization=user.organization, id=4545
-                    )
+                        organization=user.organization
+                    ) if user.organization else None
                 else:
                     departments = None
 
