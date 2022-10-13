@@ -6,7 +6,7 @@ from django.db.models import Count
 
 from rest_framework import serializers
 
-from .constants import POST_TYPE
+from .constants import POST_TYPE, SHARED_WITH
 from .models import (
     Comment, CommentLiked, Documents, ECard, ECardCategory, FlagPost,
     Post, PostLiked, PollsAnswer, Images, Videos, Voter,
@@ -424,9 +424,13 @@ class PostSerializer(DynamicFieldsModelSerializer):
             organizations = [user.organization]
 
         departments = validated_data.pop('departments', None)
-        if not departments:
-            department = self.initial_data.pop('department', None)
-            departments = [department] if department else department
+        if not departments and not organizations:
+            shared_with = self.initial_data.pop('shared_with', None)
+            if shared_with:
+                if int(shared_with) == SHARED_WITH.SELF_DEPARTMENT:
+                    departments = user.departments.all()
+                elif int(shared_with) == SHARED_WITH.ALL_DEPARTMENTS:
+                    organizations = [user.organization]
 
         post = Post.objects.create(**validated_data)
 
