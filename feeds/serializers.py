@@ -424,17 +424,13 @@ class PostSerializer(DynamicFieldsModelSerializer):
             organizations = [user.organization]
 
         departments = validated_data.pop('departments', None)
-        if not departments:
+        if not departments and not organizations:
             shared_with = self.initial_data.pop('shared_with', None)
             if shared_with:
                 if int(shared_with) == SHARED_WITH.SELF_DEPARTMENT:
                     departments = user.departments.all()
                 elif int(shared_with) == SHARED_WITH.ALL_DEPARTMENTS:
-                    departments = DEPARTMENT_MODEL.objects.filter(
-                        organization=user.organization
-                    ) if user.organization else None
-                else:
-                    departments = None
+                    organizations = [user.organization]
 
         post = Post.objects.create(**validated_data)
 
