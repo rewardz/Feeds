@@ -421,7 +421,7 @@ class PostViewSet(viewsets.ModelViewSet):
                 if request.version >= 12 and user == post.created_by:
                     send_notification = False
                 if send_notification:
-                    notif_message = _("'%s' likes your post %s" % (user_name))
+                    notif_message = _("'%s' likes your post" % (user_name))
                     push_notification(user, notif_message, post.created_by, object_type=object_type,
                                       object_id=post.id, extra_context={"reaction_type": reaction_type})
         count = PostLiked.objects.filter(post_id=post_id).count()
