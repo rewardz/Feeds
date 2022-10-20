@@ -209,7 +209,7 @@ def notify_new_comment(comment, creator):
     # if post type is feedback post and admin has commented then notify user
     if feedback_post_type and creator.is_staff:
         # object_type = NOTIFICATION_FEEDBACK_OBJECT_TYPE
-        message = _("'%s' commented on the post" % (comment_creator_string))
+        message = _("'%s' commented on the feedback" % (comment_creator_string))
         push_notification(
             creator, message, post_creator, object_type=object_type, object_id=post.id,
             extra_context={"reaction_type": 8}  # TODO: move to reaction types
