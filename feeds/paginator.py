@@ -23,9 +23,6 @@ class FeedsResultsSetPagination(PageNumberPagination):
 
 
 class FeedsCommentsSetPagination(PageNumberPagination):
-    try:
-        page_size = settings.FEEDS_PAGE_SIZE
-    except AttributeError as ae:
-        page_size = 20
+    page_size = 1000
     page_size_query_param = 'pageSize'
     max_page_size = 1000
