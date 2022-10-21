@@ -1004,6 +1004,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             feeds.data['points_left'] = None
         feeds.data['date'] = get_current_month_end_date()
         feeds.data['notification_count'] = request.user.unviewed_notifications_count
+        feeds.data['recently_recognized_count'] = Post.objects.filter(created_by=user, user__isnull=False).count()
         feeds.data['org_logo'] = get_absolute_url(organization.display_img_url)
         return feeds
 
