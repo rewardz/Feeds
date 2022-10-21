@@ -281,6 +281,48 @@ class Post(UserInfo):
         """
         self.departments.add(department_id)
 
+    @property
+    def feedback(self):
+        """
+        Returns post related Feedback
+        """
+        feedback_post = self.feedbackpost_set.first()
+        if not feedback_post:
+            return
+        return feedback_post.feedback if feedback_post.feedback else None
+
+    @property
+    def category(self):
+        """
+        Returns post related category id
+        """
+        feedback = self.feedback
+        return feedback.category_id if feedback else None
+
+    @property
+    def category_name(self):
+        """
+        Returns post related category name
+        """
+        feedback = self.feedback
+        return feedback.category_name if feedback else ""
+
+    @property
+    def sub_category(self):
+        """
+        Returns post related sub category id
+        """
+        feedback = self.feedback
+        return feedback.sub_category_id if feedback else None
+
+    @property
+    def sub_category_name(self):
+        """
+        Returns post related sub category name
+        """
+        feedback = self.feedback
+        return feedback.sub_category_name if feedback else ""
+
     def __unicode__(self):
         return self.title if self.title else str(self.pk)
 
