@@ -49,6 +49,7 @@ class PostViewSet(viewsets.ModelViewSet):
     parser_classes = (MultiPartParser, JSONParser, FormParser,)
     permission_classes = (permissions.IsAuthenticated,)
     pagination_class = FeedsResultsSetPagination
+    filter_backends = (filters.DjangoFilterBackend,)
 
     def _create_or_update(self, request, create=False):
         payload = request.data
@@ -226,13 +227,27 @@ class PostViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         feedback = self.request.query_params.get('feedback', None)
+        created_by = self.request.query_params.get('created_by', None)
         if feedback and feedback == "true":
             allow_feedback = True
         else:
             allow_feedback = False
         user = self.request.user
         org = self.request.user.organization
-        result = accessible_posts_by_user(user, org, allow_feedback=allow_feedback)
+
+        query = Q(mark_delete=False, post_type=POST_TYPE.USER_CREATED_POST)
+        if created_by == "user_org":
+            query.add(Q(organizations=org, created_by__organization=org), query.connector)
+        elif created_by == "user_dept":
+            departments = user.departments.all()
+            query.add(Q(departments__in=departments, created_by__departments__in=departments), query.connector)
+        else:
+            result = accessible_posts_by_user(user, org, allow_feedback=allow_feedback)
+
+        if created_by in ("user_org", "user_dept"):
+            result = Post.objects.filter(query)
+
+        result = PostFilter(self.request.GET, queryset=result).qs
         result = result.order_by('-priority', '-modified_on', '-created_on')
         return result
 
