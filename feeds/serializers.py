@@ -545,6 +545,9 @@ class PostDetailSerializer(PostSerializer):
     category_name = serializers.CharField(read_only=True)
     sub_category = serializers.CharField(read_only=True)
     sub_category_name = serializers.CharField(read_only=True)
+    organization_name = serializers.SerializerMethodField()
+    display_status = serializers.SerializerMethodField()
+    department_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Post
@@ -557,8 +560,17 @@ class PostDetailSerializer(PostSerializer):
             "appreciation_count", "appreciated_by", "comments_count", "comments",
             "tagged_users", "is_admin", "nomination", "feed_type", "user_strength", "user",
             "gif", "ecard", "points", "user_reaction_type", "images_with_ecard", "reaction_type", "category",
-            "category_name", "sub_category", "sub_category_name"
+            "category_name", "sub_category", "sub_category_name", "organization_name", "display_status", "department_name"
         )
+
+    def get_organization_name(self, instance):
+        return instance.feedback.organization_name if instance.feedback else ""
+
+    def get_display_status(self, instance):
+        return instance.feedback.display_status if instance.feedback else ""
+
+    def get_department_name(self, instance):
+        return instance.feedback.department_name if instance.feedback else ""
 
     def get_comments(self, instance):
         request = self.context.get('request')
