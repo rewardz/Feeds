@@ -196,6 +196,13 @@ class PostViewSet(viewsets.ModelViewSet):
         tag_users = data.get('tag_users', None)
         tags = data.get('tags', None)
         data["created_by"] = instance.created_by.id
+        if "organizations" in data:
+            instance.organizations.clear()
+            instance.organizations.add(*data.get("organizations"))
+
+        if "departments" in data:
+            instance.departments.clear()
+            instance.departments.add(*data.get("departments"))
         serializer = self.get_serializer(instance, data=data)
         serializer.is_valid(raise_exception=True)
         if tag_users:
