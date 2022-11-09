@@ -42,7 +42,7 @@ def accessible_posts_by_user(user, organization, allow_feedback=False):
     result = Post.objects.filter(
         Q(mark_delete=False) & (
             Q(organizations__in=organization) | Q(departments__in=user_depts)
-        )
+        ) | Q(mark_delete=False, created_by=user)
     )
 
     # filter / exclude feedback based on the allow_feedback
