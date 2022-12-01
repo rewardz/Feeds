@@ -21,6 +21,7 @@ from .models import (
     Post, PostLiked, PollsAnswer, Images, CommentLiked,
 )
 from .paginator import FeedsResultsSetPagination, FeedsCommentsSetPagination
+from .permissions import IsOptionsOrAuthenticated
 from .serializers import (
     CommentDetailSerializer, CommentSerializer, CommentCreateSerializer,
     DocumentsSerializer, ECardCategorySerializer, ECardSerializer,
@@ -786,7 +787,7 @@ def search_user(request):
 class ECardCategoryViewSet(viewsets.ModelViewSet):
     queryset = ECardCategory.objects.none()
     serializer_class = ECardCategorySerializer
-    permission_classes = [permissions.IsAuthenticated, ]
+    permission_classes = [IsOptionsOrAuthenticated, ]
 
     def get_queryset(self):
         user = self.request.user
@@ -797,7 +798,7 @@ class ECardCategoryViewSet(viewsets.ModelViewSet):
 class ECardViewSet(viewsets.ModelViewSet):
     queryset = ECard.objects.none()
     serializer_class = ECardSerializer
-    permission_classes = [permissions.IsAuthenticated, ]
+    permission_classes = [IsOptionsOrAuthenticated, ]
 
     def get_queryset(self):
         user = self.request.user
