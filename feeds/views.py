@@ -312,7 +312,7 @@ class PostViewSet(viewsets.ModelViewSet):
 
         raise ValidationError(_('You do not have access to comment on this post'))
 
-    @detail_route(methods=["GET", "POST"], permission_classes=(permissions.IsAuthenticated,))
+    @detail_route(methods=["GET", "POST"], permission_classes=(IsOptionsOrAuthenticated,))
     def comments(self, request, *args, **kwargs):
         """
         List of all the comments related to the post
