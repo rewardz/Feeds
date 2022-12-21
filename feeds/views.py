@@ -48,7 +48,7 @@ Organization = import_string(settings.ORGANIZATION_MODEL)
 
 class PostViewSet(viewsets.ModelViewSet):
     parser_classes = (MultiPartParser, JSONParser, FormParser,)
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsOptionsOrAuthenticated,)
     pagination_class = FeedsResultsSetPagination
     filter_backends = (filters.DjangoFilterBackend,)
 
@@ -312,7 +312,7 @@ class PostViewSet(viewsets.ModelViewSet):
 
         raise ValidationError(_('You do not have access to comment on this post'))
 
-    @detail_route(methods=["GET", "POST"], permission_classes=(permissions.IsAuthenticated,))
+    @detail_route(methods=["GET", "POST"], permission_classes=(IsOptionsOrAuthenticated,))
     def comments(self, request, *args, **kwargs):
         """
         List of all the comments related to the post
@@ -1031,7 +1031,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         feeds.data['org_logo'] = get_absolute_url(organization.display_img_url)
         return feeds
 
-    @list_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
+    @list_route(methods=["GET"], permission_classes=(IsOptionsOrAuthenticated,))
     def organization_recognitions(self, request, *args, **kwargs):
         user = self.request.user
         organization = user.organization
