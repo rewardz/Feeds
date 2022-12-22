@@ -20,6 +20,7 @@ INTERNAL_APPS = (
     'news_feed.tests.profiles',
     'news_feed.tests.finance',
     'news_feed.tests.nominations',
+    'news_feed.tests.events',
     'feeds',
 )
 
@@ -73,6 +74,7 @@ ORGANIZATION_MODEL = 'news_feed.tests.profiles.models.Organization'
 DEPARTMENT_MODEL = 'news_feed.tests.profiles.models.Department'
 TRANSACTION_MODEL = "news_feed.tests.finance.models.Transaction"
 NOMINATIONS_MODEL = "news_feed.tests.nominations.models.Nominations"
+REPEATED_EVENT_MODEL = "news_feed.tests.events.models.RepeatedEvent"
 USER_STRENGTH_MODEL = 'news_feed.tests.profiles.models.UserStrength'
 TROPHY_BADGE_MODEL = 'news_feed.tests.profiles.models.TrophyBadge'
 NOMINATION_STATUS = 'news_feed.tests.nominations.constants.NOMINATION_STATUS'

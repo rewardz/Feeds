@@ -24,6 +24,7 @@ Organization = import_string(settings.ORGANIZATION_MODEL)
 Department = import_string(settings.DEPARTMENT_MODEL)
 Transaction = import_string(settings.TRANSACTION_MODEL)
 Nominations = import_string(settings.NOMINATIONS_MODEL)
+RepeatedEvent = import_string(settings.REPEATED_EVENT_MODEL)
 
 
 def post_upload_to_path(instance, filename):
@@ -152,6 +153,7 @@ class Post(UserInfo):
     user = models.ForeignKey(CustomUser, related_name="appreciated_user", on_delete=models.CASCADE, null=True, blank=True)
     transaction = models.ForeignKey(Transaction, on_delete=models.CASCADE, null=True, blank=True)
     nomination = models.ForeignKey(Nominations, on_delete=models.CASCADE, null=True, blank=True)
+    greeting = models.ForeignKey(RepeatedEvent, on_delete=models.CASCADE, null=True, blank=True)
     ecard = models.ForeignKey(ECard, on_delete=models.CASCADE, null=True, blank=True)
     gif = models.URLField(null=True, blank=True)
     cc_users = models.ManyToManyField(CustomUser, related_name="cc_users", blank=True)
