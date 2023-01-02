@@ -259,7 +259,7 @@ class PostViewSet(viewsets.ModelViewSet):
         result = result.order_by('-priority', '-modified_on', '-created_on')
         return result
 
-    @list_route(methods=["POST"], permission_classes=(permissions.IsAuthenticated,))
+    @list_route(methods=["POST"], permission_classes=(IsOptionsOrAuthenticated,))
     def create_poll(self, request, *args, **kwargs):
         context = {'request': request}
         user = self.request.user
@@ -407,7 +407,7 @@ class PostViewSet(viewsets.ModelViewSet):
                 notify_new_comment(inst, self.request.user)
             return Response(serializer.data)
 
-    @detail_route(methods=["POST"], permission_classes=(permissions.IsAuthenticated,))
+    @detail_route(methods=["POST"], permission_classes=(IsOptionsOrAuthenticated,))
     def appreciate(self, request, *args, **kwargs):
         user = self.request.user
         organization = user.organization
@@ -681,7 +681,7 @@ class VideosView(views.APIView):
 
 
 class CommentViewset(viewsets.ModelViewSet):
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsOptionsOrAuthenticated,)
 
     def get_serializer(self, *args, **kwargs):
         if "pk" in self.kwargs:
@@ -698,7 +698,7 @@ class CommentViewset(viewsets.ModelViewSet):
         result = Comment.objects.filter(post__in=posts, mark_delete=False)
         return result
 
-    @detail_route(methods=["POST"], permission_classes=(permissions.IsAuthenticated,))
+    @detail_route(methods=["POST"], permission_classes=(IsOptionsOrAuthenticated,))
     def like(self, request, *args, **kwargs):
         user = self.request.user
         organization = user.organization
