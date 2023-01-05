@@ -565,7 +565,7 @@ class PostViewSet(viewsets.ModelViewSet):
         except Post.DoesNotExist:
             raise ValidationError(_('Post does not exist.'))
 
-    @list_route(methods=["POST"], permission_classes=(permissions.IsAuthenticated,))
+    @list_route(methods=["POST"], permission_classes=(IsOptionsOrAuthenticated,))
     def pinned_post(self, request, *args, **kwargs):
         user = self.request.user
         organization = user.organization
@@ -590,7 +590,7 @@ class PostViewSet(viewsets.ModelViewSet):
         except Post.DoesNotExist:
             raise ValidationError(_('Post does not exist.'))
 
-    @detail_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
+    @detail_route(methods=["GET"], permission_classes=(IsOptionsOrAuthenticated,))
     def post_appreciations(self, request, *args, **kwargs):
         post_id = self.kwargs.get("pk", None)
         recent = request.query_params.get("recent", None)
@@ -991,7 +991,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             "id", "description", "nomination"])
         return Response({"badges": serializer.data})
 
-    @list_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
+    @list_route(methods=["GET"], permission_classes=(IsOptionsOrAuthenticated,))
     def recent_recognitions(self, request, *args, **kwargs):
         show_cheer_msg, show_approvals = False, False
         user = self.request.user
