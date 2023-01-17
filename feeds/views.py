@@ -834,7 +834,7 @@ class ECardViewSet(viewsets.ModelViewSet):
 
 class UserFeedViewSet(viewsets.ModelViewSet):
     parser_classes = (JSONParser,)
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsOptionsOrAuthenticated,)
     serializer_class = PostFeedSerializer
     filter_backends = (filters.DjangoFilterBackend,)
     pagination_class = FeedsResultsSetPagination
