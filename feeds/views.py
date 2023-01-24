@@ -225,6 +225,13 @@ class PostViewSet(viewsets.ModelViewSet):
         instance.mark_as_delete(user)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    def get_organization(self):
+        """
+        Returns affiliated organizations list if user is staff else user's organization
+        """
+        user = self.request.user
+        return list(Organization.objects.get_affiliated(user)) if user.is_staff else user.organization
+
     def get_serializer(self, *args, **kwargs):
         if "pk" in self.kwargs:
             serializer_class = PostDetailSerializer
@@ -325,12 +332,13 @@ class PostViewSet(viewsets.ModelViewSet):
         else:
             allow_feedback = False
         user = self.request.user
-        organization = user.organization
         post_id = self.kwargs.get("pk", None)
         if not post_id:
             raise ValidationError(_('Post ID required to retrieve all the related comments'))
         post_id = int(post_id)
-        accessible_posts_queryset = accessible_posts_by_user(user, organization, allow_feedback=allow_feedback)
+
+        accessible_posts_queryset = accessible_posts_by_user(user, self.get_organization(),
+                                                             allow_feedback=allow_feedback)
         accessible_posts = accessible_posts_queryset.values_list('id', flat=True)
         if post_id not in accessible_posts:
             raise ValidationError(_('You do not have access to comment on this post'))
