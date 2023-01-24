@@ -509,7 +509,7 @@ class PostViewSet(viewsets.ModelViewSet):
             serializer.save()
             return Response(serializer.data)
 
-    @detail_route(methods=["POST"], permission_classes=(permissions.IsAuthenticated,))
+    @detail_route(methods=["POST"], permission_classes=(IsOptionsOrAuthenticated,))
     def vote(self, request, *args, **kwargs):
         user = self.request.user
         organization = user.organization
@@ -834,7 +834,7 @@ class ECardViewSet(viewsets.ModelViewSet):
 
 class UserFeedViewSet(viewsets.ModelViewSet):
     parser_classes = (JSONParser,)
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsOptionsOrAuthenticated,)
     serializer_class = PostFeedSerializer
     filter_backends = (filters.DjangoFilterBackend,)
     pagination_class = FeedsResultsSetPagination
