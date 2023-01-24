@@ -353,3 +353,14 @@ def get_absolute_url(uri):
         site_url = settings.SITE_URL.strip("/")
         uri = uri.lstrip("/")
         return "/".join([site_url, uri])
+
+
+def posts_not_shared_with_self_department(posts, user):
+    """
+    Returns filtered (posts which are not shared with requested users department) queryset of Post
+    posts: QuerySet[Post]
+    user: CustomUser
+    """
+    return posts.filter(
+        Q(shared_with=SHARED_WITH.SELF_DEPARTMENT) & ~Q(created_by__departments__in=user.departments.all())
+    )
