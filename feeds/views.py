@@ -33,7 +33,7 @@ from .utils import (
     accessible_posts_by_user, extract_tagged_users, get_user_name, notify_new_comment,
     notify_new_poll_created, notify_flagged_post, push_notification, tag_users_to_comment,
     tag_users_to_post, user_can_delete, user_can_edit, get_date_range, since_last_appreciation,
-    get_current_month_end_date, get_absolute_url, posts_not_shared_with_self_department,
+    get_current_month_end_date, get_absolute_url, posts_not_shared_with_self_department, SHARED_WITH
 )
 
 CustomUser = import_string(settings.CUSTOM_USER_MODEL)
@@ -875,6 +875,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
                 user__last_name__istartswith=search) | Q(created_by__first_name__istartswith=search) | Q(
                 created_by__last_name__istartswith=search))
         feeds = feeds.exclude(id__in=posts_not_shared_with_self_department(posts, user).values_list("id", flat=True))
+        feeds = feeds.exclude(shared_with=SHARED_WITH.ADMIN_ONLY)
         return feeds.distinct()
 
     def list(self, request, *args, **kwargs):
