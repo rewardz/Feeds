@@ -839,6 +839,18 @@ class UserFeedViewSet(viewsets.ModelViewSet):
     filter_backends = (filters.DjangoFilterBackend,)
     pagination_class = FeedsResultsSetPagination
 
+    @staticmethod
+    def get_filtered_feeds_according_to_shared_with(feeds, user):
+        """
+        Returns filtered queryset (same dept posts will be returned if post is shared with departments)
+        (All posts will be returned if shared with within organization)
+        (hide posts which has shared with is admin only)
+        params: posts: QuerySet[Post]
+        params: user: CustomUser
+        """
+        feeds = feeds.exclude(id__in=posts_not_shared_with_self_department(feeds, user).values_list("id", flat=True))
+        return feeds.exclude(shared_with=SHARED_WITH.ADMIN_ONLY)
+
     def get_queryset(self):
         feed_flag = self.request.query_params.get("feed", None)
         search = self.request.query_params.get("search", None)
@@ -874,9 +886,8 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             feeds = feeds.filter(Q(user__first_name__istartswith=search) | Q(
                 user__last_name__istartswith=search) | Q(created_by__first_name__istartswith=search) | Q(
                 created_by__last_name__istartswith=search))
-        feeds = feeds.exclude(id__in=posts_not_shared_with_self_department(posts, user).values_list("id", flat=True))
-        feeds = feeds.exclude(shared_with=SHARED_WITH.ADMIN_ONLY)
-        return feeds.distinct()
+
+        return self.get_filtered_feeds_according_to_shared_with(feeds=feeds, user=user).distinct()
 
     def list(self, request, *args, **kwargs):
         show_approvals = False
@@ -1057,7 +1068,8 @@ class UserFeedViewSet(viewsets.ModelViewSet):
                                  Q(user__last_name__istartswith=search) |
                                  Q(created_by__first_name__istartswith=search) |
                                  Q(created_by__last_name__istartswith=search))
-        feeds = feeds.order_by('-priority', '-id')
+
+        feeds = self.get_filtered_feeds_according_to_shared_with(feeds=feeds, user=user).order_by('-priority', '-id')
         page = self.paginate_queryset(feeds)
         serializer = PostFeedSerializer(page, context={"request": request}, many=True)
         feeds = self.get_paginated_response(serializer.data)
