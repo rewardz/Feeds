@@ -768,7 +768,7 @@ class CommentViewset(viewsets.ModelViewSet):
 
 
 @api_view(['GET'])
-@permission_classes((permissions.IsAuthenticated,))
+@permission_classes((IsOptionsOrAuthenticated,))
 def search_user(request):
     """
     Search users based on the search term
