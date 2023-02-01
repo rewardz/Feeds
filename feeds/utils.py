@@ -388,6 +388,6 @@ def posts_not_visible_to_user(posts, user):
     params: posts: QuerySet[Post]
     params: user: CustomUser
     """
-    posts_ids_to_exclude = posts_not_shared_with_self_department(posts, user).values_list("id", flat=True)
-    posts_ids_to_exclude.extend(admin_feeds_to_exclude(posts, user).values_list("id", flat=True))
+    posts_ids_to_exclude = list(posts_not_shared_with_self_department(posts, user).values_list("id", flat=True))
+    posts_ids_to_exclude.extend(list(admin_feeds_to_exclude(posts, user).values_list("id", flat=True)))
     return posts_ids_to_exclude
