@@ -379,7 +379,7 @@ def admin_feeds_to_exclude(posts, user):
     posts = posts.filter(shared_with=SHARED_WITH.ADMIN_ONLY)
     query = Q(shared_with=SHARED_WITH.ADMIN_ONLY)
     query.add(~Q(created_by=user) & ~Q(cc_users__in=[user.id]), query.connector)
-    return posts.filter(posts)
+    return posts.filter(query)
 
 
 def posts_not_visible_to_user(posts, user):
