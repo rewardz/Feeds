@@ -364,3 +364,30 @@ def posts_not_shared_with_self_department(posts, user):
     return posts.filter(
         Q(shared_with=SHARED_WITH.SELF_DEPARTMENT) & ~Q(created_by__departments__in=user.departments.all())
     )
+
+
+def admin_feeds_to_exclude(posts, user):
+    """
+    Returns filtered (posts which are shared with admin) queryset to exclude
+    if user is superuser then empty QS (no need to exclude anything)
+    if user is neither creator of post nor in cc posts to exclude
+    posts: QuerySet[Post]
+    user: CustomUser
+    """
+    if user.is_staff:
+        return Post.objects.none()
+    posts = posts.filter(shared_with=SHARED_WITH.ADMIN_ONLY)
+    query = Q(shared_with=SHARED_WITH.ADMIN_ONLY)
+    query.add(~Q(created_by=user) & ~Q(cc_users__in=[user.id]), query.connector)
+    return posts.filter(posts)
+
+
+def posts_not_visible_to_user(posts, user):
+    """
+    Returns List of post ids to exclude
+    params: posts: QuerySet[Post]
+    params: user: CustomUser
+    """
+    posts_ids_to_exclude = posts_not_shared_with_self_department(posts, user).values_list("id", flat=True)
+    posts_ids_to_exclude.extend(admin_feeds_to_exclude(posts, user).values_list("id", flat=True))
+    return posts_ids_to_exclude
