@@ -1046,18 +1046,17 @@ class UserFeedViewSet(viewsets.ModelViewSet):
     @list_route(methods=["GET"], permission_classes=(IsOptionsOrAuthenticated,))
     def organization_recognitions(self, request, *args, **kwargs):
         user = self.request.user
-        organization = user.organization
+        organizations = list(Organization.objects.get_affiliated(user).values_list("id", flat=True))
         post_polls = request.query_params.get("post_polls", None)
-        posts = accessible_posts_by_user(
-            user, list(Organization.objects.get_affiliated(user).values_list("id", flat=True)))
+        posts = accessible_posts_by_user(user, organizations)
         if post_polls:
             feeds = posts.filter((Q(post_type=POST_TYPE.USER_CREATED_POST) |
                                         Q(post_type=POST_TYPE.USER_CREATED_POLL)) &
-                                        Q(organizations=organization))
+                                        Q(organizations__in=organizations))
         else:
             feeds = posts.filter((Q(post_type=POST_TYPE.USER_CREATED_APPRECIATION) |
                                         Q(nomination__nom_status=NOMINATION_STATUS.approved)) &
-                                        Q(organizations=organization)).exclude(
+                                        Q(organizations__in=organizations)).exclude(
                                         user__hide_appreciation=True)
 
         feeds = PostFilter(self.request.GET, queryset=feeds).qs
