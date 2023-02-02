@@ -1051,12 +1051,31 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         feeds.data['org_logo'] = get_absolute_url(organization.display_img_url)
         return feeds
 
+    def filter_appreciations(self, feeds):
+        """
+        Returns filtered QS which matches user strength id in transaction
+        params: feeds QuerySet[Post]
+        """
+        strength_id = str(self.request.GET.get("user_strength"))
+        feeds = feeds.filter(transaction__context__isnull=False, transaction__isnull=False)
+        return feeds.filter(id__in=[
+            feed.get("id")
+            for feed in feeds.values("transaction__context", "id")
+            if str(loads(feed.get("transaction__context", {})).get("strength_id")) == strength_id
+        ])
+
+    def merge_querset(self, feeds, filter_appreciations):
+        post_ids = list(feeds.values_list("id", flat=True))
+        post_ids.extend(list(filter_appreciations.values_list("id", flat=True)))
+        return Post.objects.filter(id__in=post_ids)
+
     @list_route(methods=["GET"], permission_classes=(IsOptionsOrAuthenticated,))
     def organization_recognitions(self, request, *args, **kwargs):
         user = self.request.user
         organizations = list(Organization.objects.get_affiliated(user).values_list("id", flat=True))
         post_polls = request.query_params.get("post_polls", None)
         posts = accessible_posts_by_user(user, organizations)
+
         if post_polls:
             feeds = posts.filter((Q(post_type=POST_TYPE.USER_CREATED_POST) |
                                         Q(post_type=POST_TYPE.USER_CREATED_POLL)) &
@@ -1066,9 +1085,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
                                         Q(nomination__nom_status=NOMINATION_STATUS.approved)) &
                                         Q(organizations__in=organizations)).exclude(
                                         user__hide_appreciation=True)
-
         feeds = PostFilter(self.request.GET, queryset=feeds).qs
-
         search = self.request.query_params.get("search", None)
         if search:
             feeds = feeds.filter(Q(user__first_name__istartswith=search) |
@@ -1076,6 +1093,8 @@ class UserFeedViewSet(viewsets.ModelViewSet):
                                  Q(created_by__first_name__istartswith=search) |
                                  Q(created_by__last_name__istartswith=search))
 
+        filter_appreciations = self.filter_appreciations(feeds)
+        feeds = feeds | filter_appreciations
         feeds = self.get_filtered_feeds_according_to_shared_with(feeds=feeds, user=user).order_by('-priority', '-id')
         page = self.paginate_queryset(feeds)
         serializer = PostFeedSerializer(page, context={"request": request}, many=True)
