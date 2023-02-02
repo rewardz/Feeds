@@ -1085,6 +1085,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
                                         Q(nomination__nom_status=NOMINATION_STATUS.approved)) &
                                         Q(organizations__in=organizations)).exclude(
                                         user__hide_appreciation=True)
+        filter_appreciations = self.filter_appreciations(feeds)
         feeds = PostFilter(self.request.GET, queryset=feeds).qs
         search = self.request.query_params.get("search", None)
         if search:
@@ -1093,7 +1094,6 @@ class UserFeedViewSet(viewsets.ModelViewSet):
                                  Q(created_by__first_name__istartswith=search) |
                                  Q(created_by__last_name__istartswith=search))
 
-        filter_appreciations = self.filter_appreciations(feeds)
         feeds = feeds | filter_appreciations
         feeds = self.get_filtered_feeds_according_to_shared_with(feeds=feeds, user=user).order_by('-priority', '-id')
         page = self.paginate_queryset(feeds)
