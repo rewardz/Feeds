@@ -396,7 +396,7 @@ class PostSerializer(DynamicFieldsModelSerializer):
         return PostLiked.objects.filter(post=instance).count()
 
     def get_comments_count(self, instance):
-        return Comment.objects.filter(post=instance).count()
+        return Comment.objects.filter(post=instance, mark_delete=False).count()
 
     def get_can_edit(self, instance):
         request = self.context['request']
