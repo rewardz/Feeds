@@ -34,7 +34,9 @@ class PostFilter(django_filters.FilterSet):
         return queryset.filter(created_on__gte=start_date, created_on__lte=end_date)
 
     def department_filter(self, queryset, name, value):
-        return queryset.filter(Q(nomination__category__department__in=value) | Q(transaction__department__in=value))
+        if isinstance(value, int):
+            value = [value]
+        return queryset.filter(created_by__departments__in=value)
 
     def nom_status_filter(self, queryset, name, value):
         if value == "pending":
