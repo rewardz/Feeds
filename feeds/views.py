@@ -551,14 +551,14 @@ class PostViewSet(viewsets.ModelViewSet):
     @detail_route(methods=["POST"], permission_classes=(permissions.IsAuthenticated,))
     def flag(self, request, *args, **kwargs):
         user = self.request.user
-        organization = user.organization
+        organizations = list(Organization.objects.get_affiliated(user).values_list("id", flat=True))
         post_id = self.kwargs.get("pk", None)
         payload = self.request.data
         data = {k: v for k, v in payload.items()}
         if not post_id:
             raise ValidationError(_('Post ID required to vote'))
         post_id = int(post_id)
-        accessible_posts = accessible_posts_by_user(user, organization).values_list('id', flat=True)
+        accessible_posts = accessible_posts_by_user(user, organizations).values_list('id', flat=True)
         if post_id not in accessible_posts:
             raise ValidationError(_('You do not have access'))
         data["flagger"] = user.id
