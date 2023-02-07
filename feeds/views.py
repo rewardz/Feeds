@@ -1056,12 +1056,12 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         Returns filtered QS which matches user strength id in transaction
         params: feeds QuerySet[Post]
         """
-        strength_id = str(self.request.GET.get("user_strength"))
+        strength_id = int(self.request.GET.get("user_strength", 0))
         feeds = feeds.filter(transaction__context__isnull=False, transaction__isnull=False)
         return feeds.filter(id__in=[
             feed.get("id")
             for feed in feeds.values("transaction__context", "id")
-            if str(loads(feed.get("transaction__context", {})).get("strength_id")) == strength_id
+            if loads(feed.get("transaction__context", {})).get("strength_id") == strength_id
         ])
 
     def merge_querset(self, feeds, filter_appreciations):
