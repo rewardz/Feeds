@@ -14,7 +14,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
 
-from .filters import PostFilter
+from .filters import PostFilter, PostFilterBase
 from .constants import POST_TYPE
 from .models import (
     Comment, Documents, ECard, ECardCategory,
@@ -1058,11 +1058,11 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         """
         strength_id = int(self.request.GET.get("user_strength", 0))
         feeds = feeds.filter(transaction__context__isnull=False, transaction__isnull=False)
-        return feeds.filter(id__in=[
+        return PostFilterBase(self.request.GET, queryset=feeds.filter(id__in=[
             feed.get("id")
             for feed in feeds.values("transaction__context", "id")
             if loads(feed.get("transaction__context", {})).get("strength_id") == strength_id
-        ])
+        ])).qs
 
     def merge_querset(self, feeds, filter_appreciations):
         post_ids = list(feeds.values_list("id", flat=True))
