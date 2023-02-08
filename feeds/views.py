@@ -14,7 +14,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
 
-from .filters import PostFilter
+from .filters import PostFilter, PostFilterBase
 from .constants import POST_TYPE
 from .models import (
     Comment, Documents, ECard, ECardCategory,
@@ -33,7 +33,7 @@ from .utils import (
     accessible_posts_by_user, extract_tagged_users, get_user_name, notify_new_comment,
     notify_new_poll_created, notify_flagged_post, push_notification, tag_users_to_comment,
     tag_users_to_post, user_can_delete, user_can_edit, get_date_range, since_last_appreciation,
-    get_current_month_end_date, get_absolute_url,
+    get_current_month_end_date, get_absolute_url, SHARED_WITH, posts_not_visible_to_user
 )
 
 CustomUser = import_string(settings.CUSTOM_USER_MODEL)
@@ -551,14 +551,14 @@ class PostViewSet(viewsets.ModelViewSet):
     @detail_route(methods=["POST"], permission_classes=(permissions.IsAuthenticated,))
     def flag(self, request, *args, **kwargs):
         user = self.request.user
-        organization = user.organization
+        organizations = list(Organization.objects.get_affiliated(user).values_list("id", flat=True))
         post_id = self.kwargs.get("pk", None)
         payload = self.request.data
         data = {k: v for k, v in payload.items()}
         if not post_id:
             raise ValidationError(_('Post ID required to vote'))
         post_id = int(post_id)
-        accessible_posts = accessible_posts_by_user(user, organization).values_list('id', flat=True)
+        accessible_posts = accessible_posts_by_user(user, organizations).values_list('id', flat=True)
         if post_id not in accessible_posts:
             raise ValidationError(_('You do not have access'))
         data["flagger"] = user.id
@@ -847,11 +847,22 @@ class UserFeedViewSet(viewsets.ModelViewSet):
     filter_backends = (filters.DjangoFilterBackend,)
     pagination_class = FeedsResultsSetPagination
 
+    @staticmethod
+    def get_filtered_feeds_according_to_shared_with(feeds, user):
+        """
+        Returns filtered queryset (same dept posts will be returned if post is shared with departments)
+        (All posts will be returned if shared with within organization)
+        (hide posts which has shared with is admin only)
+        params: posts: QuerySet[Post]
+        params: user: CustomUser
+        """
+        return feeds.exclude(id__in=posts_not_visible_to_user(feeds, user))
+
     def get_queryset(self):
         feed_flag = self.request.query_params.get("feed", None)
         search = self.request.query_params.get("search", None)
         user = self.request.user
-        organization = user.organization
+        organization = list(Organization.objects.get_affiliated(user).values_list("id", flat=True))
         posts = accessible_posts_by_user(user, organization)
         if feed_flag == "post_polls":
             feeds = posts.filter(post_type__in=[POST_TYPE.USER_CREATED_POST,
@@ -882,7 +893,8 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             feeds = feeds.filter(Q(user__first_name__istartswith=search) | Q(
                 user__last_name__istartswith=search) | Q(created_by__first_name__istartswith=search) | Q(
                 created_by__last_name__istartswith=search))
-        return feeds.distinct()
+
+        return self.get_filtered_feeds_according_to_shared_with(feeds=feeds, user=user).distinct()
 
     def list(self, request, *args, **kwargs):
         show_approvals = False
@@ -1039,31 +1051,51 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         feeds.data['org_logo'] = get_absolute_url(organization.display_img_url)
         return feeds
 
+    def filter_appreciations(self, feeds):
+        """
+        Returns filtered QS which matches user strength id in transaction
+        params: feeds QuerySet[Post]
+        """
+        strength_id = int(self.request.GET.get("user_strength", 0))
+        feeds = feeds.filter(transaction__context__isnull=False, transaction__isnull=False)
+        return PostFilterBase(self.request.GET, queryset=feeds.filter(id__in=[
+            feed.get("id")
+            for feed in feeds.values("transaction__context", "id")
+            if loads(feed.get("transaction__context", {})).get("strength_id") == strength_id
+        ])).qs
+
+    def merge_querset(self, feeds, filter_appreciations):
+        post_ids = list(feeds.values_list("id", flat=True))
+        post_ids.extend(list(filter_appreciations.values_list("id", flat=True)))
+        return Post.objects.filter(id__in=post_ids)
+
     @list_route(methods=["GET"], permission_classes=(IsOptionsOrAuthenticated,))
     def organization_recognitions(self, request, *args, **kwargs):
         user = self.request.user
-        organization = user.organization
+        organizations = list(Organization.objects.get_affiliated(user).values_list("id", flat=True))
         post_polls = request.query_params.get("post_polls", None)
-        posts = accessible_posts_by_user(user, organization)
+        posts = accessible_posts_by_user(user, organizations)
+
         if post_polls:
             feeds = posts.filter((Q(post_type=POST_TYPE.USER_CREATED_POST) |
                                         Q(post_type=POST_TYPE.USER_CREATED_POLL)) &
-                                        Q(organizations=organization))
+                                        Q(organizations__in=organizations))
         else:
             feeds = posts.filter((Q(post_type=POST_TYPE.USER_CREATED_APPRECIATION) |
                                         Q(nomination__nom_status=NOMINATION_STATUS.approved)) &
-                                        Q(organizations=organization)).exclude(
+                                        Q(organizations__in=organizations)).exclude(
                                         user__hide_appreciation=True)
-
+        filter_appreciations = self.filter_appreciations(feeds)
         feeds = PostFilter(self.request.GET, queryset=feeds).qs
-
         search = self.request.query_params.get("search", None)
         if search:
             feeds = feeds.filter(Q(user__first_name__istartswith=search) |
                                  Q(user__last_name__istartswith=search) |
                                  Q(created_by__first_name__istartswith=search) |
                                  Q(created_by__last_name__istartswith=search))
-        feeds = feeds.order_by('-priority', '-id')
+
+        feeds = feeds | filter_appreciations
+        feeds = self.get_filtered_feeds_according_to_shared_with(feeds=feeds, user=user).order_by('-priority', '-id')
         page = self.paginate_queryset(feeds)
         serializer = PostFeedSerializer(page, context={"request": request}, many=True)
         feeds = self.get_paginated_response(serializer.data)
