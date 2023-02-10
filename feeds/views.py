@@ -701,8 +701,8 @@ class CommentViewset(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        org = self.request.user.organization
-        posts = accessible_posts_by_user(user, org)
+        affiliated_organizations = list(Organization.objects.get_affiliated(user).values_list("id", flat=True))
+        posts = accessible_posts_by_user(user, affiliated_organizations)
         result = Comment.objects.filter(post__in=posts, mark_delete=False)
         return result
 
