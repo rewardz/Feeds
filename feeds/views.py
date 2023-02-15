@@ -33,7 +33,7 @@ from .utils import (
     accessible_posts_by_user, extract_tagged_users, get_user_name, notify_new_comment,
     notify_new_poll_created, notify_flagged_post, push_notification, tag_users_to_comment,
     tag_users_to_post, user_can_delete, user_can_edit, get_date_range, since_last_appreciation,
-    get_current_month_end_date, get_absolute_url, SHARED_WITH, posts_not_visible_to_user
+    get_current_month_end_date, get_absolute_url, posts_not_visible_to_user
 )
 
 CustomUser = import_string(settings.CUSTOM_USER_MODEL)
@@ -44,6 +44,7 @@ NOMINATION_STATUS = import_string(settings.NOMINATION_STATUS)
 ORGANIZATION_SETTINGS_MODEL = import_string(settings.ORGANIZATION_SETTINGS_MODEL)
 MULTI_ORG_POST_ENABLE_FLAG = settings.MULTI_ORG_POST_ENABLE_FLAG
 Organization = import_string(settings.ORGANIZATION_MODEL)
+REPEATED_EVENT_TYPES = import_string(settings.REPEATED_EVENT_TYPES_CHOICE)
 
 
 class PostViewSet(viewsets.ModelViewSet):
@@ -1077,9 +1078,13 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         posts = accessible_posts_by_user(user, organizations)
 
         if post_polls:
-            feeds = posts.filter((Q(post_type=POST_TYPE.USER_CREATED_POST) |
-                                        Q(post_type=POST_TYPE.USER_CREATED_POLL)) &
-                                        Q(organizations__in=organizations))
+            feeds = posts.filter((
+                Q(post_type=POST_TYPE.USER_CREATED_POST) | Q(post_type=POST_TYPE.USER_CREATED_POLL) |
+                Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post", user__is_dob_public=True,
+                  greeting__event_type=REPEATED_EVENT_TYPES.event_birthday) |
+                Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post",
+                  greeting__event_type=REPEATED_EVENT_TYPES.event_anniversary)
+                ) & Q(organizations__in=organizations))
         else:
             feeds = posts.filter((Q(post_type=POST_TYPE.USER_CREATED_APPRECIATION) |
                                         Q(nomination__nom_status=NOMINATION_STATUS.approved)) &

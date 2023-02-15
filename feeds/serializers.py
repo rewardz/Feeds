@@ -12,7 +12,7 @@ from .models import (
     Post, PostLiked, PollsAnswer, Images, Videos, Voter,
 )
 from .utils import (
-    extract_tagged_users, get_departments, get_profile_image, tag_users_to_comment, 
+    extract_tagged_users, get_departments, get_profile_image, tag_users_to_comment,
     validate_priority, user_can_delete, user_can_edit
 )
 
@@ -25,6 +25,7 @@ UserStrength = import_string(settings.USER_STRENGTH_MODEL)
 NOMINATION_STATUS_COLOR_CODE = import_string(settings.NOMINATION_STATUS_COLOR_CODE)
 ORGANIZATION_SETTINGS_MODEL = import_string(settings.ORGANIZATION_SETTINGS_MODEL)
 MULTI_ORG_POST_ENABLE_FLAG = settings.MULTI_ORG_POST_ENABLE_FLAG
+RepeatedEventSerializer = import_string(settings.REPEATED_EVENT_SERIALIZER)
 
 
 def get_user_detail(user_id):
@@ -560,8 +561,8 @@ class PostDetailSerializer(PostSerializer):
             "appreciation_count", "appreciated_by", "comments_count", "comments",
             "tagged_users", "is_admin", "nomination", "feed_type", "user_strength", "user",
             "gif", "ecard", "points", "user_reaction_type", "images_with_ecard", "reaction_type", "category",
-            "category_name", "sub_category", "sub_category_name", "organization_name", "display_status", "department_name"
-            , "departments"
+            "category_name", "sub_category", "sub_category_name", "organization_name", "display_status",
+            "department_name", "departments"
         )
 
     def get_organization_name(self, instance):
@@ -603,6 +604,12 @@ class PostDetailSerializer(PostSerializer):
 class PostFeedSerializer(PostSerializer):
     user = UserInfoSerializer(read_only=True)
     ecard = ECardSerializer(read_only=True)
+    greeting_info = serializers.SerializerMethodField()
+
+    @staticmethod
+    def get_greeting_info(post):
+        if post.greeting:
+            return RepeatedEventSerializer(post.greeting).data
 
     class Meta:
         model = Post
@@ -615,7 +622,7 @@ class PostFeedSerializer(PostSerializer):
             "is_owner", "can_edit", "can_delete", "has_appreciated",
             "appreciation_count", "comments_count", "tagged_users", "is_admin", "tags", "reaction_type", "nomination",
             "feed_type", "user_strength", "user", "user_reaction_type", "gif", "ecard", "points", "time_left",
-            "images_with_ecard",
+            "images_with_ecard", "greeting_info"
         )
 
 
