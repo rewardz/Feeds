@@ -153,7 +153,7 @@ class Post(UserInfo):
     user = models.ForeignKey(CustomUser, related_name="appreciated_user", on_delete=models.CASCADE, null=True, blank=True)
     transaction = models.ForeignKey(Transaction, on_delete=models.CASCADE, null=True, blank=True)
     nomination = models.ForeignKey(Nominations, on_delete=models.CASCADE, null=True, blank=True)
-    greeting = models.ForeignKey(RepeatedEvent, on_delete=models.CASCADE, null=True, blank=True)
+    greeting = models.ForeignKey(RepeatedEvent, on_delete=models.CASCADE, null=True, blank=True, related_name="posts")
     ecard = models.ForeignKey(ECard, on_delete=models.CASCADE, null=True, blank=True)
     gif = models.URLField(null=True, blank=True)
     cc_users = models.ManyToManyField(CustomUser, related_name="cc_users", blank=True)
