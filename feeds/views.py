@@ -1,5 +1,6 @@
 from __future__ import division, print_function, unicode_literals
 
+import datetime
 from json import loads
 from django.conf import settings
 from django.db import transaction
@@ -27,7 +28,7 @@ from .serializers import (
     DocumentsSerializer, ECardCategorySerializer, ECardSerializer,
     FlagPostSerializer, PostLikedSerializer, PostSerializer,
     PostDetailSerializer, PollsAnswerSerializer, ImagesSerializer,
-    UserInfoSerializer, VideosSerializer, PostFeedSerializer
+    UserInfoSerializer, VideosSerializer, PostFeedSerializer, GreetingSerializer
 )
 from .utils import (
     accessible_posts_by_user, extract_tagged_users, get_user_name, notify_new_comment,
@@ -1075,6 +1076,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         user = self.request.user
         organizations = list(Organization.objects.get_affiliated(user).values_list("id", flat=True))
         post_polls = request.query_params.get("post_polls", None)
+        greeting = request.query_params.get("greeting", None)
         posts = accessible_posts_by_user(user, organizations)
 
         if post_polls:
@@ -1085,6 +1087,9 @@ class UserFeedViewSet(viewsets.ModelViewSet):
                 Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post",
                   greeting__event_type=REPEATED_EVENT_TYPES.event_anniversary)
                 ) & Q(organizations__in=organizations))
+        elif greeting:
+            feeds = posts.filter(Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting", greeting_id=greeting,
+                                   organizations__in=organizations, created_on__year=datetime.datetime.now().year))
         else:
             feeds = posts.filter((Q(post_type=POST_TYPE.USER_CREATED_APPRECIATION) |
                                         Q(nomination__nom_status=NOMINATION_STATUS.approved)) &
@@ -1102,6 +1107,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         feeds = feeds | filter_appreciations
         feeds = self.get_filtered_feeds_according_to_shared_with(feeds=feeds, user=user).order_by('-priority', '-id')
         page = self.paginate_queryset(feeds)
-        serializer = PostFeedSerializer(page, context={"request": request}, many=True)
+        serializer = GreetingSerializer if greeting else PostFeedSerializer
+        serializer = serializer(page, context={"request": request}, many=True)
         feeds = self.get_paginated_response(serializer.data)
         return feeds

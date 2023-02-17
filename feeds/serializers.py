@@ -626,6 +626,17 @@ class PostFeedSerializer(PostSerializer):
         )
 
 
+class GreetingSerializer(PostFeedSerializer):
+
+    class Meta:
+        model = Post
+        fields = (
+            "id", "created_by", "created_on", "organizations", "created_by_user_info", "title", "description",
+            "post_type", "priority", "shared_with", "is_owner", "tagged_users", "is_admin", "tags", "feed_type",
+            "gif", "ecard", "images_with_ecard", "greeting_info"
+        )
+
+
 class CommentSerializer(serializers.ModelSerializer):
     commented_by_user_info = serializers.SerializerMethodField()
     liked_count = serializers.SerializerMethodField()
