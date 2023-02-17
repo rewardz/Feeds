@@ -1088,8 +1088,10 @@ class UserFeedViewSet(viewsets.ModelViewSet):
                   greeting__event_type=REPEATED_EVENT_TYPES.event_anniversary)
                 ) & Q(organizations__in=organizations))
         elif greeting:
-            feeds = posts.filter(Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting", greeting_id=greeting,
-                                   organizations__in=organizations, created_on__year=datetime.datetime.now().year))
+            feeds = posts.filter(
+                post_type=POST_TYPE.GREETING_MESSAGE, title="greeting", greeting_id=greeting, user=user,
+                organizations__in=organizations, created_on__year=datetime.datetime.now().year
+            )
         else:
             feeds = posts.filter((Q(post_type=POST_TYPE.USER_CREATED_APPRECIATION) |
                                         Q(nomination__nom_status=NOMINATION_STATUS.approved)) &
