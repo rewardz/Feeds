@@ -12,7 +12,7 @@ from .models import (
     Post, PostLiked, PollsAnswer, Images, Videos, Voter,
 )
 from .utils import (
-    extract_tagged_users, get_departments, get_profile_image, tag_users_to_comment, 
+    extract_tagged_users, get_departments, get_profile_image, tag_users_to_comment,
     validate_priority, user_can_delete, user_can_edit
 )
 
@@ -548,6 +548,7 @@ class PostDetailSerializer(PostSerializer):
     organization_name = serializers.SerializerMethodField()
     display_status = serializers.SerializerMethodField()
     department_name = serializers.SerializerMethodField()
+    can_download = serializers.SerializerMethodField()
 
     class Meta:
         model = Post
@@ -560,9 +561,12 @@ class PostDetailSerializer(PostSerializer):
             "appreciation_count", "appreciated_by", "comments_count", "comments",
             "tagged_users", "is_admin", "nomination", "feed_type", "user_strength", "user",
             "gif", "ecard", "points", "user_reaction_type", "images_with_ecard", "reaction_type", "category",
-            "category_name", "sub_category", "sub_category_name", "organization_name", "display_status", "department_name"
-            , "departments"
+            "category_name", "sub_category", "sub_category_name", "organization_name", "display_status",
+            "department_name", "departments", "can_download",
         )
+
+    def get_can_download(self, instance):
+        return instance.user == self.context.get("request").user
 
     def get_organization_name(self, instance):
         return instance.feedback.organization_name if instance.feedback else ""
