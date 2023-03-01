@@ -13,7 +13,7 @@ from .models import (
 )
 from .utils import (
     extract_tagged_users, get_departments, get_profile_image, tag_users_to_comment,
-    validate_priority, user_can_delete, user_can_edit
+    validate_priority, user_can_delete, user_can_edit, get_absolute_url
 )
 
 DEPARTMENT_MODEL = import_string(settings.DEPARTMENT_MODEL)
@@ -30,6 +30,19 @@ RepeatedEventSerializer = import_string(settings.REPEATED_EVENT_SERIALIZER)
 
 def get_user_detail(user_id):
     return getattr(UserModel, settings.ALL_USER_OBJECT).filter(pk=user_id).first()
+
+
+def get_user_detail_with_ord(post):
+    user = post.user
+    user_details = UserInfoSerializer(instance=user, read_only=True).data
+    if post.greeting:
+        user_details.update({
+            "organization_name": user.organization.name,
+            "organization_logo": (
+                get_absolute_url(user.organization.display_img_url) if user.organization.display_img_url else ""
+            )
+        })
+    return user_details
 
 
 class DynamicFieldsModelSerializer(serializers.ModelSerializer):
@@ -540,7 +553,7 @@ class CommentsLikedSerializer(serializers.ModelSerializer):
 class PostDetailSerializer(PostSerializer):
     comments = serializers.SerializerMethodField()
     appreciated_by = serializers.SerializerMethodField()
-    user = UserInfoSerializer(read_only=True)
+    user = serializers.SerializerMethodField()
     ecard = ECardSerializer(read_only=True)
     category = serializers.CharField(read_only=True)
     category_name = serializers.CharField(read_only=True)
@@ -565,6 +578,10 @@ class PostDetailSerializer(PostSerializer):
             "category_name", "sub_category", "sub_category_name", "organization_name", "display_status",
             "department_name", "departments", "greeting_info"
         )
+
+    @staticmethod
+    def get_user(post):
+        return get_user_detail_with_ord(post)
 
     @staticmethod
     def get_greeting_info(post):
@@ -608,7 +625,7 @@ class PostDetailSerializer(PostSerializer):
 
 
 class PostFeedSerializer(PostSerializer):
-    user = UserInfoSerializer(read_only=True)
+    user = serializers.SerializerMethodField()
     ecard = ECardSerializer(read_only=True)
     greeting_info = serializers.SerializerMethodField()
 
@@ -616,6 +633,10 @@ class PostFeedSerializer(PostSerializer):
     def get_greeting_info(post):
         if post.greeting:
             return RepeatedEventSerializer(post.greeting).data
+
+    @staticmethod
+    def get_user(post):
+        return get_user_detail_with_ord(post)
 
     class Meta:
         model = Post
