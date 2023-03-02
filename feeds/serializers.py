@@ -549,6 +549,7 @@ class PostDetailSerializer(PostSerializer):
     display_status = serializers.SerializerMethodField()
     department_name = serializers.SerializerMethodField()
     can_download = serializers.SerializerMethodField()
+    is_download_choice_needed = serializers.SerializerMethodField()
 
     class Meta:
         model = Post
@@ -562,8 +563,35 @@ class PostDetailSerializer(PostSerializer):
             "tagged_users", "is_admin", "nomination", "feed_type", "user_strength", "user",
             "gif", "ecard", "points", "user_reaction_type", "images_with_ecard", "reaction_type", "category",
             "category_name", "sub_category", "sub_category_name", "organization_name", "display_status",
-            "department_name", "departments", "can_download",
+            "department_name", "departments", "can_download", "is_download_choice_needed"
         )
+
+    @staticmethod
+    def get_is_download_choice_needed(post):
+        """
+        Decides if popup should be open or not to select image in frontend
+        """
+        is_download_choice_needed = True
+        if post.certificate_records.count():
+            # already we have choice selected
+            is_download_choice_needed = False
+        else:
+            total_attached_images = post.attached_images().count()
+            ecard = post.ecard
+            gif = post.gif
+            if gif:
+                # if we have gif
+                is_download_choice_needed = False
+            elif total_attached_images == 1 and not ecard:
+                # we have only one image and no e card
+                is_download_choice_needed = False
+            elif total_attached_images == 0 and ecard:
+                # we have 0 image and have ecard
+                is_download_choice_needed = False
+            elif all([not total_attached_images, not ecard, not gif]):
+                # we don't have image/ ecard/ gif
+                is_download_choice_needed = False
+        return is_download_choice_needed
 
     def get_can_download(self, instance):
         return instance.user == self.context.get("request").user
