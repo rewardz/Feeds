@@ -1084,7 +1084,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
                 Q(post_type=POST_TYPE.USER_CREATED_POST) | Q(post_type=POST_TYPE.USER_CREATED_POLL) |
                 Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post", user__is_dob_public=True,
                   greeting__event_type=REPEATED_EVENT_TYPES.event_birthday) |
-                Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post",
+                Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post", user__is_anniversary_public=True,
                   greeting__event_type=REPEATED_EVENT_TYPES.event_anniversary)
                 ) & Q(organizations__in=organizations))
         elif greeting:
