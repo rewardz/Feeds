@@ -418,12 +418,12 @@ class PostViewSet(viewsets.ModelViewSet):
     @detail_route(methods=["POST"], permission_classes=(IsOptionsOrAuthenticated,))
     def appreciate(self, request, *args, **kwargs):
         user = self.request.user
-        organization = user.organization
+        organizations = list(Organization.objects.get_affiliated(user).values_list("id", flat=True))
         post_id = self.kwargs.get("pk", None)
         if not post_id:
             raise ValidationError(_('Post ID required to appreciate a post'))
         post_id = int(post_id)
-        accessible_posts = accessible_posts_by_user(user, organization).values_list('id', flat=True)
+        accessible_posts = accessible_posts_by_user(user, organizations).values_list('id', flat=True)
         if post_id not in accessible_posts:
             raise ValidationError(_('You do not have access to this post'))
         reaction_type = self.request.data.get('type', 0)  # to handle existing workflow
@@ -701,8 +701,8 @@ class CommentViewset(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        org = self.request.user.organization
-        posts = accessible_posts_by_user(user, org)
+        affiliated_organizations = list(Organization.objects.get_affiliated(user).values_list("id", flat=True))
+        posts = accessible_posts_by_user(user, affiliated_organizations)
         result = Comment.objects.filter(post__in=posts, mark_delete=False)
         return result
 
