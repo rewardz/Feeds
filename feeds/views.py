@@ -52,6 +52,13 @@ class PostViewSet(viewsets.ModelViewSet):
     pagination_class = FeedsResultsSetPagination
     filter_backends = (filters.DjangoFilterBackend,)
 
+    @staticmethod
+    def get_affiliated_orgs(user):
+        """
+        Returns affiliated orgs for user
+        """
+        return list(Organization.objects.get_affiliated(user).values_list("id", flat=True))
+
     def _create_or_update(self, request, create=False):
         payload = request.data
         current_user = self.request.user
@@ -225,13 +232,6 @@ class PostViewSet(viewsets.ModelViewSet):
         instance.mark_as_delete(user)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    def get_organization(self):
-        """
-        Returns affiliated organizations list if user is staff else user's organization
-        """
-        user = self.request.user
-        return list(Organization.objects.get_affiliated(user)) if user.is_staff else user.organization
-
     def get_serializer(self, *args, **kwargs):
         if "pk" in self.kwargs:
             serializer_class = PostDetailSerializer
@@ -257,7 +257,7 @@ class PostViewSet(viewsets.ModelViewSet):
             departments = user.departments.all()
             query.add(Q(departments__in=departments, created_by__departments__in=departments), query.connector)
         else:
-            result = accessible_posts_by_user(user, org, allow_feedback=allow_feedback)
+            result = accessible_posts_by_user(user, self.get_affiliated_orgs(user), allow_feedback=allow_feedback)
 
         if created_by in ("user_org", "user_dept"):
             result = Post.objects.filter(query)
@@ -337,7 +337,7 @@ class PostViewSet(viewsets.ModelViewSet):
             raise ValidationError(_('Post ID required to retrieve all the related comments'))
         post_id = int(post_id)
 
-        accessible_posts_queryset = accessible_posts_by_user(user, self.get_organization(),
+        accessible_posts_queryset = accessible_posts_by_user(user, self.get_affiliated_orgs(user),
                                                              allow_feedback=allow_feedback)
         accessible_posts = accessible_posts_queryset.values_list('id', flat=True)
         if post_id not in accessible_posts:
