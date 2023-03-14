@@ -46,6 +46,13 @@ MULTI_ORG_POST_ENABLE_FLAG = settings.MULTI_ORG_POST_ENABLE_FLAG
 Organization = import_string(settings.ORGANIZATION_MODEL)
 
 
+def get_organizations(user, appreciation=False):
+    return (
+        list(Organization.objects.get_affiliated(user).values_list("id", flat=True)) if
+        appreciation else [user.organization_id]
+    )
+
+
 class PostViewSet(viewsets.ModelViewSet):
     parser_classes = (MultiPartParser, JSONParser, FormParser,)
     permission_classes = (IsOptionsOrAuthenticated,)
@@ -257,7 +264,7 @@ class PostViewSet(viewsets.ModelViewSet):
             departments = user.departments.all()
             query.add(Q(departments__in=departments, created_by__departments__in=departments), query.connector)
         else:
-            result = accessible_posts_by_user(user, self.get_affiliated_orgs(user), allow_feedback=allow_feedback)
+            result = accessible_posts_by_user(user, org, allow_feedback=allow_feedback)
 
         if created_by in ("user_org", "user_dept"):
             result = Post.objects.filter(query)
@@ -701,8 +708,7 @@ class CommentViewset(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        affiliated_organizations = list(Organization.objects.get_affiliated(user).values_list("id", flat=True))
-        posts = accessible_posts_by_user(user, affiliated_organizations)
+        posts = accessible_posts_by_user(user, user.organization)
         result = Comment.objects.filter(post__in=posts, mark_delete=False)
         return result
 
@@ -862,7 +868,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         feed_flag = self.request.query_params.get("feed", None)
         search = self.request.query_params.get("search", None)
         user = self.request.user
-        organization = list(Organization.objects.get_affiliated(user).values_list("id", flat=True))
+        organization = get_organizations(user=user, appreciation=feed_flag != "post_polls")
         posts = accessible_posts_by_user(user, organization)
         if feed_flag == "post_polls":
             feeds = posts.filter(post_type__in=[POST_TYPE.USER_CREATED_POST,
@@ -1072,8 +1078,8 @@ class UserFeedViewSet(viewsets.ModelViewSet):
     @list_route(methods=["GET"], permission_classes=(IsOptionsOrAuthenticated,))
     def organization_recognitions(self, request, *args, **kwargs):
         user = self.request.user
-        organizations = list(Organization.objects.get_affiliated(user).values_list("id", flat=True))
         post_polls = request.query_params.get("post_polls", None)
+        organizations = get_organizations(user=user, appreciation=False if post_polls else True)
         posts = accessible_posts_by_user(user, organizations)
 
         if post_polls:
