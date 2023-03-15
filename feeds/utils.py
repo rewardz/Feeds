@@ -31,19 +31,22 @@ USER_DEPARTMENT_RELATED_NAME = settings.USER_DEPARTMENT_RELATED_NAME
 ORGANIZATION_SETTINGS_MODEL = import_string(settings.ORGANIZATION_SETTINGS_MODEL)
 
 
-def accessible_posts_by_user(user, organization, allow_feedback=False):
+def accessible_posts_by_user(user, organization, allow_feedback=False, appreciations=False):
     if not isinstance(organization, (list, tuple)):
         organization = [organization]
 
     # get the departments to which this user belongs
     user_depts = getattr(user, USER_DEPARTMENT_RELATED_NAME).all()
-
-    # get the post belongs to organization
-    result = Post.objects.filter(
-        Q(mark_delete=False) & (
+    query = Q(mark_delete=False) & (
             Q(organizations__in=organization) | Q(departments__in=user_depts)
         ) | Q(mark_delete=False, created_by=user)
-    )
+
+    if appreciations:
+        query.add(Q(post_type=POST_TYPE.USER_CREATED_APPRECIATION,
+                    organization=user.get_affiliated_orgs(), mark_delete=False), Q.OR)
+
+    # get the post belongs to organization
+    result = Post.objects.filter(query)
 
     # filter / exclude feedback based on the allow_feedback
     if not allow_feedback:
