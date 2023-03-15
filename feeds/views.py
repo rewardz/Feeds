@@ -33,7 +33,7 @@ from .utils import (
     accessible_posts_by_user, extract_tagged_users, get_user_name, notify_new_comment,
     notify_new_poll_created, notify_flagged_post, push_notification, tag_users_to_comment,
     tag_users_to_post, user_can_delete, user_can_edit, get_date_range, since_last_appreciation,
-    get_current_month_end_date, get_absolute_url, SHARED_WITH, posts_not_visible_to_user
+    get_current_month_end_date, get_absolute_url, posts_not_visible_to_user
 )
 
 CustomUser = import_string(settings.CUSTOM_USER_MODEL)
@@ -337,7 +337,7 @@ class PostViewSet(viewsets.ModelViewSet):
             raise ValidationError(_('Post ID required to retrieve all the related comments'))
         post_id = int(post_id)
         accessible_posts_queryset = accessible_posts_by_user(user, user.organization, allow_feedback,
-                                                    is_appreciation_post(post_id)).values_list('id', flat=True)
+                                                             is_appreciation_post(post_id)).values_list('id', flat=True)
         accessible_posts = accessible_posts_queryset.values_list('id', flat=True)
         if post_id not in accessible_posts:
             raise ValidationError(_('You do not have access to comment on this post'))
