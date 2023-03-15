@@ -47,6 +47,9 @@ Organization = import_string(settings.ORGANIZATION_MODEL)
 
 
 def get_organizations(user, appreciation=False):
+    """
+    Returns affiliated orgs for appreciation otherwise user's organization
+    """
     return (
         list(Organization.objects.get_affiliated(user).values_list("id", flat=True)) if
         appreciation else [user.organization_id]
@@ -60,11 +63,11 @@ class PostViewSet(viewsets.ModelViewSet):
     filter_backends = (filters.DjangoFilterBackend,)
 
     @staticmethod
-    def get_affiliated_orgs(user):
+    def is_appreciation_post(post_id):
         """
-        Returns affiliated orgs for user
+        Returns True if post is user created appreciation
         """
-        return list(Organization.objects.get_affiliated(user).values_list("id", flat=True))
+        return Post.objects.filter(post_type=POST_TYPE.USER_CREATED_APPRECIATION, id=post_id).exists()
 
     def _create_or_update(self, request, create=False):
         payload = request.data
@@ -343,9 +346,8 @@ class PostViewSet(viewsets.ModelViewSet):
         if not post_id:
             raise ValidationError(_('Post ID required to retrieve all the related comments'))
         post_id = int(post_id)
-
-        accessible_posts_queryset = accessible_posts_by_user(user, self.get_affiliated_orgs(user),
-                                                             allow_feedback=allow_feedback)
+        accessible_posts_queryset = accessible_posts_by_user(user, get_organizations(
+            user=user, appreciation=self.is_appreciation_post(post_id)), allow_feedback=allow_feedback)
         accessible_posts = accessible_posts_queryset.values_list('id', flat=True)
         if post_id not in accessible_posts:
             raise ValidationError(_('You do not have access to comment on this post'))
@@ -425,12 +427,12 @@ class PostViewSet(viewsets.ModelViewSet):
     @detail_route(methods=["POST"], permission_classes=(IsOptionsOrAuthenticated,))
     def appreciate(self, request, *args, **kwargs):
         user = self.request.user
-        organizations = list(Organization.objects.get_affiliated(user).values_list("id", flat=True))
         post_id = self.kwargs.get("pk", None)
         if not post_id:
             raise ValidationError(_('Post ID required to appreciate a post'))
         post_id = int(post_id)
-        accessible_posts = accessible_posts_by_user(user, organizations).values_list('id', flat=True)
+        accessible_posts = accessible_posts_by_user(user, get_organizations(
+            user=user, appreciation=self.is_appreciation_post(post_id))).values_list('id', flat=True)
         if post_id not in accessible_posts:
             raise ValidationError(_('You do not have access to this post'))
         reaction_type = self.request.data.get('type', 0)  # to handle existing workflow
@@ -558,13 +560,13 @@ class PostViewSet(viewsets.ModelViewSet):
     @detail_route(methods=["POST"], permission_classes=(permissions.IsAuthenticated,))
     def flag(self, request, *args, **kwargs):
         user = self.request.user
-        organizations = list(Organization.objects.get_affiliated(user).values_list("id", flat=True))
         post_id = self.kwargs.get("pk", None)
-        payload = self.request.data
-        data = {k: v for k, v in payload.items()}
         if not post_id:
             raise ValidationError(_('Post ID required to vote'))
         post_id = int(post_id)
+        organizations = get_organizations(user=user, appreciation=self.is_appreciation_post(post_id=post_id))
+        payload = self.request.data
+        data = {k: v for k, v in payload.items()}
         accessible_posts = accessible_posts_by_user(user, organizations).values_list('id', flat=True)
         if post_id not in accessible_posts:
             raise ValidationError(_('You do not have access'))
@@ -868,7 +870,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         feed_flag = self.request.query_params.get("feed", None)
         search = self.request.query_params.get("search", None)
         user = self.request.user
-        organization = get_organizations(user=user, appreciation=feed_flag != "post_polls")
+        organization = user.organization
         posts = accessible_posts_by_user(user, organization)
         if feed_flag == "post_polls":
             feeds = posts.filter(post_type__in=[POST_TYPE.USER_CREATED_POST,
