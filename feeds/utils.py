@@ -43,7 +43,7 @@ def accessible_posts_by_user(user, organization, allow_feedback=False, appreciat
 
     if appreciations:
         query.add(Q(post_type=POST_TYPE.USER_CREATED_APPRECIATION,
-                    organization=user.get_affiliated_orgs(), mark_delete=False), Q.OR)
+                    organizations__in=user.get_affiliated_orgs(), mark_delete=False), Q.OR)
 
     # get the post belongs to organization
     result = Post.objects.filter(query)
