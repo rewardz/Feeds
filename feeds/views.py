@@ -1081,10 +1081,10 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         if post_polls:
             feeds = posts.filter((Q(post_type=POST_TYPE.USER_CREATED_POST) |
                                         Q(post_type=POST_TYPE.USER_CREATED_POLL)) &
-                                        Q(organizations__in=organizations))
+                                        Q(organizations__in=[organizations]))
         else:
             query = (Q(post_type=POST_TYPE.USER_CREATED_APPRECIATION, organizations__in=user.get_affiliated_orgs()) |
-                     Q(nomination__nom_status=NOMINATION_STATUS.approved, organizations__in=organizations))
+                     Q(nomination__nom_status=NOMINATION_STATUS.approved, organizations__in=[organizations]))
             feeds = posts.filter(query).exclude(user__hide_appreciation=True)
 
         filter_appreciations = self.filter_appreciations(feeds)
