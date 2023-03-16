@@ -385,7 +385,19 @@ def admin_feeds_to_exclude(posts, user):
     return posts.filter(query)
 
 
-def posts_not_visible_to_user(posts, user):
+def shared_with_all_departments_but_not_belongs_to_user_org(posts, user):
+    """
+    Returns filtered (posts which are shared with all departments but created by user's org
+    does not match with user's org ) queryset to exclude
+    posts: QuerySet[Post]
+    user: CustomUser
+    """
+    query = Q(shared_with=SHARED_WITH.ALL_DEPARTMENTS)
+    query.add(~Q(created_by__organization=user.organization), query.connector)
+    return posts.filter(query)
+
+
+def posts_not_visible_to_user(posts, user, post_polls):
     """
     Returns List of post ids to exclude
     params: posts: QuerySet[Post]
@@ -393,4 +405,7 @@ def posts_not_visible_to_user(posts, user):
     """
     posts_ids_to_exclude = list(posts_not_shared_with_self_department(posts, user).values_list("id", flat=True))
     posts_ids_to_exclude.extend(list(admin_feeds_to_exclude(posts, user).values_list("id", flat=True)))
+    if post_polls:
+        posts_ids_to_exclude.extend(list(shared_with_all_departments_but_not_belongs_to_user_org(
+            posts, user).values_list("id", flat=True)))
     return posts_ids_to_exclude

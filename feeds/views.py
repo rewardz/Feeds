@@ -849,15 +849,16 @@ class UserFeedViewSet(viewsets.ModelViewSet):
     pagination_class = FeedsResultsSetPagination
 
     @staticmethod
-    def get_filtered_feeds_according_to_shared_with(feeds, user):
+    def get_filtered_feeds_according_to_shared_with(feeds, user, post_polls):
         """
         Returns filtered queryset (same dept posts will be returned if post is shared with departments)
         (All posts will be returned if shared with within organization)
         (hide posts which has shared with is admin only)
         params: posts: QuerySet[Post]
         params: user: CustomUser
+        params: post_polls: Bool
         """
-        return feeds.exclude(id__in=posts_not_visible_to_user(feeds, user))
+        return feeds.exclude(id__in=posts_not_visible_to_user(feeds, user, post_polls))
 
     def get_queryset(self):
         feed_flag = self.request.query_params.get("feed", None)
@@ -1096,7 +1097,8 @@ class UserFeedViewSet(viewsets.ModelViewSet):
                                  Q(created_by__last_name__istartswith=search))
 
         feeds = feeds | filter_appreciations
-        feeds = self.get_filtered_feeds_according_to_shared_with(feeds=feeds, user=user).order_by('-priority', '-id')
+        feeds = self.get_filtered_feeds_according_to_shared_with(feeds=feeds, user=user,
+                                                                 post_polls=post_polls).order_by('-priority', '-id')
         page = self.paginate_queryset(feeds)
         serializer = PostFeedSerializer(page, context={"request": request}, many=True)
         feeds = self.get_paginated_response(serializer.data)
