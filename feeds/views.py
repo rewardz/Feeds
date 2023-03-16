@@ -699,24 +699,35 @@ class CommentViewset(viewsets.ModelViewSet):
         kwargs["context"] = {"request": self.request}
         return serializer_class(*args, **kwargs)
 
+    @staticmethod
+    def get_post_id_from_comment(comment_id):
+        post_id = 0
+        if comment_id:
+            comment = Comment.objects.filter(id=comment_id).first()
+            post_id = comment.post_id if comment else 0
+        return post_id
+
     def get_queryset(self):
         user = self.request.user
-        post_id = self.kwargs.get("pk", 0)
+        post_id = self.get_post_id_from_comment(self.kwargs.get("pk", 0))
         posts = accessible_posts_by_user(user, user.organization, False,
                                          is_appreciation_post(post_id) if post_id else False)
+
         result = Comment.objects.filter(post__in=posts, mark_delete=False)
         return result
 
     @detail_route(methods=["POST"], permission_classes=(IsOptionsOrAuthenticated,))
     def like(self, request, *args, **kwargs):
         user = self.request.user
-        organization = user.organization
-        posts = accessible_posts_by_user(user, organization)
-        accessible_comments = Comment.objects.filter(post__in=posts) \
-            .values_list('id', flat=True)
         comment_id = self.kwargs.get("pk", None)
         if not comment_id:
             raise ValidationError(_('Comment ID is required'))
+        post_id = self.get_post_id_from_comment(self.kwargs.get("pk", 0))
+        organization = user.organization
+        posts = accessible_posts_by_user(user, organization, False, is_appreciation_post(post_id) if post_id else False)
+        accessible_comments = Comment.objects.filter(post__in=posts) \
+            .values_list('id', flat=True)
+
         comment_id = int(comment_id)
         if comment_id not in accessible_comments:
             raise ValidationError(_('Not allowed to like the comment'))
