@@ -249,7 +249,7 @@ class PostViewSet(viewsets.ModelViewSet):
             allow_feedback = False
         user = self.request.user
         org = self.request.user.organization
-
+        post_id = self.kwargs.get("pk", None)
         query = Q(mark_delete=False, post_type=POST_TYPE.USER_CREATED_POST)
         if created_by == "user_org":
             query.add(Q(organizations=org, created_by__organization=org), query.connector)
@@ -257,7 +257,8 @@ class PostViewSet(viewsets.ModelViewSet):
             departments = user.departments.all()
             query.add(Q(departments__in=departments, created_by__departments__in=departments), query.connector)
         else:
-            result = accessible_posts_by_user(user, org, allow_feedback=allow_feedback)
+            result = accessible_posts_by_user(user, org, allow_feedback=allow_feedback,
+                                              appreciations=is_appreciation_post(post_id) if post_id else False)
 
         if created_by in ("user_org", "user_dept"):
             result = Post.objects.filter(query)
@@ -700,7 +701,9 @@ class CommentViewset(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        posts = accessible_posts_by_user(user, user.organization)
+        post_id = self.kwargs.get("pk", 0)
+        posts = accessible_posts_by_user(user, user.organization, False,
+                                         is_appreciation_post(post_id) if post_id else False)
         result = Comment.objects.filter(post__in=posts, mark_delete=False)
         return result
 
@@ -904,7 +907,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         organization = user.organization
         posts = accessible_posts_by_user(user, organization)
         approvals_count = posts.filter(post_type=POST_TYPE.USER_CREATED_NOMINATION,
-                                              nomination__assigned_reviewer=request.user).exclude(
+                                       nomination__assigned_reviewer=request.user).exclude(
             nomination__nom_status__in=[NOMINATION_STATUS.approved, NOMINATION_STATUS.rejected]).count()
         if (request.user.userdesignation_set.count() > 0 or request.user.reviewer_users.count() > 0) and \
                 approvals_count > 0:
@@ -1072,7 +1075,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         user = self.request.user
         post_polls = request.query_params.get("post_polls", None)
         organizations = user.organization
-        posts = accessible_posts_by_user(user, organizations)
+        posts = accessible_posts_by_user(user, organizations, False if post_polls else True)
 
         if post_polls:
             feeds = posts.filter((Q(post_type=POST_TYPE.USER_CREATED_POST) |
