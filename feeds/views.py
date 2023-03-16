@@ -1076,7 +1076,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         user = self.request.user
         post_polls = request.query_params.get("post_polls", None)
         organizations = user.organization
-        posts = accessible_posts_by_user(user, organizations, False if post_polls else True)
+        posts = accessible_posts_by_user(user, organizations, False, False if post_polls else True)
 
         if post_polls:
             feeds = posts.filter((Q(post_type=POST_TYPE.USER_CREATED_POST) |
