@@ -1108,8 +1108,8 @@ class UserFeedViewSet(viewsets.ModelViewSet):
                                  Q(created_by__last_name__istartswith=search))
 
         feeds = feeds | filter_appreciations
-        feeds = self.get_filtered_feeds_according_to_shared_with(feeds=feeds, user=user,
-                                                                 post_polls=post_polls).order_by('-priority', '-id')
+        feeds = self.get_filtered_feeds_according_to_shared_with(
+            feeds=feeds, user=user, post_polls=post_polls).order_by('-priority', '-created_on')
         page = self.paginate_queryset(feeds)
         serializer = PostFeedSerializer(page, context={"request": request}, many=True)
         feeds = self.get_paginated_response(serializer.data)
