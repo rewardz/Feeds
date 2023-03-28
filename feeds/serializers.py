@@ -632,7 +632,11 @@ class PostFeedSerializer(PostSerializer):
     @staticmethod
     def get_greeting_info(post):
         if post.greeting:
-            return RepeatedEventSerializer(post.greeting).data
+            return RepeatedEventSerializer(
+                post.greeting,
+                context={
+                    "show_greeting_department": post.user.organization.has_setting_to_show_greeting_department
+                }).data
 
     @staticmethod
     def get_user(post):
