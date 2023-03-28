@@ -907,7 +907,8 @@ class UserFeedViewSet(viewsets.ModelViewSet):
                 user__last_name__istartswith=search) | Q(created_by__first_name__istartswith=search) | Q(
                 created_by__last_name__istartswith=search))
 
-        return self.get_filtered_feeds_according_to_shared_with(feeds=feeds, user=user).distinct()
+        return self.get_filtered_feeds_according_to_shared_with(feeds=feeds, user=user,
+                                                                post_polls=feed_flag == "post_polls").distinct()
 
     def list(self, request, *args, **kwargs):
         show_approvals = False
