@@ -45,6 +45,19 @@ def get_user_detail_with_ord(post):
     return user_details
 
 
+def get_info_for_greeting_post(post):
+    """
+    Returns greeting details if it is public post then we are passing ORG setting which decides to show name of DEPT
+    :params: post: Post
+    :returns: dict: RepeatedEventSerializer
+    """
+    context = {}
+    if post.title == "greeting_post":
+        context.update(
+            {"show_greeting_department": post.user.organization.has_setting_to_show_greeting_department})
+    return RepeatedEventSerializer(post.greeting, context=context).data
+
+
 class DynamicFieldsModelSerializer(serializers.ModelSerializer):
     """
     A ModelSerializer that takes an additional `fields` argument that
@@ -585,8 +598,7 @@ class PostDetailSerializer(PostSerializer):
 
     @staticmethod
     def get_greeting_info(post):
-        if post.greeting:
-            return RepeatedEventSerializer(post.greeting).data
+        return get_info_for_greeting_post(post)
 
     def get_organization_name(self, instance):
         return instance.feedback.organization_name if instance.feedback else ""
@@ -631,12 +643,7 @@ class PostFeedSerializer(PostSerializer):
 
     @staticmethod
     def get_greeting_info(post):
-        if post.greeting:
-            context = {}
-            if post.title == "greeting_post":
-                context.update(
-                    {"show_greeting_department": post.user.organization.has_setting_to_show_greeting_department})
-            return RepeatedEventSerializer(post.greeting, context=context).data
+        return get_info_for_greeting_post(post)
 
     @staticmethod
     def get_user(post):
