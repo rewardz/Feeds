@@ -33,7 +33,8 @@ from .utils import (
     accessible_posts_by_user, extract_tagged_users, get_user_name, notify_new_comment,
     notify_new_poll_created, notify_flagged_post, push_notification, tag_users_to_comment,
     tag_users_to_post, user_can_delete, user_can_edit, get_date_range, since_last_appreciation,
-    get_current_month_end_date, get_absolute_url, posts_not_visible_to_user
+    get_current_month_end_date, get_absolute_url, posts_not_visible_to_user,
+    posts_not_shared_with_self_department
 )
 
 CustomUser = import_string(settings.CUSTOM_USER_MODEL)
@@ -262,6 +263,9 @@ class PostViewSet(viewsets.ModelViewSet):
 
         if created_by in ("user_org", "user_dept"):
             result = Post.objects.filter(query)
+
+        result = result.exclude(
+            id__in=list(posts_not_shared_with_self_department(result, user).values_list("id", flat=True)))
 
         result = PostFilter(self.request.GET, queryset=result).qs
         result = result.order_by('-priority', '-modified_on', '-created_on')
