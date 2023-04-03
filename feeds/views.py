@@ -266,7 +266,9 @@ class PostViewSet(viewsets.ModelViewSet):
 
         result = result.exclude(
             id__in=list(posts_not_shared_with_self_department(result, user).values_list("id", flat=True)))
-        result = result | posts_shared_with_org_department(user, [POST_TYPE.USER_CREATED_POST])
+
+        result = (result | posts_shared_with_org_department(
+            user, [POST_TYPE.USER_CREATED_POST], result.values_list("id", flat=True))).distinct()
 
         result = PostFilter(self.request.GET, queryset=result).qs
         result = result.order_by('-priority', '-modified_on', '-created_on')
@@ -1113,7 +1115,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
                                  Q(created_by__first_name__istartswith=search) |
                                  Q(created_by__last_name__istartswith=search))
 
-        feeds = feeds | filter_appreciations
+        feeds = (feeds | filter_appreciations).distinct()
         feeds = self.get_filtered_feeds_according_to_shared_with(
             feeds=feeds, user=user, post_polls=post_polls).order_by('-priority', '-created_on')
         page = self.paginate_queryset(feeds)
