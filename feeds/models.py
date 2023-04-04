@@ -137,7 +137,7 @@ class ECardCategory(models.Model):
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE, null=True, blank=True)
 
     def __unicode__(self):
-        return "{}: {}".format(self.organization.name, self.name)
+        return "{}: {}".format(self.organization.name if self.organization else "[Default]", self.name)
 
 
 class ECard(CIImageModel):
