@@ -31,19 +31,22 @@ USER_DEPARTMENT_RELATED_NAME = settings.USER_DEPARTMENT_RELATED_NAME
 ORGANIZATION_SETTINGS_MODEL = import_string(settings.ORGANIZATION_SETTINGS_MODEL)
 
 
-def accessible_posts_by_user(user, organization, allow_feedback=False):
+def accessible_posts_by_user(user, organization, allow_feedback=False, appreciations=False):
     if not isinstance(organization, (list, tuple)):
         organization = [organization]
 
     # get the departments to which this user belongs
     user_depts = getattr(user, USER_DEPARTMENT_RELATED_NAME).all()
-
-    # get the post belongs to organization
-    result = Post.objects.filter(
-        Q(mark_delete=False) & (
+    query = Q(mark_delete=False) & (
             Q(organizations__in=organization) | Q(departments__in=user_depts)
         ) | Q(mark_delete=False, created_by=user)
-    )
+
+    if appreciations:
+        query.add(Q(post_type=POST_TYPE.USER_CREATED_APPRECIATION,
+                    organizations__in=user.get_affiliated_orgs(), mark_delete=False), Q.OR)
+
+    # get the post belongs to organization
+    result = Post.objects.filter(query)
 
     # filter / exclude feedback based on the allow_feedback
     if not allow_feedback:
@@ -382,7 +385,19 @@ def admin_feeds_to_exclude(posts, user):
     return posts.filter(query)
 
 
-def posts_not_visible_to_user(posts, user):
+def shared_with_all_departments_but_not_belongs_to_user_org(posts, user):
+    """
+    Returns filtered (posts which are shared with all departments but created by user's org
+    does not match with user's org ) queryset to exclude
+    posts: QuerySet[Post]
+    user: CustomUser
+    """
+    query = Q(shared_with=SHARED_WITH.ALL_DEPARTMENTS)
+    query.add(~Q(created_by__organization=user.organization), query.connector)
+    return posts.filter(query)
+
+
+def posts_not_visible_to_user(posts, user, post_polls):
     """
     Returns List of post ids to exclude
     params: posts: QuerySet[Post]
@@ -390,4 +405,7 @@ def posts_not_visible_to_user(posts, user):
     """
     posts_ids_to_exclude = list(posts_not_shared_with_self_department(posts, user).values_list("id", flat=True))
     posts_ids_to_exclude.extend(list(admin_feeds_to_exclude(posts, user).values_list("id", flat=True)))
+    if post_polls:
+        posts_ids_to_exclude.extend(list(shared_with_all_departments_but_not_belongs_to_user_org(
+            posts, user).values_list("id", flat=True)))
     return posts_ids_to_exclude
