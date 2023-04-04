@@ -811,7 +811,7 @@ class ECardCategoryViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        queryset = ECardCategory.objects.filter(organization=user.organization)
+        queryset = ECardCategory.objects.filter(Q(organization=user.organization) | Q(organization__isnull=True))
         return queryset
 
 
@@ -822,7 +822,8 @@ class ECardViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        queryset = ECard.objects.filter(category__organization=user.organization)
+        queryset = ECard.objects.filter(
+            Q(category__organization=user.organization) | Q(category__organization__isnull=True))
         category = self.request.query_params.get('category')
         if category:
             queryset = queryset.filter(category_id=category)
