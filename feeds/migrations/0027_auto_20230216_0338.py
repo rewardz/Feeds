@@ -12,8 +12,8 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.AlterField(
-            model_name='ecardcategory',
-            name='organization',
-            field=models.ForeignKey(blank=True, to='profiles.Organization', null=True),
+            model_name='post',
+            name='greeting',
+            field=models.ForeignKey(related_name='posts', blank=True, to='events.RepeatedEvent', null=True),
         ),
     ]

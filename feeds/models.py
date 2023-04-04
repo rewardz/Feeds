@@ -78,6 +78,9 @@ class CIImageModel(models.Model):
         except InvalidImageFormatError as ex:
             logger.error("Error generating thumbnail for %s (pk=%d) :  %s", self, self.pk, ex)
             return default_url
+        except Exception as ex:
+            logger.error("Exception occured generating thumbnail for %s (pk=%d) :  %s", self, self.pk, ex)
+            return default_url
 
     @property
     def thumbnail_img_url(self):
@@ -105,7 +108,7 @@ class CIImageModel(models.Model):
         except ValueError as ex:
             logger.error("Error generating large for %s (pk=%d) :  %s", self, self.pk, ex)
             return ""
-    
+
     class Meta:
         abstract = True
 
@@ -150,10 +153,11 @@ class Post(UserInfo):
     organizations = models.ManyToManyField(Organization, related_name="posts")
     title = models.CharField(max_length=200, null=True, blank=True)
     description = models.TextField(null=True, blank=True)
-    user = models.ForeignKey(CustomUser, related_name="appreciated_user", on_delete=models.CASCADE, null=True, blank=True)
+    user = models.ForeignKey(CustomUser, related_name="appreciated_user", on_delete=models.CASCADE, null=True,
+                             blank=True)
     transaction = models.ForeignKey(Transaction, on_delete=models.CASCADE, null=True, blank=True)
     nomination = models.ForeignKey(Nominations, on_delete=models.CASCADE, null=True, blank=True)
-    greeting = models.ForeignKey(RepeatedEvent, on_delete=models.CASCADE, null=True, blank=True)
+    greeting = models.ForeignKey(RepeatedEvent, on_delete=models.CASCADE, null=True, blank=True, related_name="posts")
     ecard = models.ForeignKey(ECard, on_delete=models.CASCADE, null=True, blank=True)
     gif = models.URLField(null=True, blank=True)
     cc_users = models.ManyToManyField(CustomUser, related_name="cc_users", blank=True)
