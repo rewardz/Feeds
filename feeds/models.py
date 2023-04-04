@@ -134,7 +134,7 @@ class ReportAbuse(models.Model):
 
 class ECardCategory(models.Model):
     name = models.CharField(max_length=100, blank=False)
-    organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, null=True, blank=True)
 
     def __unicode__(self):
         return "{}: {}".format(self.organization.name, self.name)

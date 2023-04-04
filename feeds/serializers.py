@@ -32,7 +32,7 @@ def get_user_detail(user_id):
     return getattr(UserModel, settings.ALL_USER_OBJECT).filter(pk=user_id).first()
 
 
-def get_user_detail_with_ord(post):
+def get_user_detail_with_org(post):
     user = post.user
     user_details = UserInfoSerializer(instance=user, read_only=True).data
     if post.greeting:
@@ -594,7 +594,7 @@ class PostDetailSerializer(PostSerializer):
 
     @staticmethod
     def get_user(post):
-        return get_user_detail_with_ord(post)
+        return get_user_detail_with_org(post)
 
     @staticmethod
     def get_greeting_info(post):
@@ -647,7 +647,7 @@ class PostFeedSerializer(PostSerializer):
 
     @staticmethod
     def get_user(post):
-        return get_user_detail_with_ord(post)
+        return get_user_detail_with_org(post)
 
     class Meta:
         model = Post
