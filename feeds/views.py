@@ -260,7 +260,7 @@ class PostViewSet(viewsets.ModelViewSet):
             query.add(Q(departments__in=departments, created_by__departments__in=departments), query.connector)
         else:
             if allow_feedback and user.is_staff:
-                org = user.get_affiliated_orgs()
+                org = list(user.get_affiliated_orgs().values_list("id", flat=True))
             result = accessible_posts_by_user(user, org, allow_feedback=allow_feedback,
                                               appreciations=is_appreciation_post(post_id) if post_id else False)
 
@@ -341,7 +341,10 @@ class PostViewSet(viewsets.ModelViewSet):
         if not post_id:
             raise ValidationError(_('Post ID required to retrieve all the related comments'))
         post_id = int(post_id)
-        org = user.get_affiliated_orgs() if allow_feedback and user.is_staff else user.organization
+        org = (
+            list(user.get_affiliated_orgs().values_list("id", flat=True))
+            if allow_feedback and user.is_staff else user.organization
+        )
         accessible_posts_queryset = accessible_posts_by_user(user, org, allow_feedback,
                                                              is_appreciation_post(post_id)).values_list('id', flat=True)
         accessible_posts = accessible_posts_queryset.values_list('id', flat=True)
