@@ -268,7 +268,8 @@ class PostViewSet(viewsets.ModelViewSet):
             id__in=list(posts_not_shared_with_self_department(result, user).values_list("id", flat=True)))
 
         result = (result | posts_shared_with_org_department(
-            user, [POST_TYPE.USER_CREATED_POST], result.values_list("id", flat=True))).distinct()
+            user, [POST_TYPE.USER_CREATED_POST, POST_TYPE.USER_CREATED_POLL],
+            result.values_list("id", flat=True))).distinct()
 
         result = PostFilter(self.request.GET, queryset=result).qs
         result = result.order_by('-priority', '-modified_on', '-created_on')
