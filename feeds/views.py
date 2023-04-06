@@ -1125,6 +1125,11 @@ class UserFeedViewSet(viewsets.ModelViewSet):
                      Q(nomination__nom_status=NOMINATION_STATUS.approved, organizations__in=[organizations]))
             feeds = posts.filter(query).exclude(user__hide_appreciation=True)
 
+        if post_polls:
+            feeds = (feeds | posts_shared_with_org_department(
+                user, [POST_TYPE.USER_CREATED_POST, POST_TYPE.USER_CREATED_POLL],
+                feeds.values_list("id", flat=True))).distinct()
+
         filter_appreciations = self.filter_appreciations(feeds)
         feeds = PostFilter(self.request.GET, queryset=feeds).qs
         search = self.request.query_params.get("search", None)
