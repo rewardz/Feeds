@@ -409,3 +409,17 @@ def posts_not_visible_to_user(posts, user, post_polls):
         posts_ids_to_exclude.extend(list(shared_with_all_departments_but_not_belongs_to_user_org(
             posts, user).values_list("id", flat=True)))
     return posts_ids_to_exclude
+
+
+def posts_shared_with_org_department(user, post_types, excluded_ids):
+    """
+    Return all posts which is shared with ORG departments
+    and belongs to user's department or created by user
+    params: user: CustomUser
+    params: post_types: List[POST_TYPE]
+    params: excluded_ids: List[id]
+    """
+    query = Q(created_by=user)
+    query.add(Q(departments__in=[user.department]), Q.OR)
+    query.add(Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS, post_type__in=post_types), Q.AND)
+    return Post.objects.filter(query).exclude(id__in=excluded_ids)
