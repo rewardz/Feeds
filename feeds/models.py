@@ -501,3 +501,6 @@ class PostCertificateRecord(models.Model):
     post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name="certificate_records")
     attachment_type = models.SmallIntegerField(choices=POST_CERTIFICATE_ATTACHMENTS(), null=True, blank=True)
     image = models.ForeignKey(Images, on_delete=models.CASCADE, null=True, blank=True)
+
+    def __str__(self):
+        return "{}: {}".format(self.post.title, self.post.user.email)
