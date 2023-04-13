@@ -1126,7 +1126,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
                      Q(nomination__nom_status=NOMINATION_STATUS.approved, organizations__in=[organizations]))
 
             if user_id and str(user_id).isdigit():
-                query.add(Q(user_id=user_id), query.connector)
+                query.add(Q(user_id=user_id), query.AND)
 
             feeds = posts.filter(query).exclude(user__hide_appreciation=True)
 
