@@ -365,7 +365,8 @@ def posts_not_shared_with_self_department(posts, user):
     user: CustomUser
     """
     return posts.filter(
-        Q(shared_with=SHARED_WITH.SELF_DEPARTMENT) & ~Q(created_by__departments__in=user.departments.all())
+        Q(shared_with=SHARED_WITH.SELF_DEPARTMENT) & ~Q(created_by__departments__in=user.departments.all()) &
+        ~Q(user=user) & ~Q(cc_users__in=[user])
     )
 
 
@@ -381,7 +382,7 @@ def admin_feeds_to_exclude(posts, user):
         return Post.objects.none()
     posts = posts.filter(shared_with=SHARED_WITH.ADMIN_ONLY)
     query = Q(shared_with=SHARED_WITH.ADMIN_ONLY)
-    query.add(~Q(created_by=user) & ~Q(cc_users__in=[user.id]), query.connector)
+    query.add(~Q(created_by=user) & ~Q(cc_users__in=[user.id]) & ~Q(user=user), query.connector)
     return posts.filter(query)
 
 
@@ -393,7 +394,8 @@ def shared_with_all_departments_but_not_belongs_to_user_org(posts, user):
     user: CustomUser
     """
     query = Q(shared_with=SHARED_WITH.ALL_DEPARTMENTS)
-    query.add(~Q(created_by__organization=user.organization), query.connector)
+    query.add(~Q(created_by__organization=user.organization) &
+              ~Q(created_by=user) & ~Q(user=user) & ~Q(cc_users__in=[user.id]), query.connector)
     return posts.filter(query)
 
 
