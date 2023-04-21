@@ -361,9 +361,13 @@ def get_absolute_url(uri):
 def posts_not_shared_with_self_department(posts, user):
     """
     Returns filtered (posts which are not shared with requested users department) queryset of Post
+    if user is superuser then empty QS (no need to exclude anything)
     posts: QuerySet[Post]
     user: CustomUser
     """
+    if user.is_staff:
+        return Post.objects.none()
+
     return posts.filter(
         Q(shared_with=SHARED_WITH.SELF_DEPARTMENT) & ~Q(created_by__departments__in=user.departments.all())
     )
@@ -388,10 +392,14 @@ def admin_feeds_to_exclude(posts, user):
 def shared_with_all_departments_but_not_belongs_to_user_org(posts, user):
     """
     Returns filtered (posts which are shared with all departments but created by user's org
+    user is superuser then empty QS (no need to exclude anything)
     does not match with user's org ) queryset to exclude
     posts: QuerySet[Post]
     user: CustomUser
     """
+    if user.is_staff:
+        return Post.objects.none()
+
     query = Q(shared_with=SHARED_WITH.ALL_DEPARTMENTS)
     query.add(~Q(created_by__organization=user.organization), query.connector)
     return posts.filter(query)
