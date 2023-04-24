@@ -1115,7 +1115,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
                   greeting__event_type=REPEATED_EVENT_TYPES.event_birthday) |
                 Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post", user__is_anniversary_public=True,
                   greeting__event_type=REPEATED_EVENT_TYPES.event_anniversary)
-                ) & Q(organizations__in=[organizations]))
+                ))
         elif greeting:
             feeds = posts.filter(
                 post_type=POST_TYPE.GREETING_MESSAGE, title="greeting", greeting_id=greeting, user=user,
