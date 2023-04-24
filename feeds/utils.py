@@ -168,7 +168,7 @@ def tag_users_to_comment(comment, user_list):
                 comment.tag_user(user)
                 message = _("'%s' has mentioned you in comment" % (created_by_user_name))
                 push_notification(comment.created_by, message, user,
-                                  object_type=object_type, object_id=comment.id)
+                                  object_type=object_type, object_id=comment.post_id)
             except Exception:
                 continue
     if remove_user_list:
