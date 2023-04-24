@@ -168,7 +168,7 @@ def tag_users_to_comment(comment, user_list):
                 comment.tag_user(user)
                 message = _("'%s' has mentioned you in comment" % (created_by_user_name))
                 push_notification(comment.created_by, message, user,
-                                  object_type=object_type, object_id=comment.id)
+                                  object_type=object_type, object_id=comment.post_id)
             except Exception:
                 continue
     if remove_user_list:
@@ -361,9 +361,13 @@ def get_absolute_url(uri):
 def posts_not_shared_with_self_department(posts, user):
     """
     Returns filtered (posts which are not shared with requested users department) queryset of Post
+    if user is superuser then empty QS (no need to exclude anything)
     posts: QuerySet[Post]
     user: CustomUser
     """
+    if user.is_staff:
+        return Post.objects.none()
+
     return posts.filter(
         Q(shared_with=SHARED_WITH.SELF_DEPARTMENT) & ~Q(created_by__departments__in=user.departments.all()) &
         ~Q(user=user) & ~Q(cc_users__in=[user])
@@ -389,10 +393,14 @@ def admin_feeds_to_exclude(posts, user):
 def shared_with_all_departments_but_not_belongs_to_user_org(posts, user):
     """
     Returns filtered (posts which are shared with all departments but created by user's org
+    user is superuser then empty QS (no need to exclude anything)
     does not match with user's org ) queryset to exclude
     posts: QuerySet[Post]
     user: CustomUser
     """
+    if user.is_staff:
+        return Post.objects.none()
+
     query = Q(shared_with=SHARED_WITH.ALL_DEPARTMENTS)
     query.add(~Q(created_by__organization=user.organization) &
               ~Q(created_by=user) & ~Q(user=user) & ~Q(cc_users__in=[user.id]), query.connector)
