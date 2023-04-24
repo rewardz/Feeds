@@ -32,9 +32,9 @@ def get_user_detail(user_id):
     return getattr(UserModel, settings.ALL_USER_OBJECT).filter(pk=user_id).first()
 
 
-def get_user_detail_with_org(post):
+def get_user_detail_with_org(post, context):
     user = post.user
-    user_details = UserInfoSerializer(instance=user, read_only=True).data
+    user_details = UserInfoSerializer(instance=user, read_only=True, context=context).data
     if post.greeting:
         user_details.update({
             "organization_name": user.organization.name,
@@ -592,9 +592,8 @@ class PostDetailSerializer(PostSerializer):
             "department_name", "departments", "greeting_info"
         )
 
-    @staticmethod
-    def get_user(post):
-        return get_user_detail_with_org(post)
+    def get_user(self, post):
+        return get_user_detail_with_org(post, {"request": self.context.get("request")})
 
     @staticmethod
     def get_greeting_info(post):
@@ -645,9 +644,8 @@ class PostFeedSerializer(PostSerializer):
     def get_greeting_info(post):
         return get_info_for_greeting_post(post)
 
-    @staticmethod
-    def get_user(post):
-        return get_user_detail_with_org(post)
+    def get_user(self, post):
+        return get_user_detail_with_org(post, {"request": self.context.get("request")})
 
     class Meta:
         model = Post
