@@ -429,7 +429,12 @@ def posts_shared_with_org_department(user, post_types, excluded_ids):
     params: post_types: List[POST_TYPE]
     params: excluded_ids: List[id]
     """
-    query = Q(created_by=user)
-    query.add(Q(departments__in=[user.department]), Q.OR)
-    query.add(Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS, post_type__in=post_types), Q.AND)
-    return Post.objects.filter(query).exclude(id__in=excluded_ids)
+    if user.is_staff:
+        query = Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS, created_by__organization=user.organization)
+    else:
+        query = Q(created_by=user)
+        query.add(Q(departments__in=[user.department]), Q.OR)
+        query.add(Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS, post_type__in=post_types), Q.AND)
+
+    posts = Post.objects.filter(query)
+    return posts.exclude(id__in=excluded_ids)
