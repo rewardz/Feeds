@@ -591,7 +591,7 @@ class PostDetailSerializer(PostSerializer):
             "tagged_users", "is_admin", "nomination", "feed_type", "user_strength", "user",
             "gif", "ecard", "points", "user_reaction_type", "images_with_ecard", "reaction_type", "category",
             "category_name", "sub_category", "sub_category_name", "organization_name", "display_status",
-            "department_name", "departments", "can_download", "is_download_choice_needed"
+            "department_name", "departments", "can_download", "is_download_choice_needed", "greeting_info"
         )
 
     @staticmethod
