@@ -13,7 +13,7 @@ from .models import (
 )
 from .utils import (
     extract_tagged_users, get_departments, get_profile_image, tag_users_to_comment,
-    validate_priority, user_can_delete, user_can_edit
+    validate_priority, user_can_delete, user_can_edit, get_absolute_url
 )
 
 DEPARTMENT_MODEL = import_string(settings.DEPARTMENT_MODEL)
@@ -25,10 +25,37 @@ UserStrength = import_string(settings.USER_STRENGTH_MODEL)
 NOMINATION_STATUS_COLOR_CODE = import_string(settings.NOMINATION_STATUS_COLOR_CODE)
 ORGANIZATION_SETTINGS_MODEL = import_string(settings.ORGANIZATION_SETTINGS_MODEL)
 MULTI_ORG_POST_ENABLE_FLAG = settings.MULTI_ORG_POST_ENABLE_FLAG
+RepeatedEventSerializer = import_string(settings.REPEATED_EVENT_SERIALIZER)
 
 
 def get_user_detail(user_id):
     return getattr(UserModel, settings.ALL_USER_OBJECT).filter(pk=user_id).first()
+
+
+def get_user_detail_with_org(post, context):
+    user = post.user
+    user_details = UserInfoSerializer(instance=user, read_only=True, context=context).data
+    if post.greeting:
+        user_details.update({
+            "organization_name": user.organization.name,
+            "organization_logo": (
+                get_absolute_url(user.organization.display_img_url) if user.organization.display_img_url else ""
+            )
+        })
+    return user_details
+
+
+def get_info_for_greeting_post(post):
+    """
+    Returns greeting details if it is public post then we are passing ORG setting which decides to show name of DEPT
+    :params: post: Post
+    :returns: dict: RepeatedEventSerializer
+    """
+    context = {}
+    if post.title == "greeting_post":
+        context.update(
+            {"show_greeting_department": post.user.organization.has_setting_to_show_greeting_department})
+    return RepeatedEventSerializer(post.greeting, context=context).data
 
 
 class DynamicFieldsModelSerializer(serializers.ModelSerializer):
@@ -539,7 +566,7 @@ class CommentsLikedSerializer(serializers.ModelSerializer):
 class PostDetailSerializer(PostSerializer):
     comments = serializers.SerializerMethodField()
     appreciated_by = serializers.SerializerMethodField()
-    user = UserInfoSerializer(read_only=True)
+    user = serializers.SerializerMethodField()
     ecard = ECardSerializer(read_only=True)
     category = serializers.CharField(read_only=True)
     category_name = serializers.CharField(read_only=True)
@@ -550,6 +577,7 @@ class PostDetailSerializer(PostSerializer):
     department_name = serializers.SerializerMethodField()
     can_download = serializers.SerializerMethodField()
     is_download_choice_needed = serializers.SerializerMethodField()
+    greeting_info = serializers.SerializerMethodField()
 
     class Meta:
         model = Post
@@ -596,6 +624,13 @@ class PostDetailSerializer(PostSerializer):
     def get_can_download(self, instance):
         return instance.user == self.context.get("request").user
 
+    def get_user(self, post):
+        return get_user_detail_with_org(post, {"request": self.context.get("request")})
+
+    @staticmethod
+    def get_greeting_info(post):
+        return get_info_for_greeting_post(post)
+
     def get_organization_name(self, instance):
         return instance.feedback.organization_name if instance.feedback else ""
 
@@ -637,8 +672,16 @@ class PostDetailSerializer(PostSerializer):
 
 
 class PostFeedSerializer(PostSerializer):
-    user = UserInfoSerializer(read_only=True)
+    user = serializers.SerializerMethodField()
     ecard = ECardSerializer(read_only=True)
+    greeting_info = serializers.SerializerMethodField()
+
+    @staticmethod
+    def get_greeting_info(post):
+        return get_info_for_greeting_post(post)
+
+    def get_user(self, post):
+        return get_user_detail_with_org(post, {"request": self.context.get("request")})
 
     class Meta:
         model = Post
@@ -651,7 +694,18 @@ class PostFeedSerializer(PostSerializer):
             "is_owner", "can_edit", "can_delete", "has_appreciated",
             "appreciation_count", "comments_count", "tagged_users", "is_admin", "tags", "reaction_type", "nomination",
             "feed_type", "user_strength", "user", "user_reaction_type", "gif", "ecard", "points", "time_left",
-            "images_with_ecard",
+            "images_with_ecard", "greeting_info"
+        )
+
+
+class GreetingSerializer(PostFeedSerializer):
+
+    class Meta:
+        model = Post
+        fields = (
+            "id", "created_by", "created_on", "organizations", "created_by_user_info", "title", "description",
+            "post_type", "priority", "shared_with", "is_owner", "tagged_users", "is_admin", "tags", "feed_type",
+            "gif", "ecard", "images_with_ecard", "greeting_info"
         )
 
 
