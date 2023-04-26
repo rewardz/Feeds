@@ -295,7 +295,9 @@ class PostViewSet(viewsets.ModelViewSet):
         data['post_type'] = POST_TYPE.USER_CREATED_POLL
         data['created_by'] = user.pk
         data['modified_by'] = user.pk
-        data['organization'] = organization.pk
+        # if feedback is not enabled then save current user organization
+        if not ORGANIZATION_SETTINGS_MODEL.objects.get_value(MULTI_ORG_POST_ENABLE_FLAG, user.organization):
+            data['organization'] = user.organization_id
         question_serializer = PostSerializer(data=data, context=context)
         question_serializer.is_valid(raise_exception=True)
         poll = question_serializer.save()
