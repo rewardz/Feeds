@@ -31,7 +31,7 @@ USER_DEPARTMENT_RELATED_NAME = settings.USER_DEPARTMENT_RELATED_NAME
 ORGANIZATION_SETTINGS_MODEL = import_string(settings.ORGANIZATION_SETTINGS_MODEL)
 
 
-def accessible_posts_by_user(user, organization, allow_feedback=False, appreciations=False):
+def accessible_posts_by_user(user, organization, allow_feedback=False, appreciations=False, post_id=None):
     if not isinstance(organization, (list, tuple)):
         organization = [organization]
 
@@ -58,6 +58,15 @@ def accessible_posts_by_user(user, organization, allow_feedback=False, appreciat
     # we can not apply distinct over here since order by is used at some places
     # after calling this method
     post_ids = list(set(result.values_list("id", flat=True)))
+
+    if user.is_staff and post_id:
+        # Added this condition because we are allowing admin to see the post if that post does not belongs
+        # to his department then admin can access that post
+        if (
+                post_id not in post_ids
+                and Post.objects.filter(id=post_id, created_by__organization_id=user.organization_id).exists()
+        ):
+            post_ids.append(post_id)
 
     return Post.objects.filter(id__in=post_ids)
 
