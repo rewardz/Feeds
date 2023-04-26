@@ -745,7 +745,8 @@ class CommentViewset(viewsets.ModelViewSet):
             raise ValidationError(_('Comment ID is required'))
         post_id = self.get_post_id_from_comment(self.kwargs.get("pk", 0))
         organization = user.organization
-        posts = accessible_posts_by_user(user, organization, False, is_appreciation_post(post_id) if post_id else False)
+        posts = accessible_posts_by_user(
+            user, organization, False, is_appreciation_post(post_id) if post_id else False, post_id)
         accessible_comments = Comment.objects.filter(post__in=posts) \
             .values_list('id', flat=True)
 
