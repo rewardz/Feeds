@@ -59,15 +59,26 @@ def accessible_posts_by_user(user, organization, allow_feedback=False, appreciat
     # after calling this method
     post_ids = list(set(result.values_list("id", flat=True)))
 
-    if user.is_staff and post_id:
-        # Added this condition because we are allowing admin to see the post if that post does not belongs
-        # to his department then admin can access that post
-        orgs = user.get_affiliated_orgs().values_list("id", flat=True) if allow_feedback else [user.organization_id]
-        if (
-                post_id not in post_ids
-                and Post.objects.filter(id=post_id, created_by__organization_id__in=orgs).exists()
-        ):
-            post_ids.append(post_id)
+    if user.is_staff:
+        # If the post is shared with self department and admin's department is another than creators department
+        # then post org will be None so we hahve to allow that post to admin
+        posts = Post.objects.filter(
+            organizations=None, shared_with=SHARED_WITH.SELF_DEPARTMENT,
+            created_by_organization=user.organization
+        ).exclude(id__in=post_ids).values_list("id", flat=True)
+        if posts:
+            post_ids.extend(list(posts))
+            
+        if post_id:
+
+            # Added this condition because we are allowing admin to see the post if that post does not belongs
+            # to his department then admin can access that post
+            orgs = user.get_affiliated_orgs().values_list("id", flat=True) if allow_feedback else [user.organization_id]
+            if (
+                    post_id not in post_ids
+                    and Post.objects.filter(id=post_id, created_by__organization_id__in=orgs).exists()
+            ):
+                post_ids.append(post_id)
 
     return Post.objects.filter(id__in=post_ids)
 
