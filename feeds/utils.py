@@ -64,11 +64,11 @@ def accessible_posts_by_user(user, organization, allow_feedback=False, appreciat
         # then post org will be None so we hahve to allow that post to admin
         posts = Post.objects.filter(
             organizations=None, shared_with=SHARED_WITH.SELF_DEPARTMENT,
-            created_by_organization=user.organization
+            created_by__organization=user.organization
         ).exclude(id__in=post_ids).values_list("id", flat=True)
         if posts:
             post_ids.extend(list(posts))
-            
+
         if post_id:
 
             # Added this condition because we are allowing admin to see the post if that post does not belongs
