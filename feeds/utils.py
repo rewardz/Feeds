@@ -62,9 +62,10 @@ def accessible_posts_by_user(user, organization, allow_feedback=False, appreciat
     if user.is_staff and post_id:
         # Added this condition because we are allowing admin to see the post if that post does not belongs
         # to his department then admin can access that post
+        orgs = user.get_affiliated_orgs().values_list("id", flat=True) if allow_feedback else [user.organization_id]
         if (
                 post_id not in post_ids
-                and Post.objects.filter(id=post_id, created_by__organization_id=user.organization_id).exists()
+                and Post.objects.filter(id=post_id, created_by__organization_id__in=orgs).exists()
         ):
             post_ids.append(post_id)
 
