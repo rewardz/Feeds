@@ -1128,7 +1128,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
                 organizations__in=[organizations], created_on__year=datetime.datetime.now().year
             )
         else:
-            query = (Q(post_type=POST_TYPE.USER_CREATED_APPRECIATION, organizations__in=user.get_affiliated_orgs()) |
+            query = (Q(post_type=POST_TYPE.USER_CREATED_APPRECIATION) |
                      Q(nomination__nom_status=NOMINATION_STATUS.approved, organizations__in=[organizations]))
 
             if user_id and str(user_id).isdigit():
