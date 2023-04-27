@@ -622,7 +622,7 @@ class PostDetailSerializer(PostSerializer):
         return is_download_choice_needed
 
     def get_can_download(self, instance):
-        return instance.user == self.context.get("request").user
+        return self.context.get("request").user in (instance.user, instance.created_by)
 
     def get_user(self, post):
         return get_user_detail_with_org(post, {"request": self.context.get("request")})
