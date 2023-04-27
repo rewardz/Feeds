@@ -1108,13 +1108,18 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         organizations = user.organization
         posts = accessible_posts_by_user(user, organizations, False, False if post_polls else True)
         if post_polls:
-            feeds = posts.filter((
-                Q(post_type=POST_TYPE.USER_CREATED_POST) | Q(post_type=POST_TYPE.USER_CREATED_POLL) |
-                Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post", user__is_dob_public=True,
-                  greeting__event_type=REPEATED_EVENT_TYPES.event_birthday) |
-                Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post", user__is_anniversary_public=True,
-                  greeting__event_type=REPEATED_EVENT_TYPES.event_anniversary)
-                ) & Q(organizations__in=[organizations]))
+            query = (Q(post_type=POST_TYPE.USER_CREATED_POST) | Q(post_type=POST_TYPE.USER_CREATED_POLL))
+            if int(request.version) >= 12:
+                query.add(
+                    Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post", user__is_dob_public=True,
+                      greeting__event_type=REPEATED_EVENT_TYPES.event_birthday), Q.OR
+                )
+                query.add(
+                    Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post", user__is_anniversary_public=True,
+                      greeting__event_type=REPEATED_EVENT_TYPES.event_anniversary), Q.OR
+                )
+            query.add(Q(organizations__in=[organizations]), Q.AND)
+            feeds = posts.filter(query)
         elif greeting:
             feeds = posts.filter(
                 post_type=POST_TYPE.GREETING_MESSAGE, title="greeting", greeting_id=greeting, user=user,
