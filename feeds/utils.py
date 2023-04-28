@@ -31,7 +31,7 @@ USER_DEPARTMENT_RELATED_NAME = settings.USER_DEPARTMENT_RELATED_NAME
 ORGANIZATION_SETTINGS_MODEL = import_string(settings.ORGANIZATION_SETTINGS_MODEL)
 
 
-def accessible_posts_by_user(user, organization, allow_feedback=False, appreciations=False):
+def accessible_posts_by_user(user, organization, allow_feedback=False, appreciations=False, post_id=None):
     if not isinstance(organization, (list, tuple)):
         organization = [organization]
 
@@ -43,7 +43,7 @@ def accessible_posts_by_user(user, organization, allow_feedback=False, appreciat
 
     if appreciations:
         query.add(Q(post_type=POST_TYPE.USER_CREATED_APPRECIATION,
-                    organizations__in=user.get_affiliated_orgs(), mark_delete=False), Q.OR)
+                    created_by__organization__in=user.get_affiliated_orgs(), mark_delete=False), Q.OR)
 
     # get the post belongs to organization
     result = Post.objects.filter(query)
@@ -58,6 +58,27 @@ def accessible_posts_by_user(user, organization, allow_feedback=False, appreciat
     # we can not apply distinct over here since order by is used at some places
     # after calling this method
     post_ids = list(set(result.values_list("id", flat=True)))
+
+    if user.is_staff:
+        # If the post is shared with self department and admin's department is another than creators department
+        # then post org will be None so we hahve to allow that post to admin
+        posts = Post.objects.filter(
+            organizations=None, shared_with=SHARED_WITH.SELF_DEPARTMENT,
+            created_by__organization=user.organization
+        ).exclude(id__in=post_ids).values_list("id", flat=True)
+        if posts:
+            post_ids.extend(list(posts))
+
+        if post_id:
+
+            # Added this condition because we are allowing admin to see the post if that post does not belongs
+            # to his department then admin can access that post
+            orgs = user.get_affiliated_orgs().values_list("id", flat=True) if allow_feedback else [user.organization_id]
+            if (
+                    post_id not in post_ids
+                    and Post.objects.filter(id=post_id, created_by__organization_id__in=orgs).exists()
+            ):
+                post_ids.append(post_id)
 
     return Post.objects.filter(id__in=post_ids)
 
@@ -369,7 +390,8 @@ def posts_not_shared_with_self_department(posts, user):
         return Post.objects.none()
 
     return posts.filter(
-        Q(shared_with=SHARED_WITH.SELF_DEPARTMENT) & ~Q(created_by__departments__in=user.departments.all())
+        Q(shared_with=SHARED_WITH.SELF_DEPARTMENT) & ~Q(created_by__departments__in=user.departments.all()) &
+        ~Q(user=user) & ~Q(cc_users__in=[user])
     )
 
 
@@ -385,7 +407,7 @@ def admin_feeds_to_exclude(posts, user):
         return Post.objects.none()
     posts = posts.filter(shared_with=SHARED_WITH.ADMIN_ONLY)
     query = Q(shared_with=SHARED_WITH.ADMIN_ONLY)
-    query.add(~Q(created_by=user) & ~Q(cc_users__in=[user.id]), query.connector)
+    query.add(~Q(created_by=user) & ~Q(cc_users__in=[user.id]) & ~Q(user=user), query.connector)
     return posts.filter(query)
 
 
@@ -401,7 +423,8 @@ def shared_with_all_departments_but_not_belongs_to_user_org(posts, user):
         return Post.objects.none()
 
     query = Q(shared_with=SHARED_WITH.ALL_DEPARTMENTS)
-    query.add(~Q(created_by__organization=user.organization), query.connector)
+    query.add(~Q(created_by__organization=user.organization) &
+              ~Q(created_by=user) & ~Q(user=user) & ~Q(cc_users__in=[user.id]), query.connector)
     return posts.filter(query)
 
 
@@ -427,7 +450,12 @@ def posts_shared_with_org_department(user, post_types, excluded_ids):
     params: post_types: List[POST_TYPE]
     params: excluded_ids: List[id]
     """
-    query = Q(created_by=user)
-    query.add(Q(departments__in=[user.department]), Q.OR)
-    query.add(Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS, post_type__in=post_types), Q.AND)
-    return Post.objects.filter(query).exclude(id__in=excluded_ids)
+    if user.is_staff:
+        query = Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS, created_by__organization=user.organization)
+    else:
+        query = Q(created_by=user)
+        query.add(Q(departments__in=[user.department]), Q.OR)
+        query.add(Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS, post_type__in=post_types), Q.AND)
+
+    posts = Post.objects.filter(query)
+    return posts.exclude(id__in=excluded_ids)
