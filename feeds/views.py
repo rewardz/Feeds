@@ -268,6 +268,14 @@ class PostViewSet(viewsets.ModelViewSet):
         if created_by in ("user_org", "user_dept"):
             result = Post.objects.filter(query)
 
+        if not post_id:
+            # For list api excluded personal greeting message (events.api.EventViewSet.message)
+            result = result.exclude(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting")
+
+        if int(self.request.version) < 12 and not post_id:
+            # For list api below version 12 we are excluding system created greeting post
+            result = result.exclude(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post")
+
         result = result.exclude(
             id__in=list(posts_not_shared_with_self_department(result, user).values_list("id", flat=True)))
 
