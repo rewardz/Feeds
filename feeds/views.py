@@ -67,6 +67,10 @@ class PostViewSet(viewsets.ModelViewSet):
         current_user = self.request.user
         if not current_user:
             raise serializers.ValidationError({'created_by': _('Created by is required!')})
+
+        if not current_user.allow_user_post_feed:
+            raise serializers.ValidationError(_('You are not allowed to create post.'))
+
         data = {}
         for key, value in payload.items():
             if key in ["organizations", "departments"] and isinstance(payload.get(key), unicode):
