@@ -21,6 +21,7 @@ INTERNAL_APPS = (
     'news_feed.tests.finance',
     'news_feed.tests.nominations',
     'news_feed.tests.events',
+    'news_feed.tests.feedback',
     'feeds',
 )
 
@@ -79,6 +80,7 @@ USER_STRENGTH_MODEL = 'news_feed.tests.profiles.models.UserStrength'
 TROPHY_BADGE_MODEL = 'news_feed.tests.profiles.models.TrophyBadge'
 NOMINATION_STATUS = 'news_feed.tests.nominations.constants.NOMINATION_STATUS'
 NOMINATION_STATUS_COLOR_CODE = 'news_feed.tests.nominations.constants.NOMINATION_STATUS_COLOR_CODE'
+FEEDBACK_STATUS_OPTIONS = 'news_feed.tests.feedback.constants.FEEDBACK_STATUS_OPTIONS'
 PROFILE_IMAGE_PROPERTY = 'thumbnail_img_url'
 NO_PROFILE_IMAGE = ''
 PENDING_EMAIL = 'news_feed.tests.profiles.models.PendingEmail'

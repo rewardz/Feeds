@@ -23,7 +23,7 @@ class NominationCategory(models.Model):
         help_text=_("Limit of users that can be nominated in the same category")
     )
     reviewer_levels = models.SmallIntegerField(choices=REVIEWER_LEVEL(), default=0)
-    badge = models.OneToOneField("profiles.TrophyBadge", blank=True, null=True, on_delete=models.CASCADE)
+    badges = models.ManyToManyField("profiles.TrophyBadge", related_name="categories", blank=True)
     auto_action_time = models.PositiveIntegerField(blank=True, null=True, help_text="Auto Action Time in Hours")
 
     def __unicode__(self):
@@ -32,6 +32,8 @@ class NominationCategory(models.Model):
 
 class Nominations(models.Model):
     category = models.ForeignKey(NominationCategory, related_name="categories")
+    badge = models.ForeignKey("profiles.TrophyBadge", blank=True, null=True, on_delete=models.CASCADE)
+    points = models.DecimalField(blank=True, null=True, max_digits=12, decimal_places=2)
     nominator = models.ForeignKey("profiles.CustomUser", related_name="current_user")
     assigned_reviewer = models.ManyToManyField("profiles.CustomUser", related_name="reviewer")
     nominated_team_member = models.ForeignKey("profiles.CustomUser", related_name="nominated_user",

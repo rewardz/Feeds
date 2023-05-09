@@ -208,10 +208,8 @@ class TrophyBadgeSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_award_points(instance):
         points = instance.points
-        if points - int(points) == 0:
-            points = int(points)
-        else:
-            points = float(points)
+        if points:
+            points = int(points) if points - int(points) == 0 else float(points)
         return str(points)
 
 
@@ -250,7 +248,7 @@ class NominationsSerializer(DynamicFieldsModelSerializer):
     nomination_icon = serializers.SerializerMethodField()
     review_level = serializers.SerializerMethodField()
     nominator_name = serializers.SerializerMethodField()
-    badges = serializers.SerializerMethodField()
+    badge = TrophyBadgeSerializer(read_only=True)
     user_strength = UserStrengthSerializer()
     strength = serializers.SerializerMethodField()
     nominated_team_member = UserInfoSerializer()
@@ -266,7 +264,7 @@ class NominationsSerializer(DynamicFieldsModelSerializer):
                   "nominator_name",
                   "comment",
                   "created",
-                  "badges",
+                  "badge",
                   "user_strength",
                   "nominated_team_member",
                   "message_to_reviewer",
@@ -287,11 +285,6 @@ class NominationsSerializer(DynamicFieldsModelSerializer):
             return question_obj.icon.url
         except (ValueError, AttributeError):
             return ""
-
-    def get_badges(self, instance):
-        if instance.category and instance.category.badge:
-            return TrophyBadgeSerializer(instance=instance.category.badge).data
-        return None
 
     @staticmethod
     def get_strength(instance):
