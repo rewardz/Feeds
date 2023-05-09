@@ -248,7 +248,7 @@ class NominationsSerializer(DynamicFieldsModelSerializer):
     nomination_icon = serializers.SerializerMethodField()
     review_level = serializers.SerializerMethodField()
     nominator_name = serializers.SerializerMethodField()
-    badge = TrophyBadgeSerializer(read_only=True)
+    badges = serializers.SerializerMethodField()
     user_strength = UserStrengthSerializer()
     strength = serializers.SerializerMethodField()
     nominated_team_member = UserInfoSerializer()
@@ -264,7 +264,7 @@ class NominationsSerializer(DynamicFieldsModelSerializer):
                   "nominator_name",
                   "comment",
                   "created",
-                  "badge",
+                  "badges",
                   "user_strength",
                   "nominated_team_member",
                   "message_to_reviewer",
@@ -285,6 +285,11 @@ class NominationsSerializer(DynamicFieldsModelSerializer):
             return question_obj.icon.url
         except (ValueError, AttributeError):
             return ""
+
+    def get_badges(self, instance):
+        if instance.category and instance.category.badge:
+            return TrophyBadgeSerializer(instance=instance.category.badge).data
+        return None
 
     @staticmethod
     def get_strength(instance):

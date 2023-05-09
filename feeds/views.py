@@ -997,7 +997,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             except ValueError:
                 raise ValidationError(_('badge should be numeric value.'))
             my_appreciations_user = request.user.nominated_user.filter(
-                badge=badge_id, nom_status=NOMINATION_STATUS.approved).values_list('nominator', flat=True)
+                category__badge=badge_id, nom_status=NOMINATION_STATUS.approved).values_list('nominator', flat=True)
 
         users = CustomUser.objects.filter(id__in=my_appreciations_user)
         serializer = UserInfoSerializer(users, many=True, fields=["pk", "email", "first_name", "last_name",
@@ -1047,7 +1047,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             except ValueError:
                 raise ValidationError(_('badge should be numeric value.'))
         queryset = self.get_queryset().filter(post_type=POST_TYPE.USER_CREATED_NOMINATION,
-                                              nomination__badge=badge_id,
+                                              nomination__category__badge_id=badge_id,
                                               nomination__nom_status=NOMINATION_STATUS.approved)
         user = CustomUser.objects.filter(id=user_id)
         if user.exists():
@@ -1056,7 +1056,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         else:
             raise ValidationError(_('User does not exist'))
         serializer = PostFeedSerializer(queryset, many=True, context={
-            "request": request, "nomination_fields": ["badge", "strength"]}, fields=[
+            "request": request, "nomination_fields": ["badges", "strength"]}, fields=[
             "id", "description", "nomination"])
         return Response({"badges": serializer.data})
 
