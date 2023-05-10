@@ -208,10 +208,8 @@ class TrophyBadgeSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_award_points(instance):
         points = instance.points
-        if points - int(points) == 0:
-            points = int(points)
-        else:
-            points = float(points)
+        if points:
+            points = int(points) if points - int(points) == 0 else float(points)
         return str(points)
 
 

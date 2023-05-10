@@ -67,6 +67,10 @@ class PostViewSet(viewsets.ModelViewSet):
         current_user = self.request.user
         if not current_user:
             raise serializers.ValidationError({'created_by': _('Created by is required!')})
+
+        if not current_user.allow_user_post_feed:
+            raise serializers.ValidationError(_('You are not allowed to create post.'))
+
         data = {}
         for key, value in payload.items():
             if key in ["organizations", "departments"] and isinstance(payload.get(key), unicode):
@@ -293,6 +297,14 @@ class PostViewSet(viewsets.ModelViewSet):
 
         if created_by in ("user_org", "user_dept"):
             result = Post.objects.filter(query)
+
+        if not post_id:
+            # For list api excluded personal greeting message (events.api.EventViewSet.message)
+            result = result.exclude(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting")
+
+        if int(self.request.version) < 12 and not post_id:
+            # For list api below version 12 we are excluding system created greeting post
+            result = result.exclude(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post")
 
         result = result.exclude(
             id__in=list(posts_not_shared_with_self_department(result, user).values_list("id", flat=True)))
@@ -1151,7 +1163,6 @@ class UserFeedViewSet(viewsets.ModelViewSet):
                     Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post", user__is_anniversary_public=True,
                       greeting__event_type=REPEATED_EVENT_TYPES.event_anniversary), Q.OR
                 )
-            query.add(Q(organizations__in=[organizations]), Q.AND)
             feeds = posts.filter(query)
         elif greeting:
             feeds = posts.filter(
