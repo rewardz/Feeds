@@ -241,7 +241,7 @@ def notify_new_comment(comment, creator):
         notify_user_via_email.delay(comment.id)
 
 
-def notify_new_poll_created(poll):
+def notify_new_poll_created(poll, version):
     creator = poll.created_by
     accessible_users = []
     if poll.shared_with == SHARED_WITH.SELF_DEPARTMENT:
@@ -253,7 +253,7 @@ def notify_new_poll_created(poll):
             accessible_users.append(usr)
     user_name = get_user_name(creator)
     message = _("'%s' started a new poll." % user_name)
-    object_type = NOTIFICATION_OBJECT_TYPE
+    object_type = NOTIFICATION_OBJECT.poll if version >= 12 else NOTIFICATION_OBJECT_TYPE
     for usr in accessible_users:
         push_notification(creator, message, usr, object_type=object_type, object_id=poll.id)
 

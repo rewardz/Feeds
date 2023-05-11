@@ -294,6 +294,7 @@ class PostViewSet(viewsets.ModelViewSet):
     @list_route(methods=["POST"], permission_classes=(IsOptionsOrAuthenticated,))
     def create_poll(self, request, *args, **kwargs):
         context = {'request': request}
+        version = self.request.version
         user = self.request.user
         organization = user.organization
         payload = self.request.data
@@ -320,7 +321,7 @@ class PostViewSet(viewsets.ModelViewSet):
             answer_serializer.is_valid(raise_exception=True)
             answer_serializer.save()
         result = self.get_serializer(poll)
-        notify_new_poll_created(poll)
+        notify_new_poll_created(poll, version)
         return Response(result.data)
 
     def get_ordering_field(self, default_order):
