@@ -981,10 +981,9 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         organization = user.organization
         posts = accessible_posts_by_user(user, organization)
         approvals_count = posts.filter(post_type=POST_TYPE.USER_CREATED_NOMINATION,
-                                       nomination__assigned_reviewer=request.user).exclude(
+            Q(nomination__assigned_reviewer=request.user) | Q(nomination__alternate_reviewer=request.user)).exclude(
             nomination__nom_status__in=[NOMINATION_STATUS.approved, NOMINATION_STATUS.rejected]).count()
-        if (request.user.userdesignation_set.count() > 0 or request.user.reviewer_users.count() > 0) and \
-                approvals_count > 0:
+        if approvals_count > 0:
             show_approvals = True
         if user.supervisor_remaining_budget is not None:
             supervisor_remaining_budget = str(user.supervisor_remaining_budget)
@@ -1108,10 +1107,9 @@ class UserFeedViewSet(viewsets.ModelViewSet):
                 show_cheer_msg = True
 
         approvals_count = posts.filter(post_type=POST_TYPE.USER_CREATED_NOMINATION,
-                                       nomination__assigned_reviewer=request.user).exclude(
+            Q(nomination__assigned_reviewer=request.user) | Q(nomination__alternate_reviewer=request.user)).exclude(
             nomination__nom_status__in=[NOMINATION_STATUS.approved, NOMINATION_STATUS.rejected]).count()
-        if (request.user.userdesignation_set.count() > 0 or request.user.reviewer_users.count() > 0) and \
-                approvals_count > 0:
+        if approvals_count > 0:
             show_approvals = True
         feeds.data['approvals_count'] = approvals_count
         feeds.data['show_approvals'] = show_approvals
