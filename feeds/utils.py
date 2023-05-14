@@ -255,7 +255,8 @@ def notify_new_poll_created(poll):
     message = _("'%s' started a new poll." % user_name)
     object_type = NOTIFICATION_OBJECT_TYPE
     for usr in accessible_users:
-        push_notification(creator, message, usr, object_type=object_type, object_id=poll.id)
+        push_notification(creator, message, usr, object_type=object_type, object_id=poll.id,
+        extra_context={"redirect_screen": "Poll"})
 
 
 def notify_flagged_post(post, user, reason):
