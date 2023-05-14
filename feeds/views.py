@@ -980,9 +980,10 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         user = self.request.user
         organization = user.organization
         posts = accessible_posts_by_user(user, organization)
-        approvals_count = posts.filter(post_type=POST_TYPE.USER_CREATED_NOMINATION,
-            Q(nomination__assigned_reviewer=request.user) | Q(nomination__alternate_reviewer=request.user)).exclude(
-            nomination__nom_status__in=[NOMINATION_STATUS.approved, NOMINATION_STATUS.rejected]).count()
+        approvals_count = posts.filter(
+            Q(nomination__assigned_reviewer=user) | Q(nomination__alternate_reviewer=user),
+            post_type=POST_TYPE.USER_CREATED_NOMINATION
+        ).exclude(nomination__nom_status__in=[NOMINATION_STATUS.approved, NOMINATION_STATUS.rejected]).count()
         if approvals_count > 0:
             show_approvals = True
         if user.supervisor_remaining_budget is not None:
@@ -1106,9 +1107,10 @@ class UserFeedViewSet(viewsets.ModelViewSet):
                 feeds.data['days_passed'] = days_passed
                 show_cheer_msg = True
 
-        approvals_count = posts.filter(post_type=POST_TYPE.USER_CREATED_NOMINATION,
-            Q(nomination__assigned_reviewer=request.user) | Q(nomination__alternate_reviewer=request.user)).exclude(
-            nomination__nom_status__in=[NOMINATION_STATUS.approved, NOMINATION_STATUS.rejected]).count()
+        approvals_count = posts.filter(
+            Q(nomination__assigned_reviewer=user) | Q(nomination__alternate_reviewer=user),
+            post_type=POST_TYPE.USER_CREATED_NOMINATION
+        ).exclude(nomination__nom_status__in=[NOMINATION_STATUS.approved, NOMINATION_STATUS.rejected]).count()
         if approvals_count > 0:
             show_approvals = True
         feeds.data['approvals_count'] = approvals_count
