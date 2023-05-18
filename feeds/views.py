@@ -930,13 +930,15 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             feeds = feeds.filter(Q(created_by=user, post_type=POST_TYPE.USER_CREATED_APPRECIATION) | Q(
                 nomination__nominator=user, nomination__nom_status=NOMINATION_STATUS.approved))
         elif feed_flag == "approvals":
-            feeds = feeds.filter(nomination__assigned_reviewer=user).exclude(
+            feeds = feeds.filter(
+                Q(nomination__assigned_reviewer=user) | Q(nomination__alternate_reviewer=user)).exclude(
                 post_type=POST_TYPE.USER_CREATED_NOMINATION, nomination__nom_status__in=[
                     NOMINATION_STATUS.approved, NOMINATION_STATUS.rejected])
         elif feed_flag == "my_nomination":
             feeds = feeds.filter(nomination__nominator=user)
         else:
-            feeds = feeds.filter(Q(nomination__nominator=user) | Q(user=user) | Q(nomination__assigned_reviewer=user))
+            feeds = feeds.filter(Q(nomination__nominator=user) | Q(user=user) |
+                Q(nomination__assigned_reviewer=user) | Q(nomination__alternate_reviewer=user))
         if search:
             feeds = feeds.filter(Q(user__first_name__istartswith=search) | Q(
                 user__last_name__istartswith=search) | Q(created_by__first_name__istartswith=search) | Q(
