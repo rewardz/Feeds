@@ -274,7 +274,7 @@ class NominationsSerializer(DynamicFieldsModelSerializer):
 
     @staticmethod
     def get_review_level(instance):
-        return instance.category.reviewer_levels
+        return instance.badge.reviewer_levels if instance.badge else instance.category.reviewer_levels
 
     def get_nominator_name(self, instance):
         return instance.nominator.full_name
