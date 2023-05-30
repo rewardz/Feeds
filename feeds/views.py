@@ -1124,6 +1124,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
     def organization_recognitions(self, request, *args, **kwargs):
         user = self.request.user
         post_polls = request.query_params.get("post_polls", None)
+        post_polls_filter = request.query_params.get("post_polls_filter", None)
         greeting = request.query_params.get("greeting", None)
         user_id = request.query_params.get("user", None)
         organizations = user.organization
@@ -1140,6 +1141,8 @@ class UserFeedViewSet(viewsets.ModelViewSet):
                       greeting__event_type=REPEATED_EVENT_TYPES.event_anniversary), Q.OR
                 )
             feeds = posts.filter(query)
+            feeds = feeds.exclude(post_type=POST_TYPE.USER_CREATED_POLL) if post_polls_filter == "post" else feeds
+            feeds = feeds.filter(post_type=POST_TYPE.USER_CREATED_POLL) if post_polls_filter == "poll" else feeds
         elif greeting:
             feeds = posts.filter(
                 post_type=POST_TYPE.GREETING_MESSAGE, title="greeting", greeting_id=greeting, user=user,
