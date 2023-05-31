@@ -1130,19 +1130,25 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         organizations = user.organization
         posts = accessible_posts_by_user(user, organizations, False, False if post_polls else True)
         if post_polls:
-            query = (Q(post_type=POST_TYPE.USER_CREATED_POST) | Q(post_type=POST_TYPE.USER_CREATED_POLL))
+            query_post = Q(post_type=POST_TYPE.USER_CREATED_POST)
+            query_poll = Q(post_type=POST_TYPE.USER_CREATED_POLL)
             if int(request.version) >= 12:
-                query.add(
+                query_post.add(
                     Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post", user__is_dob_public=True,
                       greeting__event_type=REPEATED_EVENT_TYPES.event_birthday), Q.OR
                 )
-                query.add(
+                query_post.add(
                     Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post", user__is_anniversary_public=True,
                       greeting__event_type=REPEATED_EVENT_TYPES.event_anniversary), Q.OR
                 )
+
+            if post_polls_filter == "post":
+                query = query_post
+            elif post_polls_filter == "poll":
+                query = query_poll
+            else:
+                query = query_post | query_poll
             feeds = posts.filter(query)
-            feeds = feeds.exclude(post_type=POST_TYPE.USER_CREATED_POLL) if post_polls_filter == "post" else feeds
-            feeds = feeds.filter(post_type=POST_TYPE.USER_CREATED_POLL) if post_polls_filter == "poll" else feeds
         elif greeting:
             feeds = posts.filter(
                 post_type=POST_TYPE.GREETING_MESSAGE, title="greeting", greeting_id=greeting, user=user,
