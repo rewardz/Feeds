@@ -231,6 +231,32 @@ class PostViewSet(viewsets.ModelViewSet):
         self.perform_update(serializer)
         return Response(serializer.data)
 
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        data = serializer.data
+        if request.version > 12 and data["comments"] is None:
+            site_url = settings.SITE_URL
+            serializer = CommentSerializer(
+                self.paginate_queryset(
+                    Comment.objects.filter(post=instance.id, mark_delete=False).order_by('created_on')
+                ), many=True, read_only=True, context={"request": request}
+            )
+            data["comments"] = self.get_paginated_response(serializer.data).data
+            if data["comments"] and data["comments"].get("count") > len(data["comments"].get("results")):
+                data["comments"]["next"] = "{}feeds/api/posts/{}/comments/?page=2".format(site_url, instance.id)
+
+            serializer = PostLikedSerializer(
+                self.paginate_queryset(PostLiked.objects.filter(post_id=instance.id).order_by('-created_on')),
+                many=True, read_only=True)
+            data["appreciated_by"] = self.get_paginated_response(serializer.data).data
+            if data["appreciated_by"] and data["appreciated_by"].get("count") > len(
+                    data["appreciated_by"].get("results")):
+                data["appreciated_by"]["next"] = "{}feeds/api/posts/{}/post_appreciations/?page=2".format(site_url,
+                                                                                                          instance.id)
+
+        return Response(data)
+
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
         user = request.user
