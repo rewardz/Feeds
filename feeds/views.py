@@ -231,6 +231,32 @@ class PostViewSet(viewsets.ModelViewSet):
         self.perform_update(serializer)
         return Response(serializer.data)
 
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        data = serializer.data
+        if request.version > 12 and data["comments"] is None:
+            site_url = settings.SITE_URL
+            serializer = CommentSerializer(
+                self.paginate_queryset(
+                    Comment.objects.filter(post=instance.id, mark_delete=False).order_by('created_on')
+                ), many=True, read_only=True, context={"request": request}
+            )
+            data["comments"] = self.get_paginated_response(serializer.data).data
+            if data["comments"] and data["comments"].get("count") > len(data["comments"].get("results")):
+                data["comments"]["next"] = "{}feeds/api/posts/{}/comments/?page=2".format(site_url, instance.id)
+
+            serializer = PostLikedSerializer(
+                self.paginate_queryset(PostLiked.objects.filter(post_id=instance.id).order_by('-created_on')),
+                many=True, read_only=True)
+            data["appreciated_by"] = self.get_paginated_response(serializer.data).data
+            if data["appreciated_by"] and data["appreciated_by"].get("count") > len(
+                    data["appreciated_by"].get("results")):
+                data["appreciated_by"]["next"] = "{}feeds/api/posts/{}/post_appreciations/?page=2".format(site_url,
+                                                                                                          instance.id)
+
+        return Response(data)
+
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
         user = request.user
@@ -1124,21 +1150,30 @@ class UserFeedViewSet(viewsets.ModelViewSet):
     def organization_recognitions(self, request, *args, **kwargs):
         user = self.request.user
         post_polls = request.query_params.get("post_polls", None)
+        post_polls_filter = request.query_params.get("post_polls_filter", None)
         greeting = request.query_params.get("greeting", None)
         user_id = request.query_params.get("user", None)
         organizations = user.organization
         posts = accessible_posts_by_user(user, organizations, False, False if post_polls else True)
         if post_polls:
-            query = (Q(post_type=POST_TYPE.USER_CREATED_POST) | Q(post_type=POST_TYPE.USER_CREATED_POLL))
+            query_post = Q(post_type=POST_TYPE.USER_CREATED_POST)
+            query_poll = Q(post_type=POST_TYPE.USER_CREATED_POLL)
             if int(request.version) >= 12:
-                query.add(
+                query_post.add(
                     Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post", user__is_dob_public=True,
                       greeting__event_type=REPEATED_EVENT_TYPES.event_birthday), Q.OR
                 )
-                query.add(
+                query_post.add(
                     Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post", user__is_anniversary_public=True,
                       greeting__event_type=REPEATED_EVENT_TYPES.event_anniversary), Q.OR
                 )
+
+            if post_polls_filter == "post":
+                query = query_post
+            elif post_polls_filter == "poll":
+                query = query_poll
+            else:
+                query = query_post | query_poll
             feeds = posts.filter(query)
         elif greeting:
             feeds = posts.filter(

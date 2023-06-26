@@ -31,3 +31,9 @@ REACTION_TYPE = Choices({
     # "All": 7,  # Reserved reactions, use other numbers for new reaction not required at DB levels
     # "COMMENT": 8,  # Reserved reactions, use other numbers for new reaction not required at DB levels
 })
+
+POST_CERTIFICATE_ATTACHMENTS = Choices({
+    "IMAGE": 1,
+    "ECARD": 2,
+    "GIF": 3,
+})

@@ -15,7 +15,7 @@ from easy_thumbnails.exceptions import InvalidImageFormatError
 from easy_thumbnails.files import get_thumbnailer
 from taggit.managers import TaggableManager
 
-from .constants import POST_TYPE, REACTION_TYPE, SHARED_WITH
+from .constants import POST_TYPE, REACTION_TYPE, SHARED_WITH, POST_CERTIFICATE_ATTACHMENTS
 
 logger = logging.getLogger(__name__)
 
@@ -329,6 +329,13 @@ class Post(UserInfo):
         feedback = self.feedback
         return feedback.sub_category_name if feedback else ""
 
+    def attached_images(self, **kwargs):
+        """
+        Returns attached images of post
+        """
+        kwargs.update({"post": self})
+        return Images.objects.filter(**kwargs)
+
     def __unicode__(self):
         return self.title if self.title else str(self.pk)
 
@@ -492,3 +499,12 @@ class FlagPost(models.Model):
     created_on = models.DateTimeField(auto_now_add=True)
     modified_on = models.DateTimeField(auto_now=True)
     notified = models.BooleanField(default=True)
+
+
+class PostCertificateRecord(models.Model):
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name="certificate_records")
+    attachment_type = models.SmallIntegerField(choices=POST_CERTIFICATE_ATTACHMENTS(), null=True, blank=True)
+    image = models.ForeignKey(Images, on_delete=models.CASCADE, null=True, blank=True)
+
+    def __str__(self):
+        return "{}: {}".format(self.post.title, self.post.user.email)

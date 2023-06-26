@@ -274,7 +274,7 @@ class NominationsSerializer(DynamicFieldsModelSerializer):
 
     @staticmethod
     def get_review_level(instance):
-        return instance.badge.reviewer_levels if instance.badge else instance.category.reviewer_levels
+        return instance.badge.reviewer_level if instance.badge else instance.category.reviewer_level
 
     def get_nominator_name(self, instance):
         return instance.nominator.full_name
@@ -568,6 +568,8 @@ class PostDetailSerializer(PostSerializer):
     organization_name = serializers.SerializerMethodField()
     display_status = serializers.SerializerMethodField()
     department_name = serializers.SerializerMethodField()
+    can_download = serializers.SerializerMethodField()
+    is_download_choice_needed = serializers.SerializerMethodField()
     greeting_info = serializers.SerializerMethodField()
 
     class Meta:
@@ -582,8 +584,38 @@ class PostDetailSerializer(PostSerializer):
             "tagged_users", "is_admin", "nomination", "feed_type", "user_strength", "user",
             "gif", "ecard", "points", "user_reaction_type", "images_with_ecard", "reaction_type", "category",
             "category_name", "sub_category", "sub_category_name", "organization_name", "display_status",
-            "department_name", "departments", "greeting_info"
+            "department_name", "departments", "can_download", "is_download_choice_needed", "greeting_info"
         )
+
+    @staticmethod
+    def get_is_download_choice_needed(post):
+        """
+        Decides if popup should be open or not to select image in frontend
+        """
+        is_download_choice_needed = True
+        if post.certificate_records.count():
+            # already we have choice selected
+            is_download_choice_needed = False
+        else:
+            total_attached_images = post.attached_images().count()
+            ecard = post.ecard
+            gif = post.gif
+            if gif:
+                # if we have gif
+                is_download_choice_needed = False
+            elif total_attached_images == 1 and not ecard:
+                # we have only one image and no e card
+                is_download_choice_needed = False
+            elif total_attached_images == 0 and ecard:
+                # we have 0 image and have ecard
+                is_download_choice_needed = False
+            elif all([not total_attached_images, not ecard, not gif]):
+                # we don't have image/ ecard/ gif
+                is_download_choice_needed = False
+        return is_download_choice_needed
+
+    def get_can_download(self, instance):
+        return self.context.get("request").user in (instance.user, instance.created_by)
 
     def get_user(self, post):
         return get_user_detail_with_org(post, {"request": self.context.get("request")})
@@ -603,6 +635,8 @@ class PostDetailSerializer(PostSerializer):
 
     def get_comments(self, instance):
         request = self.context.get('request')
+        if request.version > 12:
+            return
         serializer_context = {'request': request}
         post_id = instance.id
         comments = Comment.objects.filter(post=post_id).order_by('-created_on')[:20]
@@ -610,6 +644,8 @@ class PostDetailSerializer(PostSerializer):
             comments, many=True, read_only=True, context=serializer_context).data
 
     def get_appreciated_by(self, instance):
+        if self.context.get('request').version > 12:
+            return
         post_id = instance.id
         posts_liked = PostLiked.objects.filter(post_id=post_id).order_by('-created_on')
         return PostLikedSerializer(posts_liked, many=True, read_only=True).data
