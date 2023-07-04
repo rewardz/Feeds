@@ -14,7 +14,7 @@ from easy_thumbnails.exceptions import InvalidImageFormatError
 from easy_thumbnails.files import get_thumbnailer
 from model_helpers import upload_to
 
-from.constants import NOTIFICATION_OBJECTS, NOTIFICATION_STATES, NOTIFICATION_STATUS
+from .constants import NOTIFICATION_OBJECTS, NOTIFICATION_STATES, NOTIFICATION_STATUS
 
 
 logger = logging.getLogger(__name__)
@@ -387,6 +387,9 @@ class TrophyBadge(models.Model):
     background_color = models.CharField(max_length=20, blank=True, null=True)
     background_color_lite = models.CharField(max_length=20, blank=True, null=True)
     points = models.DecimalField(blank=True, null=True, max_digits=12, decimal_places=2)
+    nomination_category = models.ForeignKey(
+        "nominations.NominationCategory", related_name="badges", on_delete=models.CASCADE, blank=True, null=True)
+    reviewer_level = models.SmallIntegerField(default=0, help_text="Set it if Nomination Category is selected")
 
 
 class Designation(models.Model):
