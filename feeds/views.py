@@ -1010,7 +1010,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             except ValueError:
                 raise ValidationError(_('strength should be numeric value.'))
 
-            posts = accessible_posts_by_user(user, organization)
+            posts = accessible_posts_by_user(user, organization, False, True, None)
             user_appreciations = posts.filter(
                 user=request.user, post_type=POST_TYPE.USER_CREATED_APPRECIATION).values(
                 'transaction__context', 'transaction__creator')
