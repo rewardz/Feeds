@@ -935,7 +935,14 @@ class UserFeedViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         feed_flag = self.request.query_params.get("feed", None)
         search = self.request.query_params.get("search", None)
+        user_id = self.request.query_params.get("user_id", None)
         user = self.request.user
+        if user_id and str(user_id).isdigit() and feed_flag in ("received", "given"):
+            try:
+                user = CustomUser.objects.get(id=user_id)
+            except CustomUser.DoesNotExist:
+                raise ValidationError("Invalid user id")
+
         organization = user.organization
         posts = accessible_posts_by_user(user, organization, False, feed_flag != "post_polls")
         if feed_flag == "post_polls":
@@ -947,6 +954,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             feeds = posts.filter(post_type__in=[POST_TYPE.USER_CREATED_APPRECIATION,
                                                 POST_TYPE.USER_CREATED_NOMINATION])
         feeds = PostFilter(self.request.GET, queryset=feeds).qs
+
 
         if feed_flag == "received":
             # returning only approved nominations with all the received appreciations
