@@ -955,7 +955,6 @@ class UserFeedViewSet(viewsets.ModelViewSet):
                                                 POST_TYPE.USER_CREATED_NOMINATION])
         feeds = PostFilter(self.request.GET, queryset=feeds).qs
 
-
         if feed_flag == "received":
             # returning only approved nominations with all the received appreciations
             feeds = feeds.filter(user=user).filter(Q(nomination__nom_status=NOMINATION_STATUS.approved) | Q(
