@@ -295,7 +295,7 @@ class NominationsSerializer(DynamicFieldsModelSerializer):
 
     @staticmethod
     def get_strength(instance):
-        return instance.user_strength.name
+        return instance.user_strength.name if instance.user_strength else ""
 
     @staticmethod
     def get_nom_status(instance):

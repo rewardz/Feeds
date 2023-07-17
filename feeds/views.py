@@ -195,7 +195,7 @@ class PostViewSet(viewsets.ModelViewSet):
 
         if tags:
             tags = list(tags.split(","))
-            self.save_custom_tags(tags, instance.organization)
+            self.save_custom_tags(tags, request.user.organization)
             instance.tags.set(*tags)
 
         if request.FILES:
@@ -224,7 +224,7 @@ class PostViewSet(viewsets.ModelViewSet):
             tag_users_to_post(instance, tag_users)
         if tags:
             tags = list(tags.split(","))
-            self.save_custom_tags(tags, instance.organization)
+            self.save_custom_tags(tags, user.organization)
             instance.tags.set(*tags)
         if request.FILES:
             self._upload_files(request, instance.pk)
@@ -1010,7 +1010,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             except ValueError:
                 raise ValidationError(_('strength should be numeric value.'))
 
-            posts = accessible_posts_by_user(user, organization)
+            posts = accessible_posts_by_user(user, organization, False, True, None)
             user_appreciations = posts.filter(
                 user=request.user, post_type=POST_TYPE.USER_CREATED_APPRECIATION).values(
                 'transaction__context', 'transaction__creator')
