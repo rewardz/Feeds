@@ -1083,8 +1083,9 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(created_by=user)
         else:
             raise ValidationError(_('User does not exist'))
+        # ToDo : once app updated, remove it ("badges" from nomination_field)
         serializer = PostFeedSerializer(queryset, many=True, context={
-            "request": request, "nomination_fields": ["badge", "strength"]}, fields=[
+            "request": request, "nomination_fields": ["badges", "badge", "strength"]}, fields=[
             "id", "description", "nomination"])
         return Response({"badges": serializer.data})
 
