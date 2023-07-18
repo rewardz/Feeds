@@ -4,7 +4,7 @@ import datetime
 from json import loads
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Q, Count
+from django.db.models import Case, IntegerField, Q, Count, When
 from django.http import Http404
 from django.utils.module_loading import import_string
 from django.utils.translation import ugettext as _
@@ -871,7 +871,12 @@ class ECardCategoryViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        queryset = ECardCategory.objects.filter(Q(organization=user.organization) | Q(organization__isnull=True))
+        query = Q(organization=user.organization) | Q(organization__isnull=True)
+        if self.request.query_params.get('admin_function'):
+            query =  Q(organization=user.organization)
+        queryset = ECardCategory.objects.filter(query)
+        queryset = queryset.annotate(custom_order=Case(When(organization=user.organization, then=0),
+                                     default=1, output_field=IntegerField())).order_by('custom_order')
         return queryset
 
 
@@ -882,8 +887,12 @@ class ECardViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        queryset = ECard.objects.filter(
-            Q(category__organization=user.organization) | Q(category__organization__isnull=True))
+        query = Q(category__organization=user.organization) | Q(category__organization__isnull=True)
+        if self.request.query_params.get('admin_function'):
+            query =  Q(category__organization=user.organization)
+        queryset = ECard.objects.filter(query)
+        queryset = queryset.annotate(custom_order=Case(When(category__organization=user.organization, then=0),
+                                     default=1, output_field=IntegerField())).order_by('custom_order')
         category = self.request.query_params.get('category')
         if category:
             queryset = queryset.filter(category_id=category)
