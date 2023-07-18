@@ -265,6 +265,7 @@ class NominationsSerializer(DynamicFieldsModelSerializer):
                   "nominator_name",
                   "comment",
                   "created",
+                  "badges",
                   "badge",
                   "user_strength",
                   "nominated_team_member",
