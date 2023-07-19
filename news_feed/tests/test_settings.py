@@ -14,6 +14,7 @@ EXTERNAL_APPS = (
     'taggit',
     'ajax_select',
     'cropimg',
+    'auditlog',
 )
 
 INTERNAL_APPS = (
@@ -26,6 +27,10 @@ INTERNAL_APPS = (
 )
 
 INSTALLED_APPS = EXTERNAL_APPS + INTERNAL_APPS
+
+MIDDLEWARE_CLASSES = (
+    "auditlog.middleware.AuditlogMiddleware",
+)
 
 ROOT_URLCONF = 'news_feed.urls'
 
