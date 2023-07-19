@@ -22,8 +22,7 @@ class NominationCategory(models.Model):
         default=0,
         help_text=_("Limit of users that can be nominated in the same category")
     )
-    reviewer_levels = models.SmallIntegerField(choices=REVIEWER_LEVEL(), default=0)
-    badges = models.ManyToManyField("profiles.TrophyBadge", related_name="categories", blank=True)
+    reviewer_level = models.SmallIntegerField(choices=REVIEWER_LEVEL(), default=REVIEWER_LEVEL.none)
     auto_action_time = models.PositiveIntegerField(blank=True, null=True, help_text="Auto Action Time in Hours")
 
     def __unicode__(self):

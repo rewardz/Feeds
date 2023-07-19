@@ -10,6 +10,7 @@ from django.utils.translation import ugettext as _
 
 from rest_framework.exceptions import ValidationError
 
+from auditlog.registry import auditlog
 from cropimg.fields import CIImageField, CIThumbnailField
 from easy_thumbnails.exceptions import InvalidImageFormatError
 from easy_thumbnails.files import get_thumbnailer
@@ -508,3 +509,6 @@ class PostCertificateRecord(models.Model):
 
     def __str__(self):
         return "{}: {}".format(self.post.title, self.post.user.email)
+
+
+auditlog.register(Post, include_fields=['shared_with'])

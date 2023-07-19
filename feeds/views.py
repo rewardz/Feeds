@@ -34,8 +34,8 @@ from .utils import (
     accessible_posts_by_user, extract_tagged_users, get_user_name, notify_new_comment,
     notify_new_poll_created, notify_flagged_post, push_notification, tag_users_to_comment,
     tag_users_to_post, user_can_delete, user_can_edit, get_date_range, since_last_appreciation,
-    get_current_month_end_date, get_absolute_url, posts_not_visible_to_user,
-    posts_not_shared_with_self_department, posts_shared_with_org_department
+    get_current_month_end_date, get_absolute_url, posts_not_visible_to_user, assigned_nomination_post_ids,
+    posts_not_shared_with_self_department, posts_shared_with_org_department,
 )
 
 CustomUser = import_string(settings.CUSTOM_USER_MODEL)
@@ -306,8 +306,11 @@ class PostViewSet(viewsets.ModelViewSet):
             # For list api below version 12 we are excluding system created greeting post
             result = result.exclude(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post")
 
-        result = result.exclude(
-            id__in=list(posts_not_shared_with_self_department(result, user).values_list("id", flat=True)))
+        posts_ids_to_exclude = posts_not_shared_with_self_department(result, user).values_list("id", flat=True)
+        posts_ids_not_to_exclude = assigned_nomination_post_ids(user)
+        posts_ids_to_exclude = list(set(posts_ids_to_exclude) - set(posts_ids_not_to_exclude))
+
+        result = result.exclude(id__in=posts_ids_to_exclude)
 
         result = (result | posts_shared_with_org_department(
             user, [POST_TYPE.USER_CREATED_POST, POST_TYPE.USER_CREATED_POLL],
@@ -1034,7 +1037,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             except ValueError:
                 raise ValidationError(_('badge should be numeric value.'))
             my_appreciations_user = request.user.nominated_user.filter(
-                category__badge=badge_id, nom_status=NOMINATION_STATUS.approved).values_list('nominator', flat=True)
+                badge=badge_id, nom_status=NOMINATION_STATUS.approved).values_list('nominator', flat=True)
 
         users = CustomUser.objects.filter(id__in=my_appreciations_user)
         serializer = UserInfoSerializer(users, many=True, fields=["pk", "email", "first_name", "last_name",
@@ -1084,7 +1087,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             except ValueError:
                 raise ValidationError(_('badge should be numeric value.'))
         queryset = self.get_queryset().filter(post_type=POST_TYPE.USER_CREATED_NOMINATION,
-                                              nomination__category__badge_id=badge_id,
+                                              nomination__badge=badge_id,
                                               nomination__nom_status=NOMINATION_STATUS.approved)
         user = CustomUser.objects.filter(id=user_id)
         if user.exists():
@@ -1092,8 +1095,9 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(created_by=user)
         else:
             raise ValidationError(_('User does not exist'))
+        # ToDo : once app updated, remove it ("badges" from nomination_field)
         serializer = PostFeedSerializer(queryset, many=True, context={
-            "request": request, "nomination_fields": ["badges", "strength"]}, fields=[
+            "request": request, "nomination_fields": ["badges", "badge", "strength"]}, fields=[
             "id", "description", "nomination"])
         return Response({"badges": serializer.data})
 

@@ -29,6 +29,7 @@ NOTIF_OBJECT_TYPE_FIELD_NAME = settings.NOTIF_OBJECT_TYPE_FIELD_NAME
 NOTIF_OBJECT_ID_FIELD_NAME = settings.NOTIF_OBJECT_ID_FIELD_NAME
 USER_DEPARTMENT_RELATED_NAME = settings.USER_DEPARTMENT_RELATED_NAME
 ORGANIZATION_SETTINGS_MODEL = import_string(settings.ORGANIZATION_SETTINGS_MODEL)
+NOMINATION_STATUS = import_string(settings.NOMINATION_STATUS)
 
 
 def accessible_posts_by_user(user, organization, allow_feedback=False, appreciations=False, post_id=None):
@@ -429,6 +430,18 @@ def shared_with_all_departments_but_not_belongs_to_user_org(posts, user):
     return posts.filter(query)
 
 
+def assigned_nomination_post_ids(user):
+    """
+    Return List of post ids of nomination which assigned to reviewer
+    """
+    assigned_nomination_post_ids =  Post.objects.filter(
+        Q(nomination__assigned_reviewer=user) | Q(nomination__alternate_reviewer=user)
+    ).exclude(post_type=POST_TYPE.USER_CREATED_NOMINATION, 
+              nomination__nom_status__in=[NOMINATION_STATUS.approved, NOMINATION_STATUS.rejected]
+    ).values_list("id", flat=True)
+    return assigned_nomination_post_ids
+
+
 def posts_not_visible_to_user(posts, user, post_polls):
     """
     Returns List of post ids to exclude
@@ -440,6 +453,9 @@ def posts_not_visible_to_user(posts, user, post_polls):
     if post_polls:
         posts_ids_to_exclude.extend(list(shared_with_all_departments_but_not_belongs_to_user_org(
             posts, user).values_list("id", flat=True)))
+
+    posts_ids_not_to_exclude = assigned_nomination_post_ids(user) 
+    posts_ids_to_exclude = list(set(posts_ids_to_exclude) - set(posts_ids_not_to_exclude))
     return posts_ids_to_exclude
 
 
