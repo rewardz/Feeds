@@ -34,8 +34,8 @@ from .utils import (
     accessible_posts_by_user, extract_tagged_users, get_user_name, notify_new_comment,
     notify_new_poll_created, notify_flagged_post, push_notification, tag_users_to_comment,
     tag_users_to_post, user_can_delete, user_can_edit, get_date_range, since_last_appreciation,
-    get_current_month_end_date, get_absolute_url, posts_not_visible_to_user,
-    posts_not_shared_with_self_department, posts_shared_with_org_department
+    get_current_month_end_date, get_absolute_url, posts_not_visible_to_user, assigned_nomination_post_ids,
+    posts_not_shared_with_self_department, posts_shared_with_org_department,
 )
 
 CustomUser = import_string(settings.CUSTOM_USER_MODEL)
@@ -306,8 +306,11 @@ class PostViewSet(viewsets.ModelViewSet):
             # For list api below version 12 we are excluding system created greeting post
             result = result.exclude(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post")
 
-        result = result.exclude(
-            id__in=list(posts_not_shared_with_self_department(result, user).values_list("id", flat=True)))
+        posts_ids_to_exclude = posts_not_shared_with_self_department(result, user).values_list("id", flat=True)
+        posts_ids_not_to_exclude = assigned_nomination_post_ids(user)
+        posts_ids_to_exclude = list(set(posts_ids_to_exclude) - set(posts_ids_not_to_exclude))
+
+        result = result.exclude(id__in=posts_ids_to_exclude)
 
         result = (result | posts_shared_with_org_department(
             user, [POST_TYPE.USER_CREATED_POST, POST_TYPE.USER_CREATED_POLL],
