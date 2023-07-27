@@ -965,7 +965,9 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         else:
             feeds = posts.filter(post_type__in=[POST_TYPE.USER_CREATED_APPRECIATION,
                                                 POST_TYPE.USER_CREATED_NOMINATION])
+        filter_appreciations = self.filter_appreciations(feeds)
         feeds = PostFilter(self.request.GET, queryset=feeds).qs
+        feeds = (feeds | filter_appreciations).distinct()
 
         if feed_flag == "received":
             # returning only approved nominations with all the received appreciations
