@@ -87,7 +87,7 @@ class ECardAdmin(admin.ModelAdmin):
 
     def get_form(self, request, obj=None, **kwargs):
         form = super(ECardAdmin, self).get_form(request, obj, **kwargs)
-        form.base_fields['category'].queryset = ECardCategory.objects.order_by("organization__name, name")
+        form.base_fields['category'].queryset = ECardCategory.objects.order_by("organization__name", "name")
         return form
 
 
