@@ -19,4 +19,5 @@ POINT_SOURCE = Choices({"custom": 0,
                         "delivery_org": {"id": 4, "display": "Reward Delivey to Organization"},
                         "delivery_user": {"id": 5, "display": "Reward Delivey to User"},
                         "strengths": {"id": 6, "display": "Strengths"},
+                        "revoked_or_transferred": {"id": 308, "display": "Revoked or Transferred"}
                         })

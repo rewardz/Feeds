@@ -43,6 +43,9 @@ NOMINATION_STATUS = import_string(settings.NOMINATION_STATUS)
 ORGANIZATION_SETTINGS_MODEL = import_string(settings.ORGANIZATION_SETTINGS_MODEL)
 MULTI_ORG_POST_ENABLE_FLAG = settings.MULTI_ORG_POST_ENABLE_FLAG
 Organization = import_string(settings.ORGANIZATION_MODEL)
+Transaction = import_string(settings.TRANSACTION_MODEL)
+PointsTable = import_string(settings.POINTS_TABLE)
+POINT_SOURCE = import_string(settings.POINT_SOURCE)
 
 
 class PostViewSet(viewsets.ModelViewSet):
@@ -213,6 +216,17 @@ class PostViewSet(viewsets.ModelViewSet):
         user = request.user
         if not user_can_delete(user, instance):
             raise serializers.ValidationError(_("You do not have permission to delete"))
+        appreciation_trxn = instance.transaction
+        message = "reverting transaction for appreciation post {}".format(instance.title)
+        if request.data.get("revert_transaction", False):
+            reason, _ = PointsTable.objects.get_or_create(
+                point_source=POINT_SOURCE.revoked_or_transferred, organization=user.organization
+            )
+            Transaction.objects.create(
+                user=user, creator=self.request.user, organization=user.organization,
+                points=-appreciation_trxn.points, reason=reason, message=message,
+                context={"appreciation_trxn": appreciation_trxn.id, "message": message}
+            )
         instance.mark_as_delete(user)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
