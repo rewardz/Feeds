@@ -5,6 +5,7 @@ SHARED_WITH = Choices({
     "SELF_DEPARTMENT": 10,
     "ALL_DEPARTMENTS": 20,
     "ADMIN_ONLY": 30,
+    "ORGANIZATION_DEPARTMENTS": 40,
 })
 
 POST_TYPE = Choices({
@@ -16,6 +17,7 @@ POST_TYPE = Choices({
     "USER_CREATED_APPRECIATION": 6,
     "USER_CREATED_NOMINATION": 7,
     "FEEDBACK_POST": 8,
+    "GREETING_MESSAGE": 9,
 })
 
 REACTION_TYPE = Choices({
@@ -28,4 +30,10 @@ REACTION_TYPE = Choices({
     "APPLAUSE": 6,
     # "All": 7,  # Reserved reactions, use other numbers for new reaction not required at DB levels
     # "COMMENT": 8,  # Reserved reactions, use other numbers for new reaction not required at DB levels
+})
+
+POST_CERTIFICATE_ATTACHMENTS = Choices({
+    "IMAGE": 1,
+    "ECARD": 2,
+    "GIF": 3,
 })

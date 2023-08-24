@@ -14,16 +14,23 @@ EXTERNAL_APPS = (
     'taggit',
     'ajax_select',
     'cropimg',
+    'auditlog',
 )
 
 INTERNAL_APPS = (
     'news_feed.tests.profiles',
     'news_feed.tests.finance',
     'news_feed.tests.nominations',
+    'news_feed.tests.events',
+    'news_feed.tests.feedback',
     'feeds',
 )
 
 INSTALLED_APPS = EXTERNAL_APPS + INTERNAL_APPS
+
+MIDDLEWARE_CLASSES = (
+    "auditlog.middleware.AuditlogMiddleware",
+)
 
 ROOT_URLCONF = 'news_feed.urls'
 
@@ -73,10 +80,12 @@ ORGANIZATION_MODEL = 'news_feed.tests.profiles.models.Organization'
 DEPARTMENT_MODEL = 'news_feed.tests.profiles.models.Department'
 TRANSACTION_MODEL = "news_feed.tests.finance.models.Transaction"
 NOMINATIONS_MODEL = "news_feed.tests.nominations.models.Nominations"
+REPEATED_EVENT_MODEL = "news_feed.tests.events.models.RepeatedEvent"
 USER_STRENGTH_MODEL = 'news_feed.tests.profiles.models.UserStrength'
 TROPHY_BADGE_MODEL = 'news_feed.tests.profiles.models.TrophyBadge'
 NOMINATION_STATUS = 'news_feed.tests.nominations.constants.NOMINATION_STATUS'
 NOMINATION_STATUS_COLOR_CODE = 'news_feed.tests.nominations.constants.NOMINATION_STATUS_COLOR_CODE'
+FEEDBACK_STATUS_OPTIONS = 'news_feed.tests.feedback.constants.FEEDBACK_STATUS_OPTIONS'
 PROFILE_IMAGE_PROPERTY = 'thumbnail_img_url'
 NO_PROFILE_IMAGE = ''
 PENDING_EMAIL = 'news_feed.tests.profiles.models.PendingEmail'

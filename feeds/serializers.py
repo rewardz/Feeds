@@ -12,8 +12,8 @@ from .models import (
     Post, PostLiked, PollsAnswer, Images, Videos, Voter,
 )
 from .utils import (
-    extract_tagged_users, get_departments, get_profile_image, tag_users_to_comment, 
-    validate_priority, user_can_delete, user_can_edit
+    extract_tagged_users, get_departments, get_profile_image, tag_users_to_comment,
+    validate_priority, user_can_delete, user_can_edit, get_absolute_url
 )
 
 DEPARTMENT_MODEL = import_string(settings.DEPARTMENT_MODEL)
@@ -25,10 +25,37 @@ UserStrength = import_string(settings.USER_STRENGTH_MODEL)
 NOMINATION_STATUS_COLOR_CODE = import_string(settings.NOMINATION_STATUS_COLOR_CODE)
 ORGANIZATION_SETTINGS_MODEL = import_string(settings.ORGANIZATION_SETTINGS_MODEL)
 MULTI_ORG_POST_ENABLE_FLAG = settings.MULTI_ORG_POST_ENABLE_FLAG
+RepeatedEventSerializer = import_string(settings.REPEATED_EVENT_SERIALIZER)
 
 
 def get_user_detail(user_id):
     return getattr(UserModel, settings.ALL_USER_OBJECT).filter(pk=user_id).first()
+
+
+def get_user_detail_with_org(post, context):
+    user = post.user
+    user_details = UserInfoSerializer(instance=user, read_only=True, context=context).data
+    if post.greeting:
+        user_details.update({
+            "organization_name": user.organization.name,
+            "organization_logo": (
+                get_absolute_url(user.organization.display_img_url) if user.organization.display_img_url else ""
+            )
+        })
+    return user_details
+
+
+def get_info_for_greeting_post(post):
+    """
+    Returns greeting details if it is public post then we are passing ORG setting which decides to show name of DEPT
+    :params: post: Post
+    :returns: dict: RepeatedEventSerializer
+    """
+    context = {}
+    if post.title == "greeting_post":
+        context.update(
+            {"show_greeting_department": post.user.organization.has_setting_to_show_greeting_department})
+    return RepeatedEventSerializer(post.greeting, context=context).data
 
 
 class DynamicFieldsModelSerializer(serializers.ModelSerializer):
@@ -181,10 +208,8 @@ class TrophyBadgeSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_award_points(instance):
         points = instance.points
-        if points - int(points) == 0:
-            points = int(points)
-        else:
-            points = float(points)
+        if points:
+            points = int(points) if points - int(points) == 0 else float(points)
         return str(points)
 
 
@@ -224,6 +249,7 @@ class NominationsSerializer(DynamicFieldsModelSerializer):
     review_level = serializers.SerializerMethodField()
     nominator_name = serializers.SerializerMethodField()
     badges = serializers.SerializerMethodField()
+    badge = TrophyBadgeSerializer(read_only=True)
     user_strength = UserStrengthSerializer()
     strength = serializers.SerializerMethodField()
     nominated_team_member = UserInfoSerializer()
@@ -240,6 +266,7 @@ class NominationsSerializer(DynamicFieldsModelSerializer):
                   "comment",
                   "created",
                   "badges",
+                  "badge",
                   "user_strength",
                   "nominated_team_member",
                   "message_to_reviewer",
@@ -249,7 +276,7 @@ class NominationsSerializer(DynamicFieldsModelSerializer):
 
     @staticmethod
     def get_review_level(instance):
-        return instance.category.reviewer_levels
+        return instance.badge.reviewer_level if instance.badge else instance.category.reviewer_level
 
     def get_nominator_name(self, instance):
         return instance.nominator.full_name
@@ -262,13 +289,14 @@ class NominationsSerializer(DynamicFieldsModelSerializer):
             return ""
 
     def get_badges(self, instance):
-        if instance.category and instance.category.badge:
-            return TrophyBadgeSerializer(instance=instance.category.badge).data
+        # ToDo : once app updated, remove it
+        if instance.badge:
+            return TrophyBadgeSerializer(instance=instance.badge).data
         return None
 
     @staticmethod
     def get_strength(instance):
-        return instance.user_strength.name
+        return instance.user_strength.name if instance.user_strength else ""
 
     @staticmethod
     def get_nom_status(instance):
@@ -396,7 +424,7 @@ class PostSerializer(DynamicFieldsModelSerializer):
         return PostLiked.objects.filter(post=instance).count()
 
     def get_comments_count(self, instance):
-        return Comment.objects.filter(post=instance).count()
+        return Comment.objects.filter(post=instance, mark_delete=False).count()
 
     def get_can_edit(self, instance):
         request = self.context['request']
@@ -539,8 +567,18 @@ class CommentsLikedSerializer(serializers.ModelSerializer):
 class PostDetailSerializer(PostSerializer):
     comments = serializers.SerializerMethodField()
     appreciated_by = serializers.SerializerMethodField()
-    user = UserInfoSerializer(read_only=True)
+    user = serializers.SerializerMethodField()
     ecard = ECardSerializer(read_only=True)
+    category = serializers.CharField(read_only=True)
+    category_name = serializers.CharField(read_only=True)
+    sub_category = serializers.CharField(read_only=True)
+    sub_category_name = serializers.CharField(read_only=True)
+    organization_name = serializers.SerializerMethodField()
+    display_status = serializers.SerializerMethodField()
+    department_name = serializers.SerializerMethodField()
+    can_download = serializers.SerializerMethodField()
+    is_download_choice_needed = serializers.SerializerMethodField()
+    greeting_info = serializers.SerializerMethodField()
 
     class Meta:
         model = Post
@@ -552,11 +590,61 @@ class PostDetailSerializer(PostSerializer):
             "is_owner", "can_edit", "can_delete", "has_appreciated",
             "appreciation_count", "appreciated_by", "comments_count", "comments",
             "tagged_users", "is_admin", "nomination", "feed_type", "user_strength", "user",
-            "gif", "ecard", "points", "user_reaction_type", "images_with_ecard", "reaction_type"
+            "gif", "ecard", "points", "user_reaction_type", "images_with_ecard", "reaction_type", "category",
+            "category_name", "sub_category", "sub_category_name", "organization_name", "display_status",
+            "department_name", "departments", "can_download", "is_download_choice_needed", "greeting_info"
         )
+
+    @staticmethod
+    def get_is_download_choice_needed(post):
+        """
+        Decides if popup should be open or not to select image in frontend
+        """
+        is_download_choice_needed = True
+        if post.certificate_records.count():
+            # already we have choice selected
+            is_download_choice_needed = False
+        else:
+            total_attached_images = post.attached_images().count()
+            ecard = post.ecard
+            gif = post.gif
+            if gif:
+                # if we have gif
+                is_download_choice_needed = False
+            elif total_attached_images == 1 and not ecard:
+                # we have only one image and no e card
+                is_download_choice_needed = False
+            elif total_attached_images == 0 and ecard:
+                # we have 0 image and have ecard
+                is_download_choice_needed = False
+            elif all([not total_attached_images, not ecard, not gif]):
+                # we don't have image/ ecard/ gif
+                is_download_choice_needed = False
+        return is_download_choice_needed
+
+    def get_can_download(self, instance):
+        return self.context.get("request").user in (instance.user, instance.created_by)
+
+    def get_user(self, post):
+        return get_user_detail_with_org(post, {"request": self.context.get("request")})
+
+    @staticmethod
+    def get_greeting_info(post):
+        return get_info_for_greeting_post(post)
+
+    def get_organization_name(self, instance):
+        return instance.feedback.organization_name if instance.feedback else ""
+
+    def get_display_status(self, instance):
+        return instance.feedback.display_status if instance.feedback else ""
+
+    def get_department_name(self, instance):
+        return instance.feedback.department_name if instance.feedback else ""
 
     def get_comments(self, instance):
         request = self.context.get('request')
+        if request.version > 12:
+            return
         serializer_context = {'request': request}
         post_id = instance.id
         comments = Comment.objects.filter(post=post_id).order_by('-created_on')[:20]
@@ -564,6 +652,8 @@ class PostDetailSerializer(PostSerializer):
             comments, many=True, read_only=True, context=serializer_context).data
 
     def get_appreciated_by(self, instance):
+        if self.context.get('request').version > 12:
+            return
         post_id = instance.id
         posts_liked = PostLiked.objects.filter(post_id=post_id).order_by('-created_on')
         return PostLikedSerializer(posts_liked, many=True, read_only=True).data
@@ -583,8 +673,16 @@ class PostDetailSerializer(PostSerializer):
 
 
 class PostFeedSerializer(PostSerializer):
-    user = UserInfoSerializer(read_only=True)
+    user = serializers.SerializerMethodField()
     ecard = ECardSerializer(read_only=True)
+    greeting_info = serializers.SerializerMethodField()
+
+    @staticmethod
+    def get_greeting_info(post):
+        return get_info_for_greeting_post(post)
+
+    def get_user(self, post):
+        return get_user_detail_with_org(post, {"request": self.context.get("request")})
 
     class Meta:
         model = Post
@@ -597,7 +695,18 @@ class PostFeedSerializer(PostSerializer):
             "is_owner", "can_edit", "can_delete", "has_appreciated",
             "appreciation_count", "comments_count", "tagged_users", "is_admin", "tags", "reaction_type", "nomination",
             "feed_type", "user_strength", "user", "user_reaction_type", "gif", "ecard", "points", "time_left",
-            "images_with_ecard",
+            "images_with_ecard", "greeting_info"
+        )
+
+
+class GreetingSerializer(PostFeedSerializer):
+
+    class Meta:
+        model = Post
+        fields = (
+            "id", "created_by", "created_on", "organizations", "created_by_user_info", "title", "description",
+            "post_type", "priority", "shared_with", "is_owner", "tagged_users", "is_admin", "tags", "feed_type",
+            "gif", "ecard", "images_with_ecard", "greeting_info"
         )
 
 

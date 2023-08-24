@@ -29,21 +29,25 @@ NOTIF_OBJECT_TYPE_FIELD_NAME = settings.NOTIF_OBJECT_TYPE_FIELD_NAME
 NOTIF_OBJECT_ID_FIELD_NAME = settings.NOTIF_OBJECT_ID_FIELD_NAME
 USER_DEPARTMENT_RELATED_NAME = settings.USER_DEPARTMENT_RELATED_NAME
 ORGANIZATION_SETTINGS_MODEL = import_string(settings.ORGANIZATION_SETTINGS_MODEL)
+NOMINATION_STATUS = import_string(settings.NOMINATION_STATUS)
 
 
-def accessible_posts_by_user(user, organization, allow_feedback=False):
+def accessible_posts_by_user(user, organization, allow_feedback=False, appreciations=False, post_id=None):
     if not isinstance(organization, (list, tuple)):
         organization = [organization]
 
     # get the departments to which this user belongs
     user_depts = getattr(user, USER_DEPARTMENT_RELATED_NAME).all()
+    query = Q(mark_delete=False) & (
+            Q(organizations__in=organization) | Q(departments__in=user_depts)
+        ) | Q(mark_delete=False, created_by=user)
+
+    if appreciations:
+        query.add(Q(post_type=POST_TYPE.USER_CREATED_APPRECIATION,
+                    created_by__organization__in=user.get_affiliated_orgs(), mark_delete=False), Q.OR)
 
     # get the post belongs to organization
-    result = Post.objects.filter(
-        Q(mark_delete=False) & (
-            Q(organizations__in=organization) | Q(departments__in=user_depts)
-        )
-    )
+    result = Post.objects.filter(query)
 
     # filter / exclude feedback based on the allow_feedback
     if not allow_feedback:
@@ -55,6 +59,27 @@ def accessible_posts_by_user(user, organization, allow_feedback=False):
     # we can not apply distinct over here since order by is used at some places
     # after calling this method
     post_ids = list(set(result.values_list("id", flat=True)))
+
+    if user.is_staff:
+        # If the post is shared with self department and admin's department is another than creators department
+        # then post org will be None so we hahve to allow that post to admin
+        posts = Post.objects.filter(
+            organizations=None, shared_with=SHARED_WITH.SELF_DEPARTMENT,
+            created_by__organization=user.organization
+        ).exclude(id__in=post_ids).values_list("id", flat=True)
+        if posts:
+            post_ids.extend(list(posts))
+
+        if post_id:
+
+            # Added this condition because we are allowing admin to see the post if that post does not belongs
+            # to his department then admin can access that post
+            orgs = user.get_affiliated_orgs().values_list("id", flat=True) if allow_feedback else [user.organization_id]
+            if (
+                    post_id not in post_ids
+                    and Post.objects.filter(id=post_id, created_by__organization_id__in=orgs).exists()
+            ):
+                post_ids.append(post_id)
 
     return Post.objects.filter(id__in=post_ids)
 
@@ -165,7 +190,7 @@ def tag_users_to_comment(comment, user_list):
                 comment.tag_user(user)
                 message = _("'%s' has mentioned you in comment" % (created_by_user_name))
                 push_notification(comment.created_by, message, user,
-                                  object_type=object_type, object_id=comment.id)
+                                  object_type=object_type, object_id=comment.post_id)
             except Exception:
                 continue
     if remove_user_list:
@@ -209,7 +234,7 @@ def notify_new_comment(comment, creator):
     # if post type is feedback post and admin has commented then notify user
     if feedback_post_type and creator.is_staff:
         # object_type = NOTIFICATION_FEEDBACK_OBJECT_TYPE
-        message = _("'%s' commented on the post" % (comment_creator_string))
+        message = _("'%s' commented on the feedback" % (comment_creator_string))
         push_notification(
             creator, message, post_creator, object_type=object_type, object_id=post.id,
             extra_context={"reaction_type": 8}  # TODO: move to reaction types
@@ -231,7 +256,8 @@ def notify_new_poll_created(poll):
     message = _("'%s' started a new poll." % user_name)
     object_type = NOTIFICATION_OBJECT_TYPE
     for usr in accessible_users:
-        push_notification(creator, message, usr, object_type=object_type, object_id=poll.id)
+        push_notification(creator, message, usr, object_type=object_type, object_id=poll.id,
+        extra_context={"redirect_screen": "Poll"})
 
 
 def notify_flagged_post(post, user, reason):
@@ -353,3 +379,100 @@ def get_absolute_url(uri):
         site_url = settings.SITE_URL.strip("/")
         uri = uri.lstrip("/")
         return "/".join([site_url, uri])
+
+
+def posts_not_shared_with_self_department(posts, user):
+    """
+    Returns filtered (posts which are not shared with requested users department) queryset of Post
+    if user is superuser then empty QS (no need to exclude anything)
+    posts: QuerySet[Post]
+    user: CustomUser
+    """
+    if user.is_staff:
+        return Post.objects.none()
+
+    return posts.filter(
+        Q(shared_with=SHARED_WITH.SELF_DEPARTMENT) & ~Q(created_by__departments__in=user.departments.all()) &
+        ~Q(user=user) & ~Q(cc_users__in=[user])
+    )
+
+
+def admin_feeds_to_exclude(posts, user):
+    """
+    Returns filtered (posts which are shared with admin) queryset to exclude
+    if user is superuser then empty QS (no need to exclude anything)
+    if user is neither creator of post nor in cc posts to exclude
+    posts: QuerySet[Post]
+    user: CustomUser
+    """
+    if user.is_staff:
+        return Post.objects.none()
+    posts = posts.filter(shared_with=SHARED_WITH.ADMIN_ONLY)
+    query = Q(shared_with=SHARED_WITH.ADMIN_ONLY)
+    query.add(~Q(created_by=user) & ~Q(cc_users__in=[user.id]) & ~Q(user=user), query.connector)
+    return posts.filter(query)
+
+
+def shared_with_all_departments_but_not_belongs_to_user_org(posts, user):
+    """
+    Returns filtered (posts which are shared with all departments but created by user's org
+    user is superuser then empty QS (no need to exclude anything)
+    does not match with user's org ) queryset to exclude
+    posts: QuerySet[Post]
+    user: CustomUser
+    """
+    if user.is_staff:
+        return Post.objects.none()
+
+    query = Q(shared_with=SHARED_WITH.ALL_DEPARTMENTS)
+    query.add(~Q(created_by__organization=user.organization) &
+              ~Q(created_by=user) & ~Q(user=user) & ~Q(cc_users__in=[user.id]), query.connector)
+    return posts.filter(query)
+
+
+def assigned_nomination_post_ids(user):
+    """
+    Return List of post ids of nomination which assigned to reviewer
+    """
+    assigned_nomination_post_ids =  Post.objects.filter(
+        Q(nomination__assigned_reviewer=user) | Q(nomination__alternate_reviewer=user)
+    ).exclude(post_type=POST_TYPE.USER_CREATED_NOMINATION, 
+              nomination__nom_status__in=[NOMINATION_STATUS.approved, NOMINATION_STATUS.rejected]
+    ).values_list("id", flat=True)
+    return assigned_nomination_post_ids
+
+
+def posts_not_visible_to_user(posts, user, post_polls):
+    """
+    Returns List of post ids to exclude
+    params: posts: QuerySet[Post]
+    params: user: CustomUser
+    """
+    posts_ids_to_exclude = list(posts_not_shared_with_self_department(posts, user).values_list("id", flat=True))
+    posts_ids_to_exclude.extend(list(admin_feeds_to_exclude(posts, user).values_list("id", flat=True)))
+    if post_polls:
+        posts_ids_to_exclude.extend(list(shared_with_all_departments_but_not_belongs_to_user_org(
+            posts, user).values_list("id", flat=True)))
+
+    posts_ids_not_to_exclude = assigned_nomination_post_ids(user) 
+    posts_ids_to_exclude = list(set(posts_ids_to_exclude) - set(posts_ids_not_to_exclude))
+    return posts_ids_to_exclude
+
+
+def posts_shared_with_org_department(user, post_types, excluded_ids):
+    """
+    Return all posts which is shared with ORG departments
+    and belongs to user's department or created by user
+    params: user: CustomUser
+    params: post_types: List[POST_TYPE]
+    params: excluded_ids: List[id]
+    """
+    if user.is_staff:
+        query = Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS, created_by__organization=user.organization)
+    else:
+        query = Q(created_by=user)
+        query.add(Q(departments__in=[user.department]), Q.OR)
+        query.add(Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS, post_type__in=post_types), Q.AND)
+
+    posts = Post.objects.filter(query)
+    return posts.exclude(id__in=excluded_ids)

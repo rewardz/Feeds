@@ -1,9 +1,10 @@
 from __future__ import division, print_function, unicode_literals
 
+import datetime
 from json import loads
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Q, Count
+from django.db.models import Case, IntegerField, Q, Count, When
 from django.http import Http404
 from django.utils.module_loading import import_string
 from django.utils.translation import ugettext as _
@@ -14,25 +15,27 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
 
-from .filters import PostFilter
+from .filters import PostFilter, PostFilterBase
 from .constants import POST_TYPE
 from .models import (
     Comment, Documents, ECard, ECardCategory,
     Post, PostLiked, PollsAnswer, Images, CommentLiked,
 )
 from .paginator import FeedsResultsSetPagination, FeedsCommentsSetPagination
+from .permissions import IsOptionsOrAuthenticated
 from .serializers import (
     CommentDetailSerializer, CommentSerializer, CommentCreateSerializer,
     DocumentsSerializer, ECardCategorySerializer, ECardSerializer,
     FlagPostSerializer, PostLikedSerializer, PostSerializer,
     PostDetailSerializer, PollsAnswerSerializer, ImagesSerializer,
-    UserInfoSerializer, VideosSerializer, PostFeedSerializer
+    UserInfoSerializer, VideosSerializer, PostFeedSerializer, GreetingSerializer
 )
 from .utils import (
     accessible_posts_by_user, extract_tagged_users, get_user_name, notify_new_comment,
     notify_new_poll_created, notify_flagged_post, push_notification, tag_users_to_comment,
     tag_users_to_post, user_can_delete, user_can_edit, get_date_range, since_last_appreciation,
-    get_current_month_end_date, get_absolute_url,
+    get_current_month_end_date, get_absolute_url, posts_not_visible_to_user, assigned_nomination_post_ids,
+    posts_not_shared_with_self_department, posts_shared_with_org_department,
 )
 
 CustomUser = import_string(settings.CUSTOM_USER_MODEL)
@@ -46,18 +49,31 @@ Organization = import_string(settings.ORGANIZATION_MODEL)
 Transaction = import_string(settings.TRANSACTION_MODEL)
 PointsTable = import_string(settings.POINTS_TABLE)
 POINT_SOURCE = import_string(settings.POINT_SOURCE)
+REPEATED_EVENT_TYPES = import_string(settings.REPEATED_EVENT_TYPES_CHOICE)
+
+
+def is_appreciation_post(post_id):
+    """
+    Returns True if post is user created appreciation
+    """
+    return Post.objects.filter(post_type=POST_TYPE.USER_CREATED_APPRECIATION, id=post_id).exists()
 
 
 class PostViewSet(viewsets.ModelViewSet):
     parser_classes = (MultiPartParser, JSONParser, FormParser,)
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsOptionsOrAuthenticated,)
     pagination_class = FeedsResultsSetPagination
+    filter_backends = (filters.DjangoFilterBackend,)
 
     def _create_or_update(self, request, create=False):
         payload = request.data
         current_user = self.request.user
         if not current_user:
             raise serializers.ValidationError({'created_by': _('Created by is required!')})
+
+        if not current_user.allow_user_post_feed:
+            raise serializers.ValidationError(_('You are not allowed to create post.'))
+
         data = {}
         for key, value in payload.items():
             if key in ["organizations", "departments"] and isinstance(payload.get(key), unicode):
@@ -182,7 +198,7 @@ class PostViewSet(viewsets.ModelViewSet):
 
         if tags:
             tags = list(tags.split(","))
-            self.save_custom_tags(tags, instance.organization)
+            self.save_custom_tags(tags, request.user.organization)
             instance.tags.set(*tags)
 
         if request.FILES:
@@ -198,18 +214,51 @@ class PostViewSet(viewsets.ModelViewSet):
         tag_users = data.get('tag_users', None)
         tags = data.get('tags', None)
         data["created_by"] = instance.created_by.id
+        if "organizations" in data:
+            instance.organizations.clear()
+            instance.organizations.add(*data.get("organizations"))
+
+        if "departments" in data:
+            instance.departments.clear()
+            instance.departments.add(*data.get("departments"))
         serializer = self.get_serializer(instance, data=data)
         serializer.is_valid(raise_exception=True)
         if tag_users:
             tag_users_to_post(instance, tag_users)
         if tags:
             tags = list(tags.split(","))
-            self.save_custom_tags(tags, instance.organization)
+            self.save_custom_tags(tags, user.organization)
             instance.tags.set(*tags)
         if request.FILES:
             self._upload_files(request, instance.pk)
         self.perform_update(serializer)
         return Response(serializer.data)
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        data = serializer.data
+        if request.version > 12 and data["comments"] is None:
+            site_url = settings.SITE_URL
+            serializer = CommentSerializer(
+                self.paginate_queryset(
+                    Comment.objects.filter(post=instance.id, mark_delete=False).order_by('created_on')
+                ), many=True, read_only=True, context={"request": request}
+            )
+            data["comments"] = self.get_paginated_response(serializer.data).data
+            if data["comments"] and data["comments"].get("count") > len(data["comments"].get("results")):
+                data["comments"]["next"] = "{}feeds/api/posts/{}/comments/?page=2".format(site_url, instance.id)
+
+            serializer = PostLikedSerializer(
+                self.paginate_queryset(PostLiked.objects.filter(post_id=instance.id).order_by('-created_on')),
+                many=True, read_only=True)
+            data["appreciated_by"] = self.get_paginated_response(serializer.data).data
+            if data["appreciated_by"] and data["appreciated_by"].get("count") > len(
+                    data["appreciated_by"].get("results")):
+                data["appreciated_by"]["next"] = "{}feeds/api/posts/{}/post_appreciations/?page=2".format(site_url,
+                                                                                                          instance.id)
+
+        return Response(data)
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -240,17 +289,52 @@ class PostViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         feedback = self.request.query_params.get('feedback', None)
+        created_by = self.request.query_params.get('created_by', None)
         if feedback and feedback == "true":
             allow_feedback = True
         else:
             allow_feedback = False
         user = self.request.user
         org = self.request.user.organization
-        result = accessible_posts_by_user(user, org, allow_feedback=allow_feedback)
+        post_id = self.kwargs.get("pk", None)
+        query = Q(mark_delete=False, post_type=POST_TYPE.USER_CREATED_POST)
+        if created_by == "user_org":
+            query.add(Q(organizations=org, created_by__organization=org), query.connector)
+        elif created_by == "user_dept":
+            departments = user.departments.all()
+            query.add(Q(departments__in=departments, created_by__departments__in=departments), query.connector)
+        else:
+            if allow_feedback and user.is_staff:
+                org = list(user.get_affiliated_orgs().values_list("id", flat=True))
+            result = accessible_posts_by_user(user, org, allow_feedback=allow_feedback,
+                                              appreciations=is_appreciation_post(post_id) if post_id else False)
+
+        if created_by in ("user_org", "user_dept"):
+            result = Post.objects.filter(query)
+
+        if not post_id:
+            # For list api excluded personal greeting message (events.api.EventViewSet.message)
+            result = result.exclude(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting")
+
+        if int(self.request.version) < 12 and not post_id:
+            # For list api below version 12 we are excluding system created greeting post
+            result = result.exclude(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post")
+
+        posts_ids_to_exclude = posts_not_shared_with_self_department(result, user).values_list("id", flat=True)
+        posts_ids_not_to_exclude = assigned_nomination_post_ids(user)
+        posts_ids_to_exclude = list(set(posts_ids_to_exclude) - set(posts_ids_not_to_exclude))
+
+        result = result.exclude(id__in=posts_ids_to_exclude)
+
+        result = (result | posts_shared_with_org_department(
+            user, [POST_TYPE.USER_CREATED_POST, POST_TYPE.USER_CREATED_POLL],
+            result.values_list("id", flat=True))).distinct()
+
+        result = PostFilter(self.request.GET, queryset=result).qs
         result = result.order_by('-priority', '-modified_on', '-created_on')
         return result
 
-    @list_route(methods=["POST"], permission_classes=(permissions.IsAuthenticated,))
+    @list_route(methods=["POST"], permission_classes=(IsOptionsOrAuthenticated,))
     def create_poll(self, request, *args, **kwargs):
         context = {'request': request}
         user = self.request.user
@@ -266,7 +350,9 @@ class PostViewSet(viewsets.ModelViewSet):
         data['post_type'] = POST_TYPE.USER_CREATED_POLL
         data['created_by'] = user.pk
         data['modified_by'] = user.pk
-        data['organization'] = organization.pk
+        # if feedback is not enabled then save current user organization
+        if not ORGANIZATION_SETTINGS_MODEL.objects.get_value(MULTI_ORG_POST_ENABLE_FLAG, user.organization):
+            data['organization'] = user.organization_id
         question_serializer = PostSerializer(data=data, context=context)
         question_serializer.is_valid(raise_exception=True)
         poll = question_serializer.save()
@@ -303,7 +389,7 @@ class PostViewSet(viewsets.ModelViewSet):
 
         raise ValidationError(_('You do not have access to comment on this post'))
 
-    @detail_route(methods=["GET", "POST"], permission_classes=(permissions.IsAuthenticated,))
+    @detail_route(methods=["GET", "POST"], permission_classes=(IsOptionsOrAuthenticated,))
     def comments(self, request, *args, **kwargs):
         """
         List of all the comments related to the post
@@ -316,12 +402,17 @@ class PostViewSet(viewsets.ModelViewSet):
         else:
             allow_feedback = False
         user = self.request.user
-        organization = user.organization
         post_id = self.kwargs.get("pk", None)
         if not post_id:
             raise ValidationError(_('Post ID required to retrieve all the related comments'))
         post_id = int(post_id)
-        accessible_posts_queryset = accessible_posts_by_user(user, organization, allow_feedback=allow_feedback)
+        org = (
+            list(user.get_affiliated_orgs().values_list("id", flat=True))
+            if allow_feedback and user.is_staff else user.organization
+        )
+        accessible_posts_queryset = accessible_posts_by_user(
+            user, org, allow_feedback, is_appreciation_post(post_id), post_id
+        ).values_list('id', flat=True)
         accessible_posts = accessible_posts_queryset.values_list('id', flat=True)
         if post_id not in accessible_posts:
             raise ValidationError(_('You do not have access to comment on this post'))
@@ -398,15 +489,16 @@ class PostViewSet(viewsets.ModelViewSet):
                 notify_new_comment(inst, self.request.user)
             return Response(serializer.data)
 
-    @detail_route(methods=["POST"], permission_classes=(permissions.IsAuthenticated,))
+    @detail_route(methods=["POST"], permission_classes=(IsOptionsOrAuthenticated,))
     def appreciate(self, request, *args, **kwargs):
         user = self.request.user
-        organization = user.organization
         post_id = self.kwargs.get("pk", None)
         if not post_id:
             raise ValidationError(_('Post ID required to appreciate a post'))
         post_id = int(post_id)
-        accessible_posts = accessible_posts_by_user(user, organization).values_list('id', flat=True)
+        accessible_posts = accessible_posts_by_user(
+            user, user.organization, False, is_appreciation_post(post_id), post_id
+        ).values_list('id', flat=True)
         if post_id not in accessible_posts:
             raise ValidationError(_('You do not have access to this post'))
         reaction_type = self.request.data.get('type', 0)  # to handle existing workflow
@@ -435,7 +527,7 @@ class PostViewSet(viewsets.ModelViewSet):
                 if request.version >= 12 and user == post.created_by:
                     send_notification = False
                 if send_notification:
-                    notif_message = _("'%s' likes your post %s" % (user_name))
+                    notif_message = _("'%s' likes your post" % (user_name))
                     push_notification(user, notif_message, post.created_by, object_type=object_type,
                                       object_id=post.id, extra_context={"reaction_type": reaction_type})
         count = PostLiked.objects.filter(post_id=post_id).count()
@@ -460,7 +552,7 @@ class PostViewSet(viewsets.ModelViewSet):
         if not post_id:
             raise ValidationError(_('Post ID required to appreciate a post'))
         post_id = int(post_id)
-        accessible_posts = accessible_posts_by_user(user, organization). \
+        accessible_posts = accessible_posts_by_user(user, organization, False, False, post_id). \
             values_list('id', flat=True)
         if post_id not in accessible_posts:
             raise ValidationError(_('You do not have access to this post'))
@@ -481,7 +573,7 @@ class PostViewSet(viewsets.ModelViewSet):
         if not post_id:
             raise ValidationError(_('Post ID required to retrieve all the related answers'))
         post_id = int(post_id)
-        accessible_posts = accessible_posts_by_user(user, organization).values_list('id', flat=True)
+        accessible_posts = accessible_posts_by_user(user, organization, False, False, post_id).values_list('id', flat=True)
         accessible_polls = accessible_posts.filter(post_type=POST_TYPE.USER_CREATED_POLL)
         if post_id not in accessible_polls:
             raise ValidationError(_('This is not a poll.'))
@@ -500,7 +592,7 @@ class PostViewSet(viewsets.ModelViewSet):
             serializer.save()
             return Response(serializer.data)
 
-    @detail_route(methods=["POST"], permission_classes=(permissions.IsAuthenticated,))
+    @detail_route(methods=["POST"], permission_classes=(IsOptionsOrAuthenticated,))
     def vote(self, request, *args, **kwargs):
         user = self.request.user
         organization = user.organization
@@ -512,7 +604,7 @@ class PostViewSet(viewsets.ModelViewSet):
         if not post_id:
             raise ValidationError(_('Post ID required to vote'))
         post_id = int(post_id)
-        accessible_posts = accessible_posts_by_user(user, organization).values_list('id', flat=True)
+        accessible_posts = accessible_posts_by_user(user, organization, False, False, post_id).values_list('id', flat=True)
         if post_id not in accessible_posts:
             raise ValidationError(_('You do not have access'))
         accessible_polls = accessible_posts.filter(
@@ -534,14 +626,15 @@ class PostViewSet(viewsets.ModelViewSet):
     @detail_route(methods=["POST"], permission_classes=(permissions.IsAuthenticated,))
     def flag(self, request, *args, **kwargs):
         user = self.request.user
-        organization = user.organization
         post_id = self.kwargs.get("pk", None)
-        payload = self.request.data
-        data = {k: v for k, v in payload.items()}
         if not post_id:
             raise ValidationError(_('Post ID required to vote'))
         post_id = int(post_id)
-        accessible_posts = accessible_posts_by_user(user, organization).values_list('id', flat=True)
+        payload = self.request.data
+        data = {k: v for k, v in payload.items()}
+        accessible_posts = accessible_posts_by_user(
+            user, user.organization, False, is_appreciation_post(post_id), post_id
+        ).values_list('id', flat=True)
         if post_id not in accessible_posts:
             raise ValidationError(_('You do not have access'))
         data["flagger"] = user.id
@@ -556,7 +649,7 @@ class PostViewSet(viewsets.ModelViewSet):
         except Post.DoesNotExist:
             raise ValidationError(_('Post does not exist.'))
 
-    @list_route(methods=["POST"], permission_classes=(permissions.IsAuthenticated,))
+    @list_route(methods=["POST"], permission_classes=(IsOptionsOrAuthenticated,))
     def pinned_post(self, request, *args, **kwargs):
         user = self.request.user
         organization = user.organization
@@ -566,7 +659,7 @@ class PostViewSet(viewsets.ModelViewSet):
         if not post_id:
             raise ValidationError(_('Post ID required to set priority'))
         post_id = int(post_id)
-        accessible_posts = accessible_posts_by_user(user, organization).values_list('id', flat=True)
+        accessible_posts = accessible_posts_by_user(user, organization, False, False, post_id).values_list('id', flat=True)
         if post_id not in accessible_posts:
             raise ValidationError(_('You do not have access'))
         try:
@@ -581,7 +674,7 @@ class PostViewSet(viewsets.ModelViewSet):
         except Post.DoesNotExist:
             raise ValidationError(_('Post does not exist.'))
 
-    @detail_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
+    @detail_route(methods=["GET"], permission_classes=(IsOptionsOrAuthenticated,))
     def post_appreciations(self, request, *args, **kwargs):
         post_id = self.kwargs.get("pk", None)
         recent = request.query_params.get("recent", None)
@@ -672,7 +765,7 @@ class VideosView(views.APIView):
 
 
 class CommentViewset(viewsets.ModelViewSet):
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsOptionsOrAuthenticated,)
 
     def get_serializer(self, *args, **kwargs):
         if "pk" in self.kwargs:
@@ -682,23 +775,36 @@ class CommentViewset(viewsets.ModelViewSet):
         kwargs["context"] = {"request": self.request}
         return serializer_class(*args, **kwargs)
 
+    @staticmethod
+    def get_post_id_from_comment(comment_id):
+        post_id = 0
+        if comment_id:
+            comment = Comment.objects.filter(id=comment_id).first()
+            post_id = comment.post_id if comment else 0
+        return post_id
+
     def get_queryset(self):
         user = self.request.user
-        org = self.request.user.organization
-        posts = accessible_posts_by_user(user, org)
+        post_id = self.get_post_id_from_comment(self.kwargs.get("pk", 0))
+        posts = accessible_posts_by_user(user, user.organization, False,
+                                         is_appreciation_post(post_id) if post_id else False)
+
         result = Comment.objects.filter(post__in=posts, mark_delete=False)
         return result
 
-    @detail_route(methods=["POST"], permission_classes=(permissions.IsAuthenticated,))
+    @detail_route(methods=["POST"], permission_classes=(IsOptionsOrAuthenticated,))
     def like(self, request, *args, **kwargs):
         user = self.request.user
-        organization = user.organization
-        posts = accessible_posts_by_user(user, organization)
-        accessible_comments = Comment.objects.filter(post__in=posts) \
-            .values_list('id', flat=True)
         comment_id = self.kwargs.get("pk", None)
         if not comment_id:
             raise ValidationError(_('Comment ID is required'))
+        post_id = self.get_post_id_from_comment(self.kwargs.get("pk", 0))
+        organization = user.organization
+        posts = accessible_posts_by_user(
+            user, organization, False, is_appreciation_post(post_id) if post_id else False, post_id)
+        accessible_comments = Comment.objects.filter(post__in=posts) \
+            .values_list('id', flat=True)
+
         comment_id = int(comment_id)
         if comment_id not in accessible_comments:
             raise ValidationError(_('Not allowed to like the comment'))
@@ -732,7 +838,7 @@ class CommentViewset(viewsets.ModelViewSet):
                 if request.version >= 12 and user == comment.created_by:
                     send_notification = False
                 if send_notification:
-                    notif_message = _("'%s' likes your comment %s" % (user_name))
+                    notif_message = _("'%s' likes your comment" % (user_name))
                     push_notification(user, notif_message, comment.created_by, None, None,
                                       extra_context={"reaction_type": reaction_type})
         count = CommentLiked.objects.filter(comment_id=comment_id).count()
@@ -751,7 +857,7 @@ class CommentViewset(viewsets.ModelViewSet):
 
 
 @api_view(['GET'])
-@permission_classes((permissions.IsAuthenticated,))
+@permission_classes((IsOptionsOrAuthenticated,))
 def search_user(request):
     """
     Search users based on the search term
@@ -778,22 +884,32 @@ def search_user(request):
 class ECardCategoryViewSet(viewsets.ModelViewSet):
     queryset = ECardCategory.objects.none()
     serializer_class = ECardCategorySerializer
-    permission_classes = [permissions.IsAuthenticated, ]
+    permission_classes = [IsOptionsOrAuthenticated, ]
 
     def get_queryset(self):
         user = self.request.user
-        queryset = ECardCategory.objects.filter(organization=user.organization)
+        query = Q(organization=user.organization) | Q(organization__isnull=True)
+        if self.request.query_params.get('admin_function'):
+            query =  Q(organization=user.organization)
+        queryset = ECardCategory.objects.filter(query)
+        queryset = queryset.annotate(custom_order=Case(When(organization=user.organization, then=0),
+                                     default=1, output_field=IntegerField())).order_by('custom_order')
         return queryset
 
 
 class ECardViewSet(viewsets.ModelViewSet):
     queryset = ECard.objects.none()
     serializer_class = ECardSerializer
-    permission_classes = [permissions.IsAuthenticated, ]
+    permission_classes = [IsOptionsOrAuthenticated, ]
 
     def get_queryset(self):
         user = self.request.user
-        queryset = ECard.objects.filter(category__organization=user.organization)
+        query = Q(category__organization=user.organization) | Q(category__organization__isnull=True)
+        if self.request.query_params.get('admin_function'):
+            query =  Q(category__organization=user.organization)
+        queryset = ECard.objects.filter(query)
+        queryset = queryset.annotate(custom_order=Case(When(category__organization=user.organization, then=0),
+                                     default=1, output_field=IntegerField())).order_by('custom_order')
         category = self.request.query_params.get('category')
         if category:
             queryset = queryset.filter(category_id=category)
@@ -825,17 +941,36 @@ class ECardViewSet(viewsets.ModelViewSet):
 
 class UserFeedViewSet(viewsets.ModelViewSet):
     parser_classes = (JSONParser,)
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsOptionsOrAuthenticated,)
     serializer_class = PostFeedSerializer
     filter_backends = (filters.DjangoFilterBackend,)
     pagination_class = FeedsResultsSetPagination
 
+    @staticmethod
+    def get_filtered_feeds_according_to_shared_with(feeds, user, post_polls):
+        """
+        Returns filtered queryset (same dept posts will be returned if post is shared with departments)
+        (All posts will be returned if shared with within organization)
+        (hide posts which has shared with is admin only)
+        params: posts: QuerySet[Post]
+        params: user: CustomUser
+        params: post_polls: Bool
+        """
+        return feeds.exclude(id__in=posts_not_visible_to_user(feeds, user, post_polls))
+
     def get_queryset(self):
         feed_flag = self.request.query_params.get("feed", None)
         search = self.request.query_params.get("search", None)
+        user_id = self.request.query_params.get("user_id", None)
         user = self.request.user
+        if user_id and str(user_id).isdigit() and feed_flag in ("received", "given"):
+            try:
+                user = CustomUser.objects.get(id=user_id)
+            except CustomUser.DoesNotExist:
+                raise ValidationError("Invalid user id")
+
         organization = user.organization
-        posts = accessible_posts_by_user(user, organization)
+        posts = accessible_posts_by_user(user, organization, False, feed_flag != "post_polls")
         if feed_flag == "post_polls":
             feeds = posts.filter(post_type__in=[POST_TYPE.USER_CREATED_POST,
                                                 POST_TYPE.USER_CREATED_POLL], created_by=user)
@@ -844,7 +979,9 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         else:
             feeds = posts.filter(post_type__in=[POST_TYPE.USER_CREATED_APPRECIATION,
                                                 POST_TYPE.USER_CREATED_NOMINATION])
+        filter_appreciations = self.filter_appreciations(feeds)
         feeds = PostFilter(self.request.GET, queryset=feeds).qs
+        feeds = (feeds | filter_appreciations).distinct()
 
         if feed_flag == "received":
             # returning only approved nominations with all the received appreciations
@@ -854,18 +991,22 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             feeds = feeds.filter(Q(created_by=user, post_type=POST_TYPE.USER_CREATED_APPRECIATION) | Q(
                 nomination__nominator=user, nomination__nom_status=NOMINATION_STATUS.approved))
         elif feed_flag == "approvals":
-            feeds = feeds.filter(nomination__assigned_reviewer=user).exclude(
+            feeds = feeds.filter(
+                Q(nomination__assigned_reviewer=user) | Q(nomination__alternate_reviewer=user)).exclude(
                 post_type=POST_TYPE.USER_CREATED_NOMINATION, nomination__nom_status__in=[
                     NOMINATION_STATUS.approved, NOMINATION_STATUS.rejected])
         elif feed_flag == "my_nomination":
             feeds = feeds.filter(nomination__nominator=user)
         else:
-            feeds = feeds.filter(Q(nomination__nominator=user) | Q(user=user) | Q(nomination__assigned_reviewer=user))
+            feeds = feeds.filter(Q(nomination__nominator=user) | Q(user=user) |
+                Q(nomination__assigned_reviewer=user) | Q(nomination__alternate_reviewer=user))
         if search:
             feeds = feeds.filter(Q(user__first_name__istartswith=search) | Q(
                 user__last_name__istartswith=search) | Q(created_by__first_name__istartswith=search) | Q(
                 created_by__last_name__istartswith=search))
-        return feeds.distinct()
+
+        return self.get_filtered_feeds_according_to_shared_with(feeds=feeds, user=user,
+                                                                post_polls=feed_flag == "post_polls").distinct()
 
     def list(self, request, *args, **kwargs):
         show_approvals = False
@@ -876,11 +1017,11 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         user = self.request.user
         organization = user.organization
         posts = accessible_posts_by_user(user, organization)
-        approvals_count = posts.filter(post_type=POST_TYPE.USER_CREATED_NOMINATION,
-                                              nomination__assigned_reviewer=request.user).exclude(
-            nomination__nom_status__in=[NOMINATION_STATUS.approved, NOMINATION_STATUS.rejected]).count()
-        if (request.user.userdesignation_set.count() > 0 or request.user.reviewer_users.count() > 0) and \
-                approvals_count > 0:
+        approvals_count = posts.filter(
+            Q(nomination__assigned_reviewer=user) | Q(nomination__alternate_reviewer=user),
+            post_type=POST_TYPE.USER_CREATED_NOMINATION
+        ).exclude(nomination__nom_status__in=[NOMINATION_STATUS.approved, NOMINATION_STATUS.rejected]).count()
+        if approvals_count > 0:
             show_approvals = True
         if user.supervisor_remaining_budget is not None:
             supervisor_remaining_budget = str(user.supervisor_remaining_budget)
@@ -904,7 +1045,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             except ValueError:
                 raise ValidationError(_('strength should be numeric value.'))
 
-            posts = accessible_posts_by_user(user, organization)
+            posts = accessible_posts_by_user(user, organization, False, True, None)
             user_appreciations = posts.filter(
                 user=request.user, post_type=POST_TYPE.USER_CREATED_APPRECIATION).values(
                 'transaction__context', 'transaction__creator')
@@ -919,7 +1060,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             except ValueError:
                 raise ValidationError(_('badge should be numeric value.'))
             my_appreciations_user = request.user.nominated_user.filter(
-                category__badge=badge_id, nom_status=NOMINATION_STATUS.approved).values_list('nominator', flat=True)
+                badge=badge_id, nom_status=NOMINATION_STATUS.approved).values_list('nominator', flat=True)
 
         users = CustomUser.objects.filter(id__in=my_appreciations_user)
         serializer = UserInfoSerializer(users, many=True, fields=["pk", "email", "first_name", "last_name",
@@ -969,7 +1110,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             except ValueError:
                 raise ValidationError(_('badge should be numeric value.'))
         queryset = self.get_queryset().filter(post_type=POST_TYPE.USER_CREATED_NOMINATION,
-                                              nomination__category__badge_id=badge_id,
+                                              nomination__badge=badge_id,
                                               nomination__nom_status=NOMINATION_STATUS.approved)
         user = CustomUser.objects.filter(id=user_id)
         if user.exists():
@@ -977,12 +1118,13 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(created_by=user)
         else:
             raise ValidationError(_('User does not exist'))
+        # ToDo : once app updated, remove it ("badges" from nomination_field)
         serializer = PostFeedSerializer(queryset, many=True, context={
-            "request": request, "nomination_fields": ["badges", "strength"]}, fields=[
+            "request": request, "nomination_fields": ["badges", "badge", "strength"]}, fields=[
             "id", "description", "nomination"])
         return Response({"badges": serializer.data})
 
-    @list_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
+    @list_route(methods=["GET"], permission_classes=(IsOptionsOrAuthenticated,))
     def recent_recognitions(self, request, *args, **kwargs):
         show_cheer_msg, show_approvals = False, False
         user = self.request.user
@@ -1003,11 +1145,11 @@ class UserFeedViewSet(viewsets.ModelViewSet):
                 feeds.data['days_passed'] = days_passed
                 show_cheer_msg = True
 
-        approvals_count = posts.filter(post_type=POST_TYPE.USER_CREATED_NOMINATION,
-                                       nomination__assigned_reviewer=request.user).exclude(
-            nomination__nom_status__in=[NOMINATION_STATUS.approved, NOMINATION_STATUS.rejected]).count()
-        if (request.user.userdesignation_set.count() > 0 or request.user.reviewer_users.count() > 0) and \
-                approvals_count > 0:
+        approvals_count = posts.filter(
+            Q(nomination__assigned_reviewer=user) | Q(nomination__alternate_reviewer=user),
+            post_type=POST_TYPE.USER_CREATED_NOMINATION
+        ).exclude(nomination__nom_status__in=[NOMINATION_STATUS.approved, NOMINATION_STATUS.rejected]).count()
+        if approvals_count > 0:
             show_approvals = True
         feeds.data['approvals_count'] = approvals_count
         feeds.data['show_approvals'] = show_approvals
@@ -1018,35 +1160,85 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             feeds.data['points_left'] = None
         feeds.data['date'] = get_current_month_end_date()
         feeds.data['notification_count'] = request.user.unviewed_notifications_count
+        feeds.data['recently_recognized_count'] = Post.objects.filter(created_by=user, user__is_active=True).count()
         feeds.data['org_logo'] = get_absolute_url(organization.display_img_url)
         return feeds
 
-    @list_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
+    def filter_appreciations(self, feeds):
+        """
+        Returns filtered QS which matches user strength id in transaction
+        params: feeds QuerySet[Post]
+        """
+        strength_id = int(self.request.GET.get("user_strength", 0))
+        feeds = feeds.filter(transaction__context__isnull=False, transaction__isnull=False)
+        return PostFilterBase(self.request.GET, queryset=feeds.filter(id__in=[
+            feed.get("id")
+            for feed in feeds.values("transaction__context", "id")
+            if loads(feed.get("transaction__context", {})).get("strength_id") == strength_id
+        ])).qs
+
+    def merge_querset(self, feeds, filter_appreciations):
+        post_ids = list(feeds.values_list("id", flat=True))
+        post_ids.extend(list(filter_appreciations.values_list("id", flat=True)))
+        return Post.objects.filter(id__in=post_ids)
+
+    @list_route(methods=["GET"], permission_classes=(IsOptionsOrAuthenticated,))
     def organization_recognitions(self, request, *args, **kwargs):
         user = self.request.user
-        organization = user.organization
         post_polls = request.query_params.get("post_polls", None)
-        posts = accessible_posts_by_user(user, organization)
+        post_polls_filter = request.query_params.get("post_polls_filter", None)
+        greeting = request.query_params.get("greeting", None)
+        user_id = request.query_params.get("user", None)
+        organizations = user.organization
+        posts = accessible_posts_by_user(user, organizations, False, False if post_polls else True)
         if post_polls:
-            feeds = posts.filter((Q(post_type=POST_TYPE.USER_CREATED_POST) |
-                                        Q(post_type=POST_TYPE.USER_CREATED_POLL)) &
-                                        Q(organizations=organization))
+            query_post = Q(post_type=POST_TYPE.USER_CREATED_POST)
+            query_poll = Q(post_type=POST_TYPE.USER_CREATED_POLL)
+            if int(request.version) >= 12:
+                query_post.add(
+                    Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post", user__is_dob_public=True,
+                      greeting__event_type=REPEATED_EVENT_TYPES.event_birthday), Q.OR
+                )
+                query_post.add(
+                    Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post", user__is_anniversary_public=True,
+                      greeting__event_type=REPEATED_EVENT_TYPES.event_anniversary), Q.OR
+                )
+
+            if post_polls_filter == "post":
+                query = query_post
+            elif post_polls_filter == "poll":
+                query = query_poll
+            else:
+                query = query_post | query_poll
+            feeds = posts.filter(query)
+        elif greeting:
+            feeds = posts.filter(
+                post_type=POST_TYPE.GREETING_MESSAGE, title="greeting", greeting_id=greeting, user=user,
+                organizations__in=[organizations], created_on__year=datetime.datetime.now().year
+            )
         else:
-            feeds = posts.filter((Q(post_type=POST_TYPE.USER_CREATED_APPRECIATION) |
-                                        Q(nomination__nom_status=NOMINATION_STATUS.approved)) &
-                                        Q(organizations=organization)).exclude(
-                                        user__hide_appreciation=True)
+            query = (Q(post_type=POST_TYPE.USER_CREATED_APPRECIATION) |
+                     Q(nomination__nom_status=NOMINATION_STATUS.approved, organizations__in=[organizations]))
 
+            if user_id and str(user_id).isdigit():
+                query.add(Q(user_id=user_id), query.AND)
+
+            feeds = posts.filter(query).exclude(user__hide_appreciation=True)
+
+        filter_appreciations = self.filter_appreciations(feeds)
         feeds = PostFilter(self.request.GET, queryset=feeds).qs
-
         search = self.request.query_params.get("search", None)
         if search:
-            feeds = feeds.filter(Q(user__first_name__istartswith=search) |
-                                 Q(user__last_name__istartswith=search) |
-                                 Q(created_by__first_name__istartswith=search) |
-                                 Q(created_by__last_name__istartswith=search))
-        feeds = feeds.order_by('-priority', '-id')
+            feeds = feeds.filter(Q(user__first_name__icontains=search) |
+                                 Q(user__last_name__icontains=search) |
+                                 Q(created_by__first_name__icontains=search) |
+                                 Q(created_by__last_name__icontains=search))
+
+        feeds = (feeds | filter_appreciations).distinct()
+        feeds = self.get_filtered_feeds_according_to_shared_with(
+            feeds=feeds, user=user, post_polls=post_polls).order_by('-priority', '-created_on')
         page = self.paginate_queryset(feeds)
-        serializer = PostFeedSerializer(page, context={"request": request}, many=True)
+        serializer = GreetingSerializer if greeting else PostFeedSerializer
+        serializer = serializer(page, context={"request": request}, many=True)
         feeds = self.get_paginated_response(serializer.data)
         return feeds

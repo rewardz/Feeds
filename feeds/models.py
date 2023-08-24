@@ -10,12 +10,13 @@ from django.utils.translation import ugettext as _
 
 from rest_framework.exceptions import ValidationError
 
+from auditlog.registry import auditlog
 from cropimg.fields import CIImageField, CIThumbnailField
 from easy_thumbnails.exceptions import InvalidImageFormatError
 from easy_thumbnails.files import get_thumbnailer
 from taggit.managers import TaggableManager
 
-from .constants import POST_TYPE, REACTION_TYPE, SHARED_WITH
+from .constants import POST_TYPE, REACTION_TYPE, SHARED_WITH, POST_CERTIFICATE_ATTACHMENTS
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,7 @@ Organization = import_string(settings.ORGANIZATION_MODEL)
 Department = import_string(settings.DEPARTMENT_MODEL)
 Transaction = import_string(settings.TRANSACTION_MODEL)
 Nominations = import_string(settings.NOMINATIONS_MODEL)
+RepeatedEvent = import_string(settings.REPEATED_EVENT_MODEL)
 
 
 def post_upload_to_path(instance, filename):
@@ -77,6 +79,9 @@ class CIImageModel(models.Model):
         except InvalidImageFormatError as ex:
             logger.error("Error generating thumbnail for %s (pk=%d) :  %s", self, self.pk, ex)
             return default_url
+        except Exception as ex:
+            logger.error("Exception occured generating thumbnail for %s (pk=%d) :  %s", self, self.pk, ex)
+            return default_url
 
     @property
     def thumbnail_img_url(self):
@@ -104,7 +109,7 @@ class CIImageModel(models.Model):
         except ValueError as ex:
             logger.error("Error generating large for %s (pk=%d) :  %s", self, self.pk, ex)
             return ""
-    
+
     class Meta:
         abstract = True
 
@@ -130,10 +135,10 @@ class ReportAbuse(models.Model):
 
 class ECardCategory(models.Model):
     name = models.CharField(max_length=100, blank=False)
-    organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, null=True, blank=True)
 
     def __unicode__(self):
-        return "{}: {}".format(self.organization.name, self.name)
+        return "{}: {}".format(self.organization.name if self.organization else "[Default]", self.name)
 
 
 class ECard(CIImageModel):
@@ -149,9 +154,11 @@ class Post(UserInfo):
     organizations = models.ManyToManyField(Organization, related_name="posts")
     title = models.CharField(max_length=200, null=True, blank=True)
     description = models.TextField(null=True, blank=True)
-    user = models.ForeignKey(CustomUser, related_name="appreciated_user", on_delete=models.CASCADE, null=True, blank=True)
+    user = models.ForeignKey(CustomUser, related_name="appreciated_user", on_delete=models.CASCADE, null=True,
+                             blank=True)
     transaction = models.ForeignKey(Transaction, on_delete=models.CASCADE, null=True, blank=True)
     nomination = models.ForeignKey(Nominations, on_delete=models.CASCADE, null=True, blank=True)
+    greeting = models.ForeignKey(RepeatedEvent, on_delete=models.CASCADE, null=True, blank=True, related_name="posts")
     ecard = models.ForeignKey(ECard, on_delete=models.CASCADE, null=True, blank=True)
     gif = models.URLField(null=True, blank=True)
     cc_users = models.ManyToManyField(CustomUser, related_name="cc_users", blank=True)
@@ -280,6 +287,55 @@ class Post(UserInfo):
         Add department to current object's departments
         """
         self.departments.add(department_id)
+
+    @property
+    def feedback(self):
+        """
+        Returns post related Feedback
+        """
+        feedback_post = self.feedbackpost_set.first()
+        if not feedback_post:
+            return
+        return feedback_post.feedback if feedback_post.feedback else None
+
+    @property
+    def category(self):
+        """
+        Returns post related category id
+        """
+        feedback = self.feedback
+        return feedback.category_id if feedback else None
+
+    @property
+    def category_name(self):
+        """
+        Returns post related category name
+        """
+        feedback = self.feedback
+        return feedback.category_name if feedback else ""
+
+    @property
+    def sub_category(self):
+        """
+        Returns post related sub category id
+        """
+        feedback = self.feedback
+        return feedback.sub_category_id if feedback else None
+
+    @property
+    def sub_category_name(self):
+        """
+        Returns post related sub category name
+        """
+        feedback = self.feedback
+        return feedback.sub_category_name if feedback else ""
+
+    def attached_images(self, **kwargs):
+        """
+        Returns attached images of post
+        """
+        kwargs.update({"post": self})
+        return Images.objects.filter(**kwargs)
 
     def __unicode__(self):
         return self.title if self.title else str(self.pk)
@@ -444,3 +500,15 @@ class FlagPost(models.Model):
     created_on = models.DateTimeField(auto_now_add=True)
     modified_on = models.DateTimeField(auto_now=True)
     notified = models.BooleanField(default=True)
+
+
+class PostCertificateRecord(models.Model):
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name="certificate_records")
+    attachment_type = models.SmallIntegerField(choices=POST_CERTIFICATE_ATTACHMENTS(), null=True, blank=True)
+    image = models.ForeignKey(Images, on_delete=models.CASCADE, null=True, blank=True)
+
+    def __str__(self):
+        return "{}: {}".format(self.post.title, self.post.user.email)
+
+
+auditlog.register(Post, include_fields=['shared_with'])
