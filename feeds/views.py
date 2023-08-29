@@ -28,7 +28,7 @@ from .serializers import (
     DocumentsSerializer, ECardCategorySerializer, ECardSerializer,
     FlagPostSerializer, PostLikedSerializer, PostSerializer,
     PostDetailSerializer, PollsAnswerSerializer, ImagesSerializer,
-    UserInfoSerializer, VideosSerializer, PostFeedSerializer, GreetingSerializer
+    UserInfoSerializer, VideosSerializer, PostFeedSerializer, GreetingSerializer, OrganizationRecognitionSerializer
 )
 from .utils import (
     accessible_posts_by_user, extract_tagged_users, get_user_name, notify_new_comment,
@@ -1176,6 +1176,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         greeting = request.query_params.get("greeting", None)
         user_id = request.query_params.get("user", None)
         organizations = user.organization
+        filter_appreciations = Post.objects.none()
         posts = accessible_posts_by_user(user, organizations, False, False if post_polls else True)
         if post_polls:
             query_post = Q(post_type=POST_TYPE.USER_CREATED_POST)
@@ -1210,8 +1211,8 @@ class UserFeedViewSet(viewsets.ModelViewSet):
                 query.add(Q(user_id=user_id), query.AND)
 
             feeds = posts.filter(query).exclude(user__hide_appreciation=True)
-
-        filter_appreciations = self.filter_appreciations(feeds)
+            if self.request.GET.get("user_strength", 0):
+                filter_appreciations = self.filter_appreciations(feeds)
         feeds = PostFilter(self.request.GET, queryset=feeds).qs
         search = self.request.query_params.get("search", None)
         if search:
@@ -1220,11 +1221,11 @@ class UserFeedViewSet(viewsets.ModelViewSet):
                                  Q(created_by__first_name__icontains=search) |
                                  Q(created_by__last_name__icontains=search))
 
-        feeds = (feeds | filter_appreciations).distinct()
+        if filter_appreciations.exists():
+            feeds = (feeds | filter_appreciations).distinct()
         feeds = self.get_filtered_feeds_according_to_shared_with(
             feeds=feeds, user=user, post_polls=post_polls).order_by('-priority', '-created_on')
         page = self.paginate_queryset(feeds)
-        serializer = GreetingSerializer if greeting else PostFeedSerializer
+        serializer = GreetingSerializer if greeting else OrganizationRecognitionSerializer
         serializer = serializer(page, context={"request": request}, many=True)
-        feeds = self.get_paginated_response(serializer.data)
-        return feeds
+        return self.get_paginated_response(serializer.data)
