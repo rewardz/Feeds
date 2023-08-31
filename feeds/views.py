@@ -272,7 +272,8 @@ class PostViewSet(viewsets.ModelViewSet):
                 point_source=POINT_SOURCE.revoked_or_transferred, organization=user.organization
             )
             Transaction.objects.create(
-                user=user, creator=self.request.user, organization=user.organization,
+                user=appreciation_trxn.user, creator=self.request.user,
+                organization=appreciation_trxn.user.organization,
                 points=-appreciation_trxn.points, reason=reason, message=message,
                 context={"appreciation_trxn": appreciation_trxn.id, "message": message}
             )
