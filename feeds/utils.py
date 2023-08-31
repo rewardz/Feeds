@@ -58,28 +58,29 @@ def accessible_posts_by_user(user, organization, allow_feedback=False, appreciat
     # possible that result might contains duplicate posts due to OR query
     # we can not apply distinct over here since order by is used at some places
     # after calling this method
+    if not user.is_staff:
+        return result
     post_ids = list(set(result.values_list("id", flat=True)))
 
-    if user.is_staff:
-        # If the post is shared with self department and admin's department is another than creators department
-        # then post org will be None so we hahve to allow that post to admin
-        posts = Post.objects.filter(
-            organizations=None, shared_with=SHARED_WITH.SELF_DEPARTMENT,
-            created_by__organization=user.organization
-        ).exclude(id__in=post_ids).values_list("id", flat=True)
-        if posts:
-            post_ids.extend(list(posts))
+    # If the post is shared with self department and admin's department is another than creators department
+    # then post org will be None so we hahve to allow that post to admin
+    posts = Post.objects.filter(
+        organizations=None, shared_with=SHARED_WITH.SELF_DEPARTMENT,
+        created_by__organization=user.organization
+    ).exclude(id__in=post_ids).values_list("id", flat=True)
+    if posts:
+        post_ids.extend(list(posts))
 
-        if post_id:
+    if post_id:
 
-            # Added this condition because we are allowing admin to see the post if that post does not belongs
-            # to his department then admin can access that post
-            orgs = user.get_affiliated_orgs().values_list("id", flat=True) if allow_feedback else [user.organization_id]
-            if (
-                    post_id not in post_ids
-                    and Post.objects.filter(id=post_id, created_by__organization_id__in=orgs).exists()
-            ):
-                post_ids.append(post_id)
+        # Added this condition because we are allowing admin to see the post if that post does not belongs
+        # to his department then admin can access that post
+        orgs = user.get_affiliated_orgs().values_list("id", flat=True) if allow_feedback else [user.organization_id]
+        if (
+                post_id not in post_ids
+                and Post.objects.filter(id=post_id, created_by__organization_id__in=orgs).exists()
+        ):
+            post_ids.append(post_id)
 
     return Post.objects.filter(id__in=post_ids)
 

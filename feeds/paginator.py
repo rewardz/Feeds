@@ -16,7 +16,9 @@ class FeedsResultsSetPagination(PageNumberPagination):
 
     def get_page_size(self, request):
         try:
-            page_size = settings.FEEDS_PAGE_SIZE
+            page_size = request.GET.get("page_size")
+            if not page_size:
+                page_size = settings.FEEDS_PAGE_SIZE
         except AttributeError as ae:
             page_size = 20
         return page_size
