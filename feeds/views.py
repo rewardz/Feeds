@@ -28,7 +28,7 @@ from .serializers import (
     DocumentsSerializer, ECardCategorySerializer, ECardSerializer,
     FlagPostSerializer, PostLikedSerializer, PostSerializer,
     PostDetailSerializer, PollsAnswerSerializer, ImagesSerializer,
-    UserInfoSerializer, VideosSerializer, PostFeedSerializer, GreetingSerializer
+    UserInfoSerializer, VideosSerializer, PostFeedSerializer, GreetingSerializer, OrganizationRecognitionSerializer
 )
 from .utils import (
     accessible_posts_by_user, extract_tagged_users, get_user_name, notify_new_comment,
@@ -46,6 +46,9 @@ NOMINATION_STATUS = import_string(settings.NOMINATION_STATUS)
 ORGANIZATION_SETTINGS_MODEL = import_string(settings.ORGANIZATION_SETTINGS_MODEL)
 MULTI_ORG_POST_ENABLE_FLAG = settings.MULTI_ORG_POST_ENABLE_FLAG
 Organization = import_string(settings.ORGANIZATION_MODEL)
+Transaction = import_string(settings.TRANSACTION_MODEL)
+PointsTable = import_string(settings.POINTS_TABLE)
+POINT_SOURCE = import_string(settings.POINT_SOURCE)
 REPEATED_EVENT_TYPES = import_string(settings.REPEATED_EVENT_TYPES_CHOICE)
 
 
@@ -262,6 +265,18 @@ class PostViewSet(viewsets.ModelViewSet):
         user = request.user
         if not user_can_delete(user, instance):
             raise serializers.ValidationError(_("You do not have permission to delete"))
+        appreciation_trxn = instance.transaction
+        message = "reverting transaction for appreciation post {}".format(instance.title)
+        if request.data.get("revert_transaction", False):
+            reason, _ = PointsTable.objects.get_or_create(
+                point_source=POINT_SOURCE.revoked_or_transferred, organization=user.organization
+            )
+            Transaction.objects.create(
+                user=appreciation_trxn.user, creator=appreciation_trxn.creator,
+                organization=appreciation_trxn.user.organization,
+                points=-appreciation_trxn.points, reason=reason, message=message,
+                context={"appreciation_trxn": appreciation_trxn.id, "message": message}
+            )
         instance.mark_as_delete(user)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -1182,6 +1197,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         greeting = request.query_params.get("greeting", None)
         user_id = request.query_params.get("user", None)
         organizations = user.organization
+        filter_appreciations = Post.objects.none()
         posts = accessible_posts_by_user(user, organizations, False, False if post_polls else True)
         if post_polls:
             query_post = Q(post_type=POST_TYPE.USER_CREATED_POST)
@@ -1216,8 +1232,8 @@ class UserFeedViewSet(viewsets.ModelViewSet):
                 query.add(Q(user_id=user_id), query.AND)
 
             feeds = posts.filter(query).exclude(user__hide_appreciation=True)
-
-        filter_appreciations = self.filter_appreciations(feeds)
+            if self.request.GET.get("user_strength", 0):
+                filter_appreciations = self.filter_appreciations(feeds)
         feeds = PostFilter(self.request.GET, queryset=feeds).qs
         search = self.request.query_params.get("search", None)
         if search:
@@ -1226,11 +1242,11 @@ class UserFeedViewSet(viewsets.ModelViewSet):
                                  Q(created_by__first_name__icontains=search) |
                                  Q(created_by__last_name__icontains=search))
 
-        feeds = (feeds | filter_appreciations).distinct()
+        if filter_appreciations.exists():
+            feeds = (feeds | filter_appreciations).distinct()
         feeds = self.get_filtered_feeds_according_to_shared_with(
             feeds=feeds, user=user, post_polls=post_polls).order_by('-priority', '-created_on')
         page = self.paginate_queryset(feeds)
-        serializer = GreetingSerializer if greeting else PostFeedSerializer
+        serializer = GreetingSerializer if greeting else OrganizationRecognitionSerializer
         serializer = serializer(page, context={"request": request}, many=True)
-        feeds = self.get_paginated_response(serializer.data)
-        return feeds
+        return self.get_paginated_response(serializer.data)
