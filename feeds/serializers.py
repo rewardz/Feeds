@@ -711,7 +711,7 @@ class OrganizationRecognitionSerializer(PostFeedSerializer):
             "shared_with",
             "is_owner", "can_edit", "can_delete", "has_appreciated",
             "appreciation_count", "comments_count", "is_admin", "reaction_type", "nomination",
-            "user_strength", "user", "user_reaction_type", "gif", "ecard", "points",
+            "feed_type", "user_strength", "user", "user_reaction_type", "gif", "ecard", "points",
             "images_with_ecard", "greeting_info"
         )
 
