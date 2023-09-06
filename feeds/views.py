@@ -1173,7 +1173,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         strength_id = self.request.GET.get("user_strength", 0)
 
         # sometimes user_strength coming as empty string,
-        if not strength_id:
+        if strength_id == '':
             raise ValidationError(_('user strength should not be empty string'))
 
         strength_id = int(strength_id) if isinstance(strength_id, str) else strength_id
