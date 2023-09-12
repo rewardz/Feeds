@@ -269,7 +269,7 @@ class PostViewSet(viewsets.ModelViewSet):
         message = "reverting transaction for appreciation post {}".format(instance.title)
         if request.data.get("revert_transaction", False):
             reason, _ = PointsTable.objects.get_or_create(
-                point_source=POINT_SOURCE.revoked_or_transferred, organization=user.organization
+                point_source=POINT_SOURCE.revoked_feed, organization=user.organization
             )
             Transaction.objects.create(
                 user=appreciation_trxn.user, creator=appreciation_trxn.creator,
