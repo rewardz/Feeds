@@ -464,9 +464,12 @@ class PostSerializer(DynamicFieldsModelSerializer):
         validate_priority(validated_data)
         organizations = validated_data.pop('organizations', None)
         job_families = self.initial_data.get('job_families', None)
+        shared_with = self.initial_data.pop('shared_with', None)
 
-        if job_families:
+        if job_families and shared_with and int(shared_with) == SHARED_WITH.ORGANIZATION_DEPARTMENTS:
             job_families = self.validate_job_families(json.loads(job_families), user.get_affiliated_orgs())
+        else:
+            job_families = None
 
         if not organizations:
             organization = self.initial_data.pop('organization', None)
@@ -478,7 +481,6 @@ class PostSerializer(DynamicFieldsModelSerializer):
 
         departments = validated_data.pop('departments', None)
         if not departments and not organizations:
-            shared_with = self.initial_data.pop('shared_with', None)
             if shared_with:
                 if int(shared_with) == SHARED_WITH.SELF_DEPARTMENT:
                     departments = user.departments.all()
