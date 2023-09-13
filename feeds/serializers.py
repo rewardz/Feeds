@@ -1,4 +1,5 @@
 from __future__ import division, print_function, unicode_literals
+import json
 
 from django.conf import settings
 from django.utils.module_loading import import_string
@@ -26,6 +27,7 @@ NOMINATION_STATUS_COLOR_CODE = import_string(settings.NOMINATION_STATUS_COLOR_CO
 ORGANIZATION_SETTINGS_MODEL = import_string(settings.ORGANIZATION_SETTINGS_MODEL)
 MULTI_ORG_POST_ENABLE_FLAG = settings.MULTI_ORG_POST_ENABLE_FLAG
 RepeatedEventSerializer = import_string(settings.REPEATED_EVENT_SERIALIZER)
+UserJobFamily = import_string(settings.USER_JOB_FAMILY)
 
 
 def get_user_detail(user_id):
@@ -344,6 +346,7 @@ class PostSerializer(DynamicFieldsModelSerializer):
     images_with_ecard = serializers.SerializerMethodField()
     organization = serializers.SerializerMethodField()
     department = serializers.SerializerMethodField()
+    job_families = serializers.SerializerMethodField()
 
     class Meta:
         model = Post
@@ -356,8 +359,22 @@ class PostSerializer(DynamicFieldsModelSerializer):
             "is_owner", "can_edit", "can_delete", "has_appreciated",
             "appreciation_count", "comments_count", "tagged_users", "is_admin", "tags", "reaction_type", "nomination",
             "feed_type", "user_strength", "user", "user_reaction_type", "gif", "ecard", "points", "time_left",
-            "images_with_ecard", "departments", "organization", "department"
+            "images_with_ecard", "departments", "organization", "department", "job_families"
         )
+
+    @staticmethod
+    def validate_job_families(job_families, affiliated_orgs):
+        """Returns active job families of the user's affiliated org"""
+        # import pdb;pdb.set_trace()
+        job_families_qs = UserJobFamily.objects.filter(
+            id__in=job_families, organization__in=affiliated_orgs, is_active=True)
+        if job_families_qs.count() != len(job_families):
+            raise serializers.ValidationError(
+                "Invalid Job Family {}".format(
+                    list(set(job_families) - set(job_families_qs.values_list("id", flat=True)))
+                ))
+
+        return job_families_qs
 
     def get_organization(self, instance):
         organization = instance.organizations.first()
@@ -374,6 +391,9 @@ class PostSerializer(DynamicFieldsModelSerializer):
         request = self.context['request']
         user = request.user
         return user.is_staff
+
+    def get_job_families(self, instance):
+        return instance.job_families.values_list("id", flat=True)
 
     def get_poll_info(self, instance):
         if not instance.post_type == POST_TYPE.USER_CREATED_POLL:
@@ -440,13 +460,18 @@ class PostSerializer(DynamicFieldsModelSerializer):
 
     def create(self, validated_data):
         request = self.context.get('request', None)
+        user = request.user
         validate_priority(validated_data)
         organizations = validated_data.pop('organizations', None)
+        job_families = self.initial_data.get('job_families', None)
+
+        if job_families:
+            job_families = self.validate_job_families(json.loads(job_families), user.get_affiliated_orgs())
+
         if not organizations:
             organization = self.initial_data.pop('organization', None)
             organizations = [organization] if organization else organization
 
-        user = request.user
 
         if not organizations and not ORGANIZATION_SETTINGS_MODEL.objects.get_value(MULTI_ORG_POST_ENABLE_FLAG, user.organization):
             organizations = [user.organization]
@@ -467,6 +492,9 @@ class PostSerializer(DynamicFieldsModelSerializer):
                 post.organizations.add(*organizations)
             if departments:
                 post.departments.add(*departments)
+            if job_families:
+                post.job_families.add(*job_families)
+
         return post
 
     def to_representation(self, instance):
