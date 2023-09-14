@@ -691,6 +691,23 @@ class PostFeedSerializer(PostSerializer):
         )
 
 
+class OrganizationRecognitionSerializer(PostFeedSerializer):
+
+    class Meta:
+        model = Post
+        fields = (
+            "id", "created_by", "created_on", "modified_by", "modified_on",
+            "organizations", "created_by_user_info",
+            "title", "description", "post_type", "poll_info", "active_days",
+            "priority", "prior_till",
+            "shared_with",
+            "is_owner", "can_edit", "can_delete", "has_appreciated",
+            "appreciation_count", "comments_count", "is_admin", "reaction_type", "nomination",
+            "feed_type", "user_strength", "user", "user_reaction_type", "gif", "ecard", "points",
+            "images_with_ecard", "greeting_info"
+        )
+
+
 class GreetingSerializer(PostFeedSerializer):
 
     class Meta:
