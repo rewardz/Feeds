@@ -1032,7 +1032,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         feeds.data['supervisor_remaining_budget'] = supervisor_remaining_budget
         return feeds
 
-    @list_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
+    @list_route(methods=["GET"], permission_classes=(permissions.IsOptionsOrAuthenticated,))
     def appreciated_by(self, request, *args, **kwargs):
         user = self.request.user
         organization = user.organization
@@ -1068,7 +1068,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
                                                                   "profile_pic_url", "profile_img"])
         return Response({"users": serializer.data})
 
-    @list_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
+    @list_route(methods=["GET"], permission_classes=(permissions.IsOptionsOrAuthenticated,))
     def strengths(self, request, *args, **kwargs):
         user_id = request.query_params.get("user_id", None)
         strength_id = request.query_params.get("strength", None)
@@ -1097,7 +1097,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             "id", "ecard", "gif", "images", "description", "points", "images_with_ecard"])
         return Response({"strengths": serializer.data})
 
-    @list_route(methods=["GET"], permission_classes=(permissions.IsAuthenticated,))
+    @list_route(methods=["GET"], permission_classes=(permissions.IsOptionsOrAuthenticated,))
     def badges(self, request, *args, **kwargs):
         user_id = request.query_params.get("user_id", None)
         badge_id = request.query_params.get("badge", None)
