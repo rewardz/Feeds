@@ -365,7 +365,6 @@ class PostSerializer(DynamicFieldsModelSerializer):
     @staticmethod
     def validate_job_families(job_families, affiliated_orgs):
         """Returns active job families of the user's affiliated org"""
-        # import pdb;pdb.set_trace()
         job_families_qs = UserJobFamily.objects.filter(
             id__in=job_families, organization__in=affiliated_orgs, is_active=True)
         if job_families_qs.count() != len(job_families):
@@ -484,7 +483,7 @@ class PostSerializer(DynamicFieldsModelSerializer):
             if shared_with:
                 if int(shared_with) == SHARED_WITH.SELF_DEPARTMENT:
                     departments = user.departments.all()
-                elif int(shared_with) == SHARED_WITH.ALL_DEPARTMENTS:
+                elif int(shared_with) in (SHARED_WITH.ALL_DEPARTMENTS, SHARED_WITH.SELF_JOB_FAMILY):
                     organizations = [user.organization]
 
         post = Post.objects.create(**validated_data)

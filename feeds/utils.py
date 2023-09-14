@@ -398,6 +398,25 @@ def posts_not_shared_with_self_department(posts, user):
     )
 
 
+def posts_not_shared_with_job_family(posts, user):
+    """
+    Returns the posts to exclude which is shared with my job family
+    Case if I am admin then i can see the post
+    posts: QuerySet[Post]
+    user: CustomUser
+    """
+    try:
+        if user.is_staff:
+            return Post.objects.none()
+
+        return posts.filter(
+            Q(shared_with=SHARED_WITH.SELF_JOB_FAMILY) &
+            ~Q(created_by__employee_id_store__job_family=user.employee_id_store.job_family)
+        )
+    except AttributeError:
+        return posts.filter(Q(shared_with=SHARED_WITH.SELF_JOB_FAMILY))
+
+
 def admin_feeds_to_exclude(posts, user):
     """
     Returns filtered (posts which are shared with admin) queryset to exclude
