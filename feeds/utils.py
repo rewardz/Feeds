@@ -490,8 +490,13 @@ def posts_shared_with_org_department(user, post_types, excluded_ids):
     if user.is_staff:
         query = Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS, created_by__organization=user.organization)
     else:
+        try:
+            job_families = [user.employee_id_store.job_family]
+        except AttributeError:
+            job_families = []
         query = Q(created_by=user)
         query.add(Q(departments__in=[user.department]), Q.OR)
+        query.add(Q(job_families__in=job_families), Q.OR)
         query.add(Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS, post_type__in=post_types), Q.AND)
 
     posts = Post.objects.filter(query)
