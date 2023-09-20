@@ -51,6 +51,10 @@ PointsTable = import_string(settings.POINTS_TABLE)
 POINT_SOURCE = import_string(settings.POINT_SOURCE)
 REPEATED_EVENT_TYPES = import_string(settings.REPEATED_EVENT_TYPES_CHOICE)
 
+# InspireMe API wrapper
+InspireMeAPI = import_string(settings.API_WRAPPER_CLASS)
+InspireMe = InspireMeAPI()
+
 
 def is_appreciation_post(post_id):
     """
@@ -1250,3 +1254,15 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         serializer = GreetingSerializer if greeting else OrganizationRecognitionSerializer
         serializer = serializer(page, context={"request": request}, many=True)
         return self.get_paginated_response(serializer.data)
+
+
+class InspireMeViewSet(viewsets.ModelViewSet):
+    queryset = Post.objects.none()
+    serializer_class = PostSerializer
+    permission_classes = [IsOptionsOrAuthenticated, ]
+
+    @list_route(methods=["POST"], permission_classes=(IsOptionsOrAuthenticated,))
+    def amplify_core_value_recognition(self, request, *args, **kwargs):
+        response = InspireMe.amplify_core_value_recognition(request.data)
+
+        return Response(response, status=status.HTTP_200_OK)
