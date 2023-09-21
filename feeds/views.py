@@ -16,7 +16,7 @@ from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
 
 from .filters import PostFilter, PostFilterBase
-from .constants import POST_TYPE
+from .constants import POST_TYPE, SHARED_WITH
 from .models import (
     Comment, Documents, ECard, ECardCategory,
     Post, PostLiked, PollsAnswer, Images, CommentLiked,
@@ -36,6 +36,7 @@ from .utils import (
     tag_users_to_post, user_can_delete, user_can_edit, get_date_range, since_last_appreciation,
     get_current_month_end_date, get_absolute_url, posts_not_visible_to_user, assigned_nomination_post_ids,
     posts_not_shared_with_self_department, posts_shared_with_org_department, posts_not_shared_with_job_family,
+    validate_job_families, get_job_families,
 )
 
 CustomUser = import_string(settings.CUSTOM_USER_MODEL)
@@ -212,6 +213,9 @@ class PostViewSet(viewsets.ModelViewSet):
             raise serializers.ValidationError(_("You do not have permission to edit"))
         data = self._create_or_update(request)
         tag_users = data.get('tag_users', None)
+        if "job_families" in data:
+            job_families = get_job_families(user, data.get("shared_with"), data)
+            instance.job_families.add(*job_families)
         tags = data.get('tags', None)
         data["created_by"] = instance.created_by.id
         if "organizations" in data:

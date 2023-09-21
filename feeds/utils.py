@@ -1,7 +1,7 @@
 from __future__ import division, print_function, unicode_literals
 
+import json
 import re
-
 from django.conf import settings
 from django.db.models import Q
 from django.utils.translation import ugettext as _
@@ -10,7 +10,7 @@ from django.utils import timezone
 from datetime import timedelta
 import calendar
 
-from rest_framework import exceptions
+from rest_framework import exceptions, serializers
 
 from .constants import POST_TYPE, SHARED_WITH
 from .models import Comment, Post
@@ -30,6 +30,7 @@ NOTIF_OBJECT_ID_FIELD_NAME = settings.NOTIF_OBJECT_ID_FIELD_NAME
 USER_DEPARTMENT_RELATED_NAME = settings.USER_DEPARTMENT_RELATED_NAME
 ORGANIZATION_SETTINGS_MODEL = import_string(settings.ORGANIZATION_SETTINGS_MODEL)
 NOMINATION_STATUS = import_string(settings.NOMINATION_STATUS)
+UserJobFamily = import_string(settings.USER_JOB_FAMILY)
 
 
 def accessible_posts_by_user(user, organization, allow_feedback=False, appreciations=False, post_id=None):
@@ -501,3 +502,26 @@ def posts_shared_with_org_department(user, post_types, excluded_ids):
 
     posts = Post.objects.filter(query)
     return posts.exclude(id__in=excluded_ids)
+
+
+def validate_job_families(job_families, affiliated_orgs):
+    """Returns active job families of the user's affiliated org"""
+    job_families_qs = UserJobFamily.objects.filter(
+        id__in=job_families, organization__in=affiliated_orgs, is_active=True)
+    if job_families_qs.count() != len(job_families):
+        raise serializers.ValidationError(
+            "Invalid Job Family {}".format(
+                list(set(job_families) - set(job_families_qs.values_list("id", flat=True)))
+            ))
+
+    return job_families_qs
+
+
+def get_job_families(user, shared_with, data):
+    """Returns Job families based on the data"""
+    job_families = data.get('job_families', None)
+    if job_families and shared_with and int(shared_with) == SHARED_WITH.ORGANIZATION_DEPARTMENTS:
+        job_families = validate_job_families(json.loads(job_families), user.get_affiliated_orgs())
+    else:
+        job_families = None
+    return job_families

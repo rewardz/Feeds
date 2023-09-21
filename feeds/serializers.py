@@ -14,7 +14,7 @@ from .models import (
 )
 from .utils import (
     extract_tagged_users, get_departments, get_profile_image, tag_users_to_comment,
-    validate_priority, user_can_delete, user_can_edit, get_absolute_url
+    validate_priority, user_can_delete, user_can_edit, get_absolute_url, validate_job_families, get_job_families
 )
 
 DEPARTMENT_MODEL = import_string(settings.DEPARTMENT_MODEL)
@@ -27,7 +27,6 @@ NOMINATION_STATUS_COLOR_CODE = import_string(settings.NOMINATION_STATUS_COLOR_CO
 ORGANIZATION_SETTINGS_MODEL = import_string(settings.ORGANIZATION_SETTINGS_MODEL)
 MULTI_ORG_POST_ENABLE_FLAG = settings.MULTI_ORG_POST_ENABLE_FLAG
 RepeatedEventSerializer = import_string(settings.REPEATED_EVENT_SERIALIZER)
-UserJobFamily = import_string(settings.USER_JOB_FAMILY)
 
 
 def get_user_detail(user_id):
@@ -362,19 +361,6 @@ class PostSerializer(DynamicFieldsModelSerializer):
             "images_with_ecard", "departments", "organization", "department", "job_families"
         )
 
-    @staticmethod
-    def validate_job_families(job_families, affiliated_orgs):
-        """Returns active job families of the user's affiliated org"""
-        job_families_qs = UserJobFamily.objects.filter(
-            id__in=job_families, organization__in=affiliated_orgs, is_active=True)
-        if job_families_qs.count() != len(job_families):
-            raise serializers.ValidationError(
-                "Invalid Job Family {}".format(
-                    list(set(job_families) - set(job_families_qs.values_list("id", flat=True)))
-                ))
-
-        return job_families_qs
-
     def get_organization(self, instance):
         organization = instance.organizations.first()
         return organization.id if organization else organization
@@ -462,18 +448,12 @@ class PostSerializer(DynamicFieldsModelSerializer):
         user = request.user
         validate_priority(validated_data)
         organizations = validated_data.pop('organizations', None)
-        job_families = self.initial_data.get('job_families', None)
         shared_with = self.initial_data.pop('shared_with', None)
-
-        if job_families and shared_with and int(shared_with) == SHARED_WITH.ORGANIZATION_DEPARTMENTS:
-            job_families = self.validate_job_families(json.loads(job_families), user.get_affiliated_orgs())
-        else:
-            job_families = None
+        job_families = get_job_families(user, shared_with, self.initial_data)
 
         if not organizations:
             organization = self.initial_data.pop('organization', None)
             organizations = [organization] if organization else organization
-
 
         if not organizations and not ORGANIZATION_SETTINGS_MODEL.objects.get_value(MULTI_ORG_POST_ENABLE_FLAG, user.organization):
             organizations = [user.organization]
