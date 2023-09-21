@@ -215,6 +215,7 @@ class PostViewSet(viewsets.ModelViewSet):
         tag_users = data.get('tag_users', None)
         if "job_families" in data:
             job_families = get_job_families(user, data.get("shared_with"), data)
+            instance.job_families.clear()
             instance.job_families.add(*job_families)
         tags = data.get('tags', None)
         data["created_by"] = instance.created_by.id
