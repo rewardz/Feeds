@@ -213,7 +213,7 @@ class PostViewSet(viewsets.ModelViewSet):
             raise serializers.ValidationError(_("You do not have permission to edit"))
         data = self._create_or_update(request)
         tag_users = data.get('tag_users', None)
-        if "job_families" in data and data.get("shared_with") == SHARED_WITH.ORGANIZATION_DEPARTMENTS:
+        if "job_families" in data and int(data.get("shared_with")) == SHARED_WITH.ORGANIZATION_DEPARTMENTS:
             job_families = get_job_families(user, data.get("shared_with"), data)
             instance.job_families.clear()
             instance.job_families.add(*job_families)
@@ -363,6 +363,9 @@ class PostViewSet(viewsets.ModelViewSet):
         question_serializer = PostSerializer(data=data, context=context)
         question_serializer.is_valid(raise_exception=True)
         poll = question_serializer.save()
+        job_families = get_job_families(user, data.get("shared_with"), data, False)
+        if job_families:
+            poll.job_families.add(*job_families)
         for answer in answers:
             data['question'] = poll.pk
             data['answer_text'] = answer
