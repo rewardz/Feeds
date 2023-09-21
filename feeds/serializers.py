@@ -278,7 +278,7 @@ class NominationsSerializer(DynamicFieldsModelSerializer):
     nomination_icon = serializers.SerializerMethodField()
     review_level = serializers.SerializerMethodField()
     nominator_name = serializers.SerializerMethodField()
-    question = serializers.SerializerMethodField(source="question_set")
+    question = serializers.SerializerMethodField()
     badge = TrophyBadgeSerializer(read_only=True)
     user_strength = UserStrengthSerializer()
     strength = serializers.SerializerMethodField()
