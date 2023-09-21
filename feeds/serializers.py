@@ -588,6 +588,7 @@ class PostDetailSerializer(PostSerializer):
     can_download = serializers.SerializerMethodField()
     is_download_choice_needed = serializers.SerializerMethodField()
     greeting_info = serializers.SerializerMethodField()
+    job_families = serializers.SerializerMethodField()
 
     class Meta:
         model = Post
@@ -601,8 +602,13 @@ class PostDetailSerializer(PostSerializer):
             "tagged_users", "is_admin", "nomination", "feed_type", "user_strength", "user",
             "gif", "ecard", "points", "user_reaction_type", "images_with_ecard", "reaction_type", "category",
             "category_name", "sub_category", "sub_category_name", "organization_name", "display_status",
-            "department_name", "departments", "can_download", "is_download_choice_needed", "greeting_info"
+            "department_name", "departments", "can_download", "is_download_choice_needed", "greeting_info",
+            "job_families"
         )
+
+    @staticmethod
+    def get_job_families(instance):
+        return instance.job_families.values_list("id", flat=True)
 
     @staticmethod
     def get_is_download_choice_needed(post):

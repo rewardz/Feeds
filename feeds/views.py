@@ -213,7 +213,7 @@ class PostViewSet(viewsets.ModelViewSet):
             raise serializers.ValidationError(_("You do not have permission to edit"))
         data = self._create_or_update(request)
         tag_users = data.get('tag_users', None)
-        if "job_families" in data:
+        if "job_families" in data and data.get("shared_with") == SHARED_WITH.ORGANIZATION_DEPARTMENTS:
             job_families = get_job_families(user, data.get("shared_with"), data)
             instance.job_families.clear()
             instance.job_families.add(*job_families)
