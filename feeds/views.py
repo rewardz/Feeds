@@ -32,7 +32,7 @@ from .serializers import (
 )
 from .utils import (
     accessible_posts_by_user, extract_tagged_users, get_user_name, notify_new_comment,
-    notify_new_poll_created, notify_flagged_post, push_notification, tag_users_to_comment,
+    notify_new_post_poll_created, notify_flagged_post, push_notification, tag_users_to_comment,
     tag_users_to_post, user_can_delete, user_can_edit, get_date_range, since_last_appreciation,
     get_current_month_end_date, get_absolute_url, posts_not_visible_to_user, assigned_nomination_post_ids,
     posts_not_shared_with_self_department, posts_shared_with_org_department, posts_not_shared_with_job_family,
@@ -204,6 +204,8 @@ class PostViewSet(viewsets.ModelViewSet):
 
         if request.FILES:
             self._upload_files(request, post_id)
+
+        notify_new_post_poll_created(instance)
         return Response(serializer.data)
 
     def update(self, request, pk=None):
@@ -373,7 +375,7 @@ class PostViewSet(viewsets.ModelViewSet):
             answer_serializer.is_valid(raise_exception=True)
             answer_serializer.save()
         result = self.get_serializer(poll)
-        notify_new_poll_created(poll)
+        notify_new_post_poll_created(poll)
         return Response(result.data)
 
     def get_ordering_field(self, default_order):
