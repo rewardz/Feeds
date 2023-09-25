@@ -281,7 +281,7 @@ def notify_new_post_poll_created(poll, is_post=False):
         for employee_id_store in employee_ids_store:
             user = employee_id_store.user
             if user and user.signed_up and user not in accessible_users:
-                accessible_users.append(employee_id_store.user)
+                accessible_users.append(user)
 
     user_name = get_user_name(creator)
     message = _("'%s' created a new post." % user_name) if is_post else _("'%s' started a new poll." % user_name)
@@ -289,7 +289,7 @@ def notify_new_post_poll_created(poll, is_post=False):
     accessible_users = list(set(accessible_users))
     for usr in accessible_users:
         push_notification(creator, message, usr, object_type=object_type, object_id=poll.id,
-        extra_context={"redirect_screen": "Poll"})
+                          extra_context={"redirect_screen": "Poll"})
 
 
 def notify_flagged_post(post, user, reason):
