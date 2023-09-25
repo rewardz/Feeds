@@ -205,7 +205,7 @@ class PostViewSet(viewsets.ModelViewSet):
         if request.FILES:
             self._upload_files(request, post_id)
 
-        notify_new_post_poll_created(instance)
+        notify_new_post_poll_created(instance, True)
         return Response(serializer.data)
 
     def update(self, request, pk=None):

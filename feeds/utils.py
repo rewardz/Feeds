@@ -245,7 +245,7 @@ def notify_new_comment(comment, creator):
         notify_user_via_email.delay(comment.id)
 
 
-def notify_new_post_poll_created(poll):
+def notify_new_post_poll_created(poll, is_post=False):
     creator = poll.created_by
     accessible_users = []
     if poll.shared_with == SHARED_WITH.SELF_DEPARTMENT:
@@ -284,7 +284,7 @@ def notify_new_post_poll_created(poll):
                 accessible_users.append(employee_id_store.user)
 
     user_name = get_user_name(creator)
-    message = _("'%s' started a new poll." % user_name)
+    message = _("'%s' created a new post." % user_name) if is_post else _("'%s' started a new poll." % user_name)
     object_type = NOTIFICATION_OBJECT_TYPE
     accessible_users = list(set(accessible_users))
     for usr in accessible_users:
