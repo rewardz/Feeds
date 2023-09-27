@@ -31,6 +31,7 @@ USER_DEPARTMENT_RELATED_NAME = settings.USER_DEPARTMENT_RELATED_NAME
 ORGANIZATION_SETTINGS_MODEL = import_string(settings.ORGANIZATION_SETTINGS_MODEL)
 NOMINATION_STATUS = import_string(settings.NOMINATION_STATUS)
 UserJobFamily = import_string(settings.USER_JOB_FAMILY)
+EmployeeIDStore = import_string(settings.EMPLOYEE_ID_STORE)
 
 
 def accessible_posts_by_user(user, organization, allow_feedback=False, appreciations=False, post_id=None):
@@ -244,22 +245,51 @@ def notify_new_comment(comment, creator):
         notify_user_via_email.delay(comment.id)
 
 
-def notify_new_poll_created(poll):
+def notify_new_post_poll_created(poll, is_post=False):
     creator = poll.created_by
     accessible_users = []
     if poll.shared_with == SHARED_WITH.SELF_DEPARTMENT:
-        for dept in DEPARTMENT_MODEL.objects.filter(users=creator):
-            for usr in dept.users.all():
-                accessible_users.append(usr)
+        departments = creator.departments.all()
+        for dept in departments:
+            accessible_users.extend(list(dept.users.all()))
+
     elif poll.shared_with == SHARED_WITH.ALL_DEPARTMENTS:
-        for usr in USERMODEL.objects.filter(organization=creator.organization):
-            accessible_users.append(usr)
+        accessible_users.extend(list(creator.organization.users.all()))
+
+    elif poll.shared_with == SHARED_WITH.SELF_JOB_FAMILY:
+        try:
+            employee_id_store = EmployeeIDStore.objects.filter(
+                user__is_active=True, job_family=creator.employee_id_store.job_family, signed_up=True)
+            for emp_id_store in employee_id_store:
+                if emp_id_store.user in accessible_users:
+                    continue
+                accessible_users.append(emp_id_store.user)
+        except AttributeError:
+            # User does not have any job family No need to send notification
+            pass
+
+    elif poll.shared_with == SHARED_WITH.ORGANIZATION_DEPARTMENTS:
+        departments = poll.departments.all()
+        organizations = poll.organizations.all()
+        employee_ids_store = EmployeeIDStore.objects.filter(job_family__in=poll.job_families.all())
+        for department in departments:
+            accessible_users.extend(list(department.users.all()))
+
+        for organization in organizations:
+            accessible_users.extend(list(organization.users.all()))
+
+        for employee_id_store in employee_ids_store:
+            user = employee_id_store.user
+            if user and user.signed_up and user not in accessible_users:
+                accessible_users.append(user)
+
     user_name = get_user_name(creator)
-    message = _("'%s' started a new poll." % user_name)
+    message = _("'%s' created a new post." % user_name) if is_post else _("'%s' started a new poll." % user_name)
     object_type = NOTIFICATION_OBJECT_TYPE
+    accessible_users = list(set(accessible_users))
     for usr in accessible_users:
         push_notification(creator, message, usr, object_type=object_type, object_id=poll.id,
-        extra_context={"redirect_screen": "Poll"})
+                          extra_context={"redirect_screen": "Poll"})
 
 
 def notify_flagged_post(post, user, reason):
@@ -457,7 +487,7 @@ def assigned_nomination_post_ids(user):
     """
     assigned_nomination_post_ids =  Post.objects.filter(
         Q(nomination__assigned_reviewer=user) | Q(nomination__alternate_reviewer=user)
-    ).exclude(post_type=POST_TYPE.USER_CREATED_NOMINATION, 
+    ).exclude(post_type=POST_TYPE.USER_CREATED_NOMINATION,
               nomination__nom_status__in=[NOMINATION_STATUS.approved, NOMINATION_STATUS.rejected]
     ).values_list("id", flat=True)
     return assigned_nomination_post_ids
@@ -475,7 +505,7 @@ def posts_not_visible_to_user(posts, user, post_polls):
         posts_ids_to_exclude.extend(list(shared_with_all_departments_but_not_belongs_to_user_org(
             posts, user).values_list("id", flat=True)))
 
-    posts_ids_not_to_exclude = assigned_nomination_post_ids(user) 
+    posts_ids_not_to_exclude = assigned_nomination_post_ids(user)
     posts_ids_to_exclude = list(set(posts_ids_to_exclude) - set(posts_ids_not_to_exclude))
     return posts_ids_to_exclude
 
