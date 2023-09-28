@@ -553,9 +553,9 @@ def get_job_families(user, shared_with, data):
     if not job_families:
         return
 
-    if isinstance(job_families, (str, unicode)):
-        job_families = json.loads(job_families)
-
     if shared_with and int(shared_with) == SHARED_WITH.ORGANIZATION_DEPARTMENTS:
+        if isinstance(job_families, (str, unicode)):
+            job_families = json.loads(job_families)
+
         job_families = validate_job_families(job_families, user.get_affiliated_orgs())
     return job_families
