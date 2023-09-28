@@ -547,12 +547,15 @@ def validate_job_families(job_families, affiliated_orgs):
     return job_families_qs
 
 
-def get_job_families(user, shared_with, data, is_str=True):
+def get_job_families(user, shared_with, data):
     """Returns Job families based on the data"""
     job_families = data.get('job_families', None)
-    if job_families and shared_with and int(shared_with) == SHARED_WITH.ORGANIZATION_DEPARTMENTS:
-        job_families = validate_job_families(json.loads(job_families) if is_str else job_families,
-                                             user.get_affiliated_orgs())
-    else:
-        job_families = None
+    if not job_families:
+        return
+
+    if isinstance(job_families, (str, unicode)):
+        job_families = json.loads(job_families)
+
+    if shared_with and int(shared_with) == SHARED_WITH.ORGANIZATION_DEPARTMENTS:
+        job_families = validate_job_families(job_families, user.get_affiliated_orgs())
     return job_families

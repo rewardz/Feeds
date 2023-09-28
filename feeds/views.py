@@ -347,7 +347,6 @@ class PostViewSet(viewsets.ModelViewSet):
     def create_poll(self, request, *args, **kwargs):
         context = {'request': request}
         user = self.request.user
-        organization = user.organization
         payload = self.request.data
         data = {k: v for k, v in payload.items()}
         question = data.get('title', None)
@@ -365,9 +364,6 @@ class PostViewSet(viewsets.ModelViewSet):
         question_serializer = PostSerializer(data=data, context=context)
         question_serializer.is_valid(raise_exception=True)
         poll = question_serializer.save()
-        job_families = get_job_families(user, data.get("shared_with"), data, False)
-        if job_families:
-            poll.job_families.add(*job_families)
         for answer in answers:
             data['question'] = poll.pk
             data['answer_text'] = answer
