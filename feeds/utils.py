@@ -280,7 +280,7 @@ def notify_new_post_poll_created(poll, is_post=False):
 
         for employee_id_store in employee_ids_store:
             user = employee_id_store.user
-            if user and user.signed_up and user not in accessible_users:
+            if user and employee_id_store.signed_up and user not in accessible_users:
                 accessible_users.append(user)
 
     user_name = get_user_name(creator)
