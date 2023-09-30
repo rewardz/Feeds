@@ -624,7 +624,7 @@ class PostViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(poll)
         return Response(serializer.data)
 
-    @detail_route(methods=["POST"], permission_classes=(permissions.IsAuthenticated,))
+    @detail_route(methods=["POST"], permission_classes=(IsOptionsOrAuthenticated,))
     def flag(self, request, *args, **kwargs):
         user = self.request.user
         post_id = self.kwargs.get("pk", None)
