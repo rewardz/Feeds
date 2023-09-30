@@ -504,6 +504,7 @@ def posts_not_visible_to_user(posts, user, post_polls):
     if post_polls:
         posts_ids_to_exclude.extend(list(shared_with_all_departments_but_not_belongs_to_user_org(
             posts, user).values_list("id", flat=True)))
+        posts_ids_to_exclude.extend(list(posts_not_shared_with_job_family(posts, user).values_list("id", flat=True)))
 
     posts_ids_not_to_exclude = assigned_nomination_post_ids(user)
     posts_ids_to_exclude = list(set(posts_ids_to_exclude) - set(posts_ids_not_to_exclude))

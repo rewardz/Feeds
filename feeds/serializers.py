@@ -14,7 +14,7 @@ from .models import (
 )
 from .utils import (
     extract_tagged_users, get_departments, get_profile_image, tag_users_to_comment,
-    validate_priority, user_can_delete, user_can_edit, get_absolute_url, validate_job_families, get_job_families
+    validate_priority, user_can_delete, user_can_edit, get_absolute_url, get_job_families
 )
 
 DEPARTMENT_MODEL = import_string(settings.DEPARTMENT_MODEL)

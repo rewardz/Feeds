@@ -36,7 +36,7 @@ from .utils import (
     tag_users_to_post, user_can_delete, user_can_edit, get_date_range, since_last_appreciation,
     get_current_month_end_date, get_absolute_url, posts_not_visible_to_user, assigned_nomination_post_ids,
     posts_not_shared_with_self_department, posts_shared_with_org_department, posts_not_shared_with_job_family,
-    validate_job_families, get_job_families,
+    get_job_families,
 )
 
 CustomUser = import_string(settings.CUSTOM_USER_MODEL)
