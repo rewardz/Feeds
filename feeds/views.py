@@ -1253,6 +1253,10 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             feeds = (feeds | filter_appreciations).distinct()
         feeds = self.get_filtered_feeds_according_to_shared_with(
             feeds=feeds, user=user, post_polls=post_polls).order_by('-priority', '-created_on')
+        if post_polls:
+            feeds = (feeds | posts_shared_with_org_department(
+                user, [POST_TYPE.USER_CREATED_POST, POST_TYPE.USER_CREATED_POLL],
+                feeds.values_list("id", flat=True))).distinct()
         page = self.paginate_queryset(feeds)
         serializer = GreetingSerializer if greeting else OrganizationRecognitionSerializer
         serializer = serializer(page, context={"request": request}, many=True)
