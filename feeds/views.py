@@ -624,7 +624,7 @@ class PostViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(poll)
         return Response(serializer.data)
 
-    @detail_route(methods=["POST"], permission_classes=(permissions.IsAuthenticated,))
+    @detail_route(methods=["POST"], permission_classes=(IsOptionsOrAuthenticated,))
     def flag(self, request, *args, **kwargs):
         user = self.request.user
         post_id = self.kwargs.get("pk", None)
@@ -1176,7 +1176,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         if strength_id == '':
             raise ValidationError(_('user strength should not be empty string'))
 
-        strength_id = int(strength_id) if isinstance(strength_id, str) else strength_id
+        strength_id = int(strength_id) if isinstance(strength_id, (str, unicode)) else strength_id
         feeds = feeds.filter(transaction__context__isnull=False, transaction__isnull=False)
         return PostFilterBase(self.request.GET, queryset=feeds.filter(id__in=[
             feed.get("id")
