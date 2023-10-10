@@ -975,11 +975,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         search = self.request.query_params.get("search", None)
         user_id = self.request.query_params.get("user_id", None)
         requested_user = self.request.user
-        user = (
-            self.get_user_by_id(user_id, requested_user)
-            if user_id and str(user_id).isdigit() and feed_flag in ("received", "given")
-            else requested_user
-        )
+        user = self.get_user_by_id(user_id, requested_user) if user_id and str(user_id).isdigit() else requested_user
 
         organization = user.organization
         posts = accessible_posts_by_user(user, organization, False, feed_flag != "post_polls")
