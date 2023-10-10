@@ -960,10 +960,12 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         return feeds.exclude(id__in=posts_not_visible_to_user(feeds, user, post_polls))
 
     @staticmethod
-    def get_user_by_id(user_id):
+    def get_user_by_id(user_id, requested_user):
         """Returns the user by id provided"""
         try:
             user = CustomUser.objects.get(id=user_id, is_active=True)
+            if user.organization not in requested_user.get_affiliated_orgs():
+                raise CustomUser.DoesNotExist
         except CustomUser.DoesNotExist:
             raise ValidationError("Invalid user id")
         return user
@@ -972,9 +974,12 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         feed_flag = self.request.query_params.get("feed", None)
         search = self.request.query_params.get("search", None)
         user_id = self.request.query_params.get("user_id", None)
-        user = self.request.user
-        if user_id and str(user_id).isdigit() and feed_flag in ("received", "given"):
-            user = self.get_user_by_id(user_id)
+        requested_user = self.request.user
+        user = (
+            self.get_user_by_id(user_id, requested_user)
+            if user_id and str(user_id).isdigit() and feed_flag in ("received", "given")
+            else requested_user
+        )
 
         organization = user.organization
         posts = accessible_posts_by_user(user, organization, False, feed_flag != "post_polls")
@@ -1021,7 +1026,8 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         page = self.paginate_queryset(self.get_queryset())
         serializer = PostFeedSerializer(page, context={"request": request}, many=True)
         user_id = self.request.query_params.get("user_id", None)
-        user = self.get_user_by_id(user_id) if user_id and str(user_id).isdigit() else self.request.user
+        requested_user = self.request.user
+        user = self.get_user_by_id(user_id, requested_user) if user_id and str(user_id).isdigit() else requested_user
         organization = user.organization
         posts = accessible_posts_by_user(user, organization)
         approvals_count = posts.filter(
@@ -1040,8 +1046,9 @@ class UserFeedViewSet(viewsets.ModelViewSet):
 
     @list_route(methods=["GET"], permission_classes=(IsOptionsOrAuthenticated,))
     def appreciated_by(self, request, *args, **kwargs):
+        requested_user = request.user
         user_id = self.request.query_params.get("user_id", None)
-        user = self.get_user_by_id(user_id) if user_id and str(user_id).isdigit() else self.request.user
+        user = self.get_user_by_id(user_id, requested_user) if user_id and str(user_id).isdigit() else requested_user
         organization = user.organization
         strength_id = request.query_params.get("strength", None)
         badge_id = request.query_params.get("badge", None)
