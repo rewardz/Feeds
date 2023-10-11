@@ -963,16 +963,23 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         """
         return feeds.exclude(id__in=posts_not_visible_to_user(feeds, user, post_polls))
 
+    @staticmethod
+    def get_user_by_id(user_id, requested_user):
+        """Returns the user by id provided"""
+        try:
+            user = CustomUser.objects.get(id=user_id, is_active=True)
+            if user.organization not in requested_user.get_affiliated_orgs():
+                raise CustomUser.DoesNotExist
+        except CustomUser.DoesNotExist:
+            raise ValidationError("Invalid user id")
+        return user
+
     def get_queryset(self):
         feed_flag = self.request.query_params.get("feed", None)
         search = self.request.query_params.get("search", None)
         user_id = self.request.query_params.get("user_id", None)
-        user = self.request.user
-        if user_id and str(user_id).isdigit() and feed_flag in ("received", "given"):
-            try:
-                user = CustomUser.objects.get(id=user_id)
-            except CustomUser.DoesNotExist:
-                raise ValidationError("Invalid user id")
+        requested_user = self.request.user
+        user = self.get_user_by_id(user_id, requested_user) if user_id and str(user_id).isdigit() else requested_user
 
         organization = user.organization
         posts = accessible_posts_by_user(user, organization, False, feed_flag != "post_polls")
@@ -1018,8 +1025,9 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         supervisor_remaining_budget = ""
         page = self.paginate_queryset(self.get_queryset())
         serializer = PostFeedSerializer(page, context={"request": request}, many=True)
-
-        user = self.request.user
+        user_id = self.request.query_params.get("user_id", None)
+        requested_user = self.request.user
+        user = self.get_user_by_id(user_id, requested_user) if user_id and str(user_id).isdigit() else requested_user
         organization = user.organization
         posts = accessible_posts_by_user(user, organization)
         approvals_count = posts.filter(
@@ -1038,7 +1046,9 @@ class UserFeedViewSet(viewsets.ModelViewSet):
 
     @list_route(methods=["GET"], permission_classes=(IsOptionsOrAuthenticated,))
     def appreciated_by(self, request, *args, **kwargs):
-        user = self.request.user
+        requested_user = request.user
+        user_id = self.request.query_params.get("user_id", None)
+        user = self.get_user_by_id(user_id, requested_user) if user_id and str(user_id).isdigit() else requested_user
         organization = user.organization
         strength_id = request.query_params.get("strength", None)
         badge_id = request.query_params.get("badge", None)
@@ -1052,7 +1062,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
 
             posts = accessible_posts_by_user(user, organization, False, True, None)
             user_appreciations = posts.filter(
-                user=request.user, post_type=POST_TYPE.USER_CREATED_APPRECIATION).values(
+                user=user, post_type=POST_TYPE.USER_CREATED_APPRECIATION).values(
                 'transaction__context', 'transaction__creator')
 
             my_appreciations_user = [user_appreciation.get('transaction__creator') for user_appreciation in
@@ -1064,7 +1074,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
                 badge_id = int(badge_id)
             except ValueError:
                 raise ValidationError(_('badge should be numeric value.'))
-            my_appreciations_user = request.user.nominated_user.filter(
+            my_appreciations_user = user.nominated_user.filter(
                 badge=badge_id, nom_status=NOMINATION_STATUS.approved).values_list('nominator', flat=True)
 
         users = CustomUser.objects.filter(id__in=my_appreciations_user)
