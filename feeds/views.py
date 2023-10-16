@@ -970,7 +970,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             user = CustomUser.objects.get(id=user_id, is_active=True)
             if user.organization not in requested_user.get_affiliated_orgs():
                 raise CustomUser.DoesNotExist
-        except CustomUser.DoesNotExist:
+        except (CustomUser.DoesNotExist, ValueError):
             raise ValidationError("Invalid user id")
         return user
 
@@ -979,7 +979,10 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         search = self.request.query_params.get("search", None)
         user_id = self.request.query_params.get("user_id", None)
         requested_user = self.request.user
-        user = self.get_user_by_id(user_id, requested_user) if user_id and str(user_id).isdigit() else requested_user
+        user = (
+            self.get_user_by_id(user_id, requested_user)
+            if user_id and feed_flag in ("received", "given", "post_polls") else requested_user
+        )
 
         organization = user.organization
         posts = accessible_posts_by_user(user, organization, False, feed_flag != "post_polls")
@@ -1027,7 +1030,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         serializer = PostFeedSerializer(page, context={"request": request}, many=True)
         user_id = self.request.query_params.get("user_id", None)
         requested_user = self.request.user
-        user = self.get_user_by_id(user_id, requested_user) if user_id and str(user_id).isdigit() else requested_user
+        user = self.get_user_by_id(user_id, requested_user) if user_id else requested_user
         organization = user.organization
         posts = accessible_posts_by_user(user, organization)
         approvals_count = posts.filter(
@@ -1048,7 +1051,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
     def appreciated_by(self, request, *args, **kwargs):
         requested_user = request.user
         user_id = self.request.query_params.get("user_id", None)
-        user = self.get_user_by_id(user_id, requested_user) if user_id and str(user_id).isdigit() else requested_user
+        user = self.get_user_by_id(user_id, requested_user) if user_id else requested_user
         organization = user.organization
         strength_id = request.query_params.get("strength", None)
         badge_id = request.query_params.get("badge", None)
@@ -1251,10 +1254,14 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         feeds = PostFilter(self.request.GET, queryset=feeds).qs
         search = self.request.query_params.get("search", None)
         if search:
-            feeds = feeds.filter(Q(user__first_name__icontains=search) |
-                                 Q(user__last_name__icontains=search) |
-                                 Q(created_by__first_name__icontains=search) |
-                                 Q(created_by__last_name__icontains=search))
+            feeds = feeds.filter(
+                Q(user__first_name__icontains=search) |
+                Q(user__last_name__icontains=search) |
+                Q(created_by__first_name__icontains=search) |
+                Q(created_by__last_name__icontains=search) |
+                Q(user__email__icontains=search) |
+                Q(created_by__email__icontains=search)
+            )
 
         if filter_appreciations.exists():
             feeds = (feeds | filter_appreciations).distinct()
