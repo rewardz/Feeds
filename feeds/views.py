@@ -970,7 +970,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             user = CustomUser.objects.get(id=user_id, is_active=True)
             if user.organization not in requested_user.get_affiliated_orgs():
                 raise CustomUser.DoesNotExist
-        except CustomUser.DoesNotExist:
+        except (CustomUser.DoesNotExist, ValueError):
             raise ValidationError("Invalid user id")
         return user
 
@@ -981,7 +981,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         requested_user = self.request.user
         user = (
             self.get_user_by_id(user_id, requested_user)
-            if user_id and str(user_id).isdigit() and feed_flag in ("received", "given") else requested_user
+            if user_id and feed_flag in ("received", "given") else requested_user
         )
 
         organization = user.organization
@@ -1030,7 +1030,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         serializer = PostFeedSerializer(page, context={"request": request}, many=True)
         user_id = self.request.query_params.get("user_id", None)
         requested_user = self.request.user
-        user = self.get_user_by_id(user_id, requested_user) if user_id and str(user_id).isdigit() else requested_user
+        user = self.get_user_by_id(user_id, requested_user) if user_id else requested_user
         organization = user.organization
         posts = accessible_posts_by_user(user, organization)
         approvals_count = posts.filter(
@@ -1051,7 +1051,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
     def appreciated_by(self, request, *args, **kwargs):
         requested_user = request.user
         user_id = self.request.query_params.get("user_id", None)
-        user = self.get_user_by_id(user_id, requested_user) if user_id and str(user_id).isdigit() else requested_user
+        user = self.get_user_by_id(user_id, requested_user) if user_id else requested_user
         organization = user.organization
         strength_id = request.query_params.get("strength", None)
         badge_id = request.query_params.get("badge", None)
