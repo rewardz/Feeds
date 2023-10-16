@@ -981,7 +981,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         requested_user = self.request.user
         user = (
             self.get_user_by_id(user_id, requested_user)
-            if user_id and feed_flag in ("received", "given") else requested_user
+            if user_id and feed_flag in ("received", "given", "post_polls") else requested_user
         )
 
         organization = user.organization
