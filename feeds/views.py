@@ -1254,10 +1254,14 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         feeds = PostFilter(self.request.GET, queryset=feeds).qs
         search = self.request.query_params.get("search", None)
         if search:
-            feeds = feeds.filter(Q(user__first_name__icontains=search) |
-                                 Q(user__last_name__icontains=search) |
-                                 Q(created_by__first_name__icontains=search) |
-                                 Q(created_by__last_name__icontains=search))
+            feeds = feeds.filter(
+                Q(user__first_name__icontains=search) |
+                Q(user__last_name__icontains=search) |
+                Q(created_by__first_name__icontains=search) |
+                Q(created_by__last_name__icontains=search) |
+                Q(user__email__icontains=search) |
+                Q(created_by__email__icontains=search)
+            )
 
         if filter_appreciations.exists():
             feeds = (feeds | filter_appreciations).distinct()
