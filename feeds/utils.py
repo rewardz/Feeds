@@ -45,7 +45,7 @@ def accessible_posts_by_user(user, organization, allow_feedback=False, appreciat
     if user.is_staff:
         admin_orgs = user.child_organizations
         admin_query = (
-            Q(created_by__organizations__in=admin_orgs,
+            Q(created_by__organization__in=admin_orgs,
               post_type__in=[POST_TYPE.USER_CREATED_POST, POST_TYPE.USER_CREATED_POLL, POST_TYPE.FEEDBACK_POST])
         )
         post_query = post_query | admin_query
