@@ -31,6 +31,7 @@ class PostAdmin(admin.ModelAdmin):
             "widget": FilteredSelectMultiple("", is_stacked=False)
         }
     }
+    search_fields = ('user__email', 'created_by__email', "organizations__name", )
 
 
 @admin.register(Comment)

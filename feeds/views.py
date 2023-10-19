@@ -51,6 +51,10 @@ PointsTable = import_string(settings.POINTS_TABLE)
 POINT_SOURCE = import_string(settings.POINT_SOURCE)
 REPEATED_EVENT_TYPES = import_string(settings.REPEATED_EVENT_TYPES_CHOICE)
 
+# InspireMe API wrapper
+InspireMeAPI = import_string(settings.API_WRAPPER_CLASS)
+InspireMe = InspireMeAPI()
+
 
 def is_appreciation_post(post_id):
     """
@@ -624,7 +628,7 @@ class PostViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(poll)
         return Response(serializer.data)
 
-    @detail_route(methods=["POST"], permission_classes=(permissions.IsAuthenticated,))
+    @detail_route(methods=["POST"], permission_classes=(IsOptionsOrAuthenticated,))
     def flag(self, request, *args, **kwargs):
         user = self.request.user
         post_id = self.kwargs.get("pk", None)
@@ -959,16 +963,26 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         """
         return feeds.exclude(id__in=posts_not_visible_to_user(feeds, user, post_polls))
 
+    @staticmethod
+    def get_user_by_id(user_id, requested_user):
+        """Returns the user by id provided"""
+        try:
+            user = CustomUser.objects.get(id=user_id, is_active=True)
+            if user.organization not in requested_user.get_affiliated_orgs():
+                raise CustomUser.DoesNotExist
+        except (CustomUser.DoesNotExist, ValueError):
+            raise ValidationError("Invalid user id")
+        return user
+
     def get_queryset(self):
         feed_flag = self.request.query_params.get("feed", None)
         search = self.request.query_params.get("search", None)
         user_id = self.request.query_params.get("user_id", None)
-        user = self.request.user
-        if user_id and str(user_id).isdigit() and feed_flag in ("received", "given"):
-            try:
-                user = CustomUser.objects.get(id=user_id)
-            except CustomUser.DoesNotExist:
-                raise ValidationError("Invalid user id")
+        requested_user = self.request.user
+        user = (
+            self.get_user_by_id(user_id, requested_user)
+            if user_id and feed_flag in ("received", "given", "post_polls") else requested_user
+        )
 
         organization = user.organization
         posts = accessible_posts_by_user(user, organization, False, feed_flag != "post_polls")
@@ -1014,8 +1028,9 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         supervisor_remaining_budget = ""
         page = self.paginate_queryset(self.get_queryset())
         serializer = PostFeedSerializer(page, context={"request": request}, many=True)
-
-        user = self.request.user
+        user_id = self.request.query_params.get("user_id", None)
+        requested_user = self.request.user
+        user = self.get_user_by_id(user_id, requested_user) if user_id else requested_user
         organization = user.organization
         posts = accessible_posts_by_user(user, organization)
         approvals_count = posts.filter(
@@ -1034,7 +1049,9 @@ class UserFeedViewSet(viewsets.ModelViewSet):
 
     @list_route(methods=["GET"], permission_classes=(IsOptionsOrAuthenticated,))
     def appreciated_by(self, request, *args, **kwargs):
-        user = self.request.user
+        requested_user = request.user
+        user_id = self.request.query_params.get("user_id", None)
+        user = self.get_user_by_id(user_id, requested_user) if user_id else requested_user
         organization = user.organization
         strength_id = request.query_params.get("strength", None)
         badge_id = request.query_params.get("badge", None)
@@ -1048,7 +1065,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
 
             posts = accessible_posts_by_user(user, organization, False, True, None)
             user_appreciations = posts.filter(
-                user=request.user, post_type=POST_TYPE.USER_CREATED_APPRECIATION).values(
+                user=user, post_type=POST_TYPE.USER_CREATED_APPRECIATION).values(
                 'transaction__context', 'transaction__creator')
 
             my_appreciations_user = [user_appreciation.get('transaction__creator') for user_appreciation in
@@ -1060,7 +1077,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
                 badge_id = int(badge_id)
             except ValueError:
                 raise ValidationError(_('badge should be numeric value.'))
-            my_appreciations_user = request.user.nominated_user.filter(
+            my_appreciations_user = user.nominated_user.filter(
                 badge=badge_id, nom_status=NOMINATION_STATUS.approved).values_list('nominator', flat=True)
 
         users = CustomUser.objects.filter(id__in=my_appreciations_user)
@@ -1176,7 +1193,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         if strength_id == '':
             raise ValidationError(_('user strength should not be empty string'))
 
-        strength_id = int(strength_id) if isinstance(strength_id, str) else strength_id
+        strength_id = int(strength_id) if isinstance(strength_id, (str, unicode)) else strength_id
         feeds = feeds.filter(transaction__context__isnull=False, transaction__isnull=False)
         return PostFilterBase(self.request.GET, queryset=feeds.filter(id__in=[
             feed.get("id")
@@ -1237,10 +1254,14 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         feeds = PostFilter(self.request.GET, queryset=feeds).qs
         search = self.request.query_params.get("search", None)
         if search:
-            feeds = feeds.filter(Q(user__first_name__icontains=search) |
-                                 Q(user__last_name__icontains=search) |
-                                 Q(created_by__first_name__icontains=search) |
-                                 Q(created_by__last_name__icontains=search))
+            feeds = feeds.filter(
+                Q(user__first_name__icontains=search) |
+                Q(user__last_name__icontains=search) |
+                Q(created_by__first_name__icontains=search) |
+                Q(created_by__last_name__icontains=search) |
+                Q(user__email__icontains=search) |
+                Q(created_by__email__icontains=search)
+            )
 
         if filter_appreciations.exists():
             feeds = (feeds | filter_appreciations).distinct()
@@ -1250,3 +1271,39 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         serializer = GreetingSerializer if greeting else OrganizationRecognitionSerializer
         serializer = serializer(page, context={"request": request}, many=True)
         return self.get_paginated_response(serializer.data)
+
+
+class InspireMeViewSet(viewsets.ModelViewSet):
+    queryset = Post.objects.none()
+    serializer_class = PostSerializer
+    permission_classes = [IsOptionsOrAuthenticated, ]
+
+    @list_route(methods=["POST"], permission_classes=(IsOptionsOrAuthenticated,))
+    def amplify_core_value_recognition(self, request, *args, **kwargs):
+        response = InspireMe.amplify_core_value_recognition(request.data)
+
+        return Response(response, status=status.HTTP_200_OK)
+
+    @list_route(methods=["POST"], permission_classes=(IsOptionsOrAuthenticated,))
+    def edit_tone(self, request, *args, **kwargs):
+        response = InspireMe.edit_tone(request.data)
+
+        return Response(response, status=status.HTTP_200_OK)
+
+    @list_route(methods=["POST"], permission_classes=(IsOptionsOrAuthenticated,))
+    def amplify_content_post(self, request, *args, **kwargs):
+        response = InspireMe.amplify_content_post(request.data)
+
+        return Response(response, status=status.HTTP_200_OK)
+
+    @list_route(methods=["POST"], permission_classes=(IsOptionsOrAuthenticated,))
+    def amplify_content_poll(self, request, *args, **kwargs):
+        response = InspireMe.amplify_content_poll(request.data)
+
+        return Response(response, status=status.HTTP_200_OK)
+
+    @list_route(methods=["POST"], permission_classes=(IsOptionsOrAuthenticated,))
+    def proof_read_content(self, request, *args, **kwargs):
+        response = InspireMe.proof_read_content(request.data)
+
+        return Response(response, status=status.HTTP_200_OK)
