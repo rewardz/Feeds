@@ -294,6 +294,7 @@ class NominationsSerializer(DynamicFieldsModelSerializer):
                   "nomination_icon",
                   "review_level",
                   "nominator_name",
+                  "question",
                   "comment",
                   "created",
                   "badges",
