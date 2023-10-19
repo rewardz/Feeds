@@ -3,8 +3,8 @@ from django.conf.urls import include, url
 from ajax_select import urls as ajax_select_urls
 from rest_framework import routers
 
-from .views import CommentViewset, ECardCategoryViewSet, ECardViewSet, PostViewSet, ImagesDetailView, search_user,\
-    UserFeedViewSet
+from .views import CommentViewset, ECardCategoryViewSet, ECardViewSet, PostViewSet, ImagesDetailView, search_user, \
+    UserFeedViewSet, InspireMeViewSet
 
 router = routers.DefaultRouter()
 router.register(r'posts', PostViewSet, base_name='posts')
@@ -12,6 +12,7 @@ router.register(r'comments', CommentViewset, base_name='comments')
 router.register(r'ecard_category', ECardCategoryViewSet)
 router.register(r'ecard', ECardViewSet)
 router.register(r'user_feed', UserFeedViewSet, base_name="user_feed")
+router.register(r'inspire_me', InspireMeViewSet, base_name="inspire_me")
 
 api_urls = router.urls
 
