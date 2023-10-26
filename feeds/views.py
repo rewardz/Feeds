@@ -979,6 +979,10 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         search = self.request.query_params.get("search", None)
         user_id = self.request.query_params.get("user_id", None)
         requested_user = self.request.user
+        receiver_user = self.request.query_params.get("receiver_user", None)
+        if receiver_user:
+            requested_user = self.get_user_by_id(receiver_user, requested_user)
+
         user = (
             self.get_user_by_id(user_id, requested_user)
             if user_id and feed_flag in ("received", "given", "post_polls") else requested_user
