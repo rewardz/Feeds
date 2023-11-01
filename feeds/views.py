@@ -8,6 +8,7 @@ from django.db.models import Case, IntegerField, Q, Count, When
 from django.http import Http404
 from django.utils.module_loading import import_string
 from django.utils.translation import ugettext as _
+from feeds.constants import SHARED_WITH
 
 from rest_framework import permissions, viewsets, serializers, status, views, filters
 from rest_framework.decorators import api_view, detail_route, list_route, permission_classes
@@ -218,13 +219,19 @@ class PostViewSet(viewsets.ModelViewSet):
         tag_users = data.get('tag_users', None)
         tags = data.get('tags', None)
         data["created_by"] = instance.created_by.id
+        shared_with =  data.get("shared_with")
         if "organizations" in data:
             instance.organizations.clear()
+            if shared_with and int(shared_with) == SHARED_WITH.ALL_DEPARTMENTS:
+                data["organizations"] = [user.organization_id]
             instance.organizations.add(*data.get("organizations"))
 
         if "departments" in data:
             instance.departments.clear()
+            if shared_with and int(shared_with) == SHARED_WITH.SELF_DEPARTMENT:
+                data["departments"] = user.departments.all()
             instance.departments.add(*data.get("departments"))
+
         serializer = self.get_serializer(instance, data=data)
         serializer.is_valid(raise_exception=True)
         if tag_users:
