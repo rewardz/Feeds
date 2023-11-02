@@ -1,6 +1,7 @@
 from __future__ import division, print_function, unicode_literals
 
 import datetime
+import json
 from json import loads
 from django.conf import settings
 from django.db import transaction
@@ -229,7 +230,7 @@ class PostViewSet(viewsets.ModelViewSet):
         shared_with =  data.get("shared_with")
         if "organizations" in data:
             instance.organizations.clear()
-            if shared_with and int(shared_with) == SHARED_WITH.ALL_DEPARTMENTS:
+            if shared_with and int(shared_with) in (SHARED_WITH.ALL_DEPARTMENTS, SHARED_WITH.SELF_JOB_FAMILY):
                 data["organizations"] = [user.organization_id]
             instance.organizations.add(*data.get("organizations"))
 
@@ -238,6 +239,11 @@ class PostViewSet(viewsets.ModelViewSet):
             if shared_with and int(shared_with) == SHARED_WITH.SELF_DEPARTMENT:
                 data["departments"] = user.departments.all()
             instance.departments.add(*data.get("departments"))
+
+        if "job_families" in data:
+            job_families = data.get("job_families")
+            instance.job_families.clear()
+            instance.job_families.add(*job_families)
 
         serializer = self.get_serializer(instance, data=data)
         serializer.is_valid(raise_exception=True)
