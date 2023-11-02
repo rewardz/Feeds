@@ -6,6 +6,7 @@ SHARED_WITH = Choices({
     "ALL_DEPARTMENTS": 20,
     "ADMIN_ONLY": 30,
     "ORGANIZATION_DEPARTMENTS": 40,
+    "SELF_JOB_FAMILY": 50,
 })
 
 POST_TYPE = Choices({
