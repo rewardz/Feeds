@@ -1,4 +1,5 @@
 from __future__ import division, print_function, unicode_literals
+import json
 
 from django.conf import settings
 from django.utils.module_loading import import_string
@@ -13,7 +14,7 @@ from .models import (
 )
 from .utils import (
     extract_tagged_users, get_departments, get_profile_image, tag_users_to_comment,
-    validate_priority, user_can_delete, user_can_edit, get_absolute_url
+    validate_priority, user_can_delete, user_can_edit, get_absolute_url, get_job_families
 )
 
 DEPARTMENT_MODEL = import_string(settings.DEPARTMENT_MODEL)
@@ -344,6 +345,7 @@ class PostSerializer(DynamicFieldsModelSerializer):
     images_with_ecard = serializers.SerializerMethodField()
     organization = serializers.SerializerMethodField()
     department = serializers.SerializerMethodField()
+    job_families = serializers.SerializerMethodField()
 
     class Meta:
         model = Post
@@ -356,7 +358,7 @@ class PostSerializer(DynamicFieldsModelSerializer):
             "is_owner", "can_edit", "can_delete", "has_appreciated",
             "appreciation_count", "comments_count", "tagged_users", "is_admin", "tags", "reaction_type", "nomination",
             "feed_type", "user_strength", "user", "user_reaction_type", "gif", "ecard", "points", "time_left",
-            "images_with_ecard", "departments", "organization", "department"
+            "images_with_ecard", "departments", "organization", "department", "job_families"
         )
 
     def get_organization(self, instance):
@@ -374,6 +376,9 @@ class PostSerializer(DynamicFieldsModelSerializer):
         request = self.context['request']
         user = request.user
         return user.is_staff
+
+    def get_job_families(self, instance):
+        return instance.job_families.values_list("id", flat=True)
 
     def get_poll_info(self, instance):
         if not instance.post_type == POST_TYPE.USER_CREATED_POLL:
@@ -440,24 +445,25 @@ class PostSerializer(DynamicFieldsModelSerializer):
 
     def create(self, validated_data):
         request = self.context.get('request', None)
+        user = request.user
         validate_priority(validated_data)
         organizations = validated_data.pop('organizations', None)
+        shared_with = self.initial_data.pop('shared_with', None)
+        job_families = get_job_families(user, shared_with, self.initial_data)
+
         if not organizations:
             organization = self.initial_data.pop('organization', None)
             organizations = [organization] if organization else organization
-
-        user = request.user
 
         if not organizations and not ORGANIZATION_SETTINGS_MODEL.objects.get_value(MULTI_ORG_POST_ENABLE_FLAG, user.organization):
             organizations = [user.organization]
 
         departments = validated_data.pop('departments', None)
         if not departments and not organizations:
-            shared_with = self.initial_data.pop('shared_with', None)
             if shared_with:
                 if int(shared_with) == SHARED_WITH.SELF_DEPARTMENT:
                     departments = user.departments.all()
-                elif int(shared_with) == SHARED_WITH.ALL_DEPARTMENTS:
+                elif int(shared_with) in (SHARED_WITH.ALL_DEPARTMENTS, SHARED_WITH.SELF_JOB_FAMILY):
                     organizations = [user.organization]
 
         post = Post.objects.create(**validated_data)
@@ -467,6 +473,9 @@ class PostSerializer(DynamicFieldsModelSerializer):
                 post.organizations.add(*organizations)
             if departments:
                 post.departments.add(*departments)
+            if job_families:
+                post.job_families.add(*job_families)
+
         return post
 
     def to_representation(self, instance):
@@ -579,6 +588,7 @@ class PostDetailSerializer(PostSerializer):
     can_download = serializers.SerializerMethodField()
     is_download_choice_needed = serializers.SerializerMethodField()
     greeting_info = serializers.SerializerMethodField()
+    job_families = serializers.SerializerMethodField()
 
     class Meta:
         model = Post
@@ -592,8 +602,13 @@ class PostDetailSerializer(PostSerializer):
             "tagged_users", "is_admin", "nomination", "feed_type", "user_strength", "user",
             "gif", "ecard", "points", "user_reaction_type", "images_with_ecard", "reaction_type", "category",
             "category_name", "sub_category", "sub_category_name", "organization_name", "display_status",
-            "department_name", "departments", "can_download", "is_download_choice_needed", "greeting_info"
+            "department_name", "departments", "can_download", "is_download_choice_needed", "greeting_info",
+            "job_families"
         )
+
+    @staticmethod
+    def get_job_families(instance):
+        return instance.job_families.values_list("id", flat=True)
 
     @staticmethod
     def get_is_download_choice_needed(post):

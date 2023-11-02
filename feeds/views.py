@@ -17,7 +17,7 @@ from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
 
 from .filters import PostFilter, PostFilterBase
-from .constants import POST_TYPE
+from .constants import POST_TYPE, SHARED_WITH
 from .models import (
     Comment, Documents, ECard, ECardCategory,
     Post, PostLiked, PollsAnswer, Images, CommentLiked,
@@ -33,10 +33,11 @@ from .serializers import (
 )
 from .utils import (
     accessible_posts_by_user, extract_tagged_users, get_user_name, notify_new_comment,
-    notify_new_poll_created, notify_flagged_post, push_notification, tag_users_to_comment,
+    notify_new_post_poll_created, notify_flagged_post, push_notification, tag_users_to_comment,
     tag_users_to_post, user_can_delete, user_can_edit, get_date_range, since_last_appreciation,
     get_current_month_end_date, get_absolute_url, posts_not_visible_to_user, assigned_nomination_post_ids,
-    posts_not_shared_with_self_department, posts_shared_with_org_department,
+    posts_not_shared_with_self_department, posts_shared_with_org_department, posts_not_shared_with_job_family,
+    get_job_families,
 )
 
 CustomUser = import_string(settings.CUSTOM_USER_MODEL)
@@ -208,6 +209,8 @@ class PostViewSet(viewsets.ModelViewSet):
 
         if request.FILES:
             self._upload_files(request, post_id)
+
+        notify_new_post_poll_created(instance, True)
         return Response(serializer.data)
 
     def update(self, request, pk=None):
@@ -217,6 +220,10 @@ class PostViewSet(viewsets.ModelViewSet):
             raise serializers.ValidationError(_("You do not have permission to edit"))
         data = self._create_or_update(request)
         tag_users = data.get('tag_users', None)
+        if "job_families" in data and int(data.get("shared_with")) == SHARED_WITH.ORGANIZATION_DEPARTMENTS:
+            job_families = get_job_families(user, data.get("shared_with"), data)
+            instance.job_families.clear()
+            instance.job_families.add(*job_families)
         tags = data.get('tags', None)
         data["created_by"] = instance.created_by.id
         shared_with =  data.get("shared_with")
@@ -317,11 +324,16 @@ class PostViewSet(viewsets.ModelViewSet):
             query.add(Q(departments__in=departments, created_by__departments__in=departments), query.connector)
         else:
             if allow_feedback and user.is_staff:
-                org = list(user.get_affiliated_orgs().values_list("id", flat=True))
+                org = list(user.child_organizations.values_list("id", flat=True))
             result = accessible_posts_by_user(user, org, allow_feedback=allow_feedback,
                                               appreciations=is_appreciation_post(post_id) if post_id else False)
 
         if created_by in ("user_org", "user_dept"):
+            if user.is_staff:
+                query.add(Q(
+                    mark_delete=False,
+                    post_type=POST_TYPE.USER_CREATED_POST, created_by__organizations__in=user.child_organizations), Q.OR
+                )
             result = Post.objects.filter(query)
 
         if not post_id:
@@ -332,7 +344,8 @@ class PostViewSet(viewsets.ModelViewSet):
             # For list api below version 12 we are excluding system created greeting post
             result = result.exclude(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post")
 
-        posts_ids_to_exclude = posts_not_shared_with_self_department(result, user).values_list("id", flat=True)
+        posts_ids_to_exclude = list(posts_not_shared_with_self_department(result, user).values_list("id", flat=True))
+        posts_ids_to_exclude.extend(list(posts_not_shared_with_job_family(result, user).values_list("id", flat=True)))
         posts_ids_not_to_exclude = assigned_nomination_post_ids(user)
         posts_ids_to_exclude = list(set(posts_ids_to_exclude) - set(posts_ids_not_to_exclude))
 
@@ -350,7 +363,6 @@ class PostViewSet(viewsets.ModelViewSet):
     def create_poll(self, request, *args, **kwargs):
         context = {'request': request}
         user = self.request.user
-        organization = user.organization
         payload = self.request.data
         data = {k: v for k, v in payload.items()}
         question = data.get('title', None)
@@ -375,7 +387,7 @@ class PostViewSet(viewsets.ModelViewSet):
             answer_serializer.is_valid(raise_exception=True)
             answer_serializer.save()
         result = self.get_serializer(poll)
-        notify_new_poll_created(poll)
+        notify_new_post_poll_created(poll)
         return Response(result.data)
 
     def get_ordering_field(self, default_order):
@@ -419,7 +431,7 @@ class PostViewSet(viewsets.ModelViewSet):
             raise ValidationError(_('Post ID required to retrieve all the related comments'))
         post_id = int(post_id)
         org = (
-            list(user.get_affiliated_orgs().values_list("id", flat=True))
+            list(user.child_organizations.values_list("id", flat=True))
             if allow_feedback and user.is_staff else user.organization
         )
         accessible_posts_queryset = accessible_posts_by_user(
@@ -1278,6 +1290,10 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             feeds = (feeds | filter_appreciations).distinct()
         feeds = self.get_filtered_feeds_according_to_shared_with(
             feeds=feeds, user=user, post_polls=post_polls).order_by('-priority', '-created_on')
+        if post_polls:
+            feeds = (feeds | posts_shared_with_org_department(
+                user, [POST_TYPE.USER_CREATED_POST, POST_TYPE.USER_CREATED_POLL],
+                feeds.values_list("id", flat=True))).distinct()
         page = self.paginate_queryset(feeds)
         serializer = GreetingSerializer if greeting else OrganizationRecognitionSerializer
         serializer = serializer(page, context={"request": request}, many=True)
