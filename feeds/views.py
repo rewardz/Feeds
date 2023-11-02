@@ -1,7 +1,6 @@
 from __future__ import division, print_function, unicode_literals
 
 import datetime
-import json
 from json import loads
 from django.conf import settings
 from django.db import transaction
