@@ -457,7 +457,7 @@ def posts_not_shared_with_job_family(posts, user):
             ~Q(created_by__employee_id_store__job_family=user.employee_id_store.job_family)
         )
     except AttributeError:
-        return posts.filter(Q(shared_with=SHARED_WITH.SELF_JOB_FAMILY))
+        return posts.filter(shared_with=SHARED_WITH.SELF_JOB_FAMILY)
 
 
 def admin_feeds_to_exclude(posts, user):
