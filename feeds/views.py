@@ -236,7 +236,7 @@ class PostViewSet(viewsets.ModelViewSet):
         if "departments" in data:
             instance.departments.clear()
             if shared_with and int(shared_with) == SHARED_WITH.SELF_DEPARTMENT:
-                data["departments"] = user.departments.all()
+                data["departments"] = list(user.departments.values_list("id", flat=True))
             instance.departments.add(*data.get("departments"))
 
         if "job_families" in data:
