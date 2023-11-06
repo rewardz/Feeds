@@ -1281,6 +1281,15 @@ class UserFeedViewSet(viewsets.ModelViewSet):
                 filter_appreciations = self.filter_appreciations(feeds)
         feeds = PostFilter(self.request.GET, queryset=feeds).qs
         search = self.request.query_params.get("search", None)
+        if filter_appreciations.exists():
+            feeds = (feeds | filter_appreciations).distinct()
+        feeds = self.get_filtered_feeds_according_to_shared_with(
+            feeds=feeds, user=user, post_polls=post_polls).order_by('-priority', '-created_on')
+        if post_polls:
+            feeds = (feeds | posts_shared_with_org_department(
+                user, [POST_TYPE.USER_CREATED_POST, POST_TYPE.USER_CREATED_POLL],
+                feeds.values_list("id", flat=True))).distinct()
+
         if search:
             feeds = feeds.filter(
                 Q(user__first_name__icontains=search) |
@@ -1290,15 +1299,6 @@ class UserFeedViewSet(viewsets.ModelViewSet):
                 Q(user__email__icontains=search) |
                 Q(created_by__email__icontains=search)
             )
-
-        if filter_appreciations.exists():
-            feeds = (feeds | filter_appreciations).distinct()
-        feeds = self.get_filtered_feeds_according_to_shared_with(
-            feeds=feeds, user=user, post_polls=post_polls).order_by('-priority', '-created_on')
-        if post_polls:
-            feeds = (feeds | posts_shared_with_org_department(
-                user, [POST_TYPE.USER_CREATED_POST, POST_TYPE.USER_CREATED_POLL],
-                feeds.values_list("id", flat=True))).distinct()
         page = self.paginate_queryset(feeds)
         serializer = GreetingSerializer if greeting else OrganizationRecognitionSerializer
         serializer = serializer(page, context={"request": request}, many=True)
