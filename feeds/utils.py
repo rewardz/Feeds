@@ -96,7 +96,7 @@ def accessible_posts_by_user(user, organization, allow_feedback=False, appreciat
         ):
             post_ids.append(post_id)
 
-    return Post.objects.filter(id__in=post_ids)
+    return Post.objects.filter(id__in=post_ids, mark_delete=False)
 
 
 def validate_priority(data):
