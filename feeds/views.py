@@ -509,6 +509,7 @@ class PostViewSet(viewsets.ModelViewSet):
     @detail_route(methods=["POST"], permission_classes=(IsOptionsOrAuthenticated,))
     def appreciate(self, request, *args, **kwargs):
         user = self.request.user
+
         post_id = self.kwargs.get("pk", None)
         if not post_id:
             raise ValidationError(_('Post ID required to appreciate a post'))
@@ -1005,6 +1006,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         if feed_flag == "post_polls":
             feeds = posts.filter(post_type__in=[POST_TYPE.USER_CREATED_POST,
                                                 POST_TYPE.USER_CREATED_POLL], created_by=user)
+            feeds = feeds.exclude(id__in=posts_not_visible_to_user(feeds, self.request.user, True))
             feeds = PostFilter(self.request.GET, queryset=feeds).qs
             return feeds.distinct()
         else:

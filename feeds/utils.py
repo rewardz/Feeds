@@ -441,6 +441,28 @@ def posts_not_shared_with_self_department(posts, user):
     )
 
 
+def posts_not_shared_with_org_department(posts, user):
+    """
+    Returns filtered (posts which are not shared with organization department i.e. Custom) queryset of Post
+    if user is superuser then empty QS (no need to exclude anything)
+    posts: QuerySet[Post]
+    user: CustomUser
+    """
+    if user.is_staff:
+        query = (
+                Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS) &
+                ~Q(created_by__organization__in=user.child_organizations)
+        )
+    else:
+        query = (
+                Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS) &
+                ~Q(departments__in=user.departments.all()) &
+                ~Q(organizations__in=[user.organization])
+        )
+
+    return posts.filter(query)
+
+
 def posts_not_shared_with_job_family(posts, user):
     """
     Returns the posts to exclude which is shared with my job family
@@ -513,6 +535,7 @@ def posts_not_visible_to_user(posts, user, post_polls):
     """
     posts_ids_to_exclude = list(posts_not_shared_with_self_department(posts, user).values_list("id", flat=True))
     posts_ids_to_exclude.extend(list(admin_feeds_to_exclude(posts, user).values_list("id", flat=True)))
+    posts_ids_to_exclude.extend(list(posts_not_shared_with_org_department(posts, user).values_list("id", flat=True)))
     if post_polls:
         posts_ids_to_exclude.extend(list(shared_with_all_departments_but_not_belongs_to_user_org(
             posts, user).values_list("id", flat=True)))
