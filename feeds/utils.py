@@ -259,6 +259,8 @@ def notify_new_comment(comment, creator):
 
 def notify_new_post_poll_created(poll, is_post=False):
     creator = poll.created_by
+    if poll.post_type == POST_TYPE.USER_CREATED_POST and not creator.is_staff:
+        return
     accessible_users = []
     if poll.shared_with == SHARED_WITH.SELF_DEPARTMENT:
         departments = creator.departments.all()
