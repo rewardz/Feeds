@@ -40,7 +40,11 @@ def accessible_posts_by_user(user, organization, allow_feedback=False, appreciat
 
     # get the departments to which this user belongs
     user_depts = getattr(user, USER_DEPARTMENT_RELATED_NAME).all()
-    post_query = Q(organizations__in=organization) | Q(departments__in=user_depts)
+    post_query = (
+            Q(organizations__in=organization) |
+            Q(departments__in=user_depts) |
+            Q(shared_with=SHARED_WITH.SELF_DEPARTMENT) & Q(created_by__departments__in=user.departments.all())
+    )
 
     if user.is_staff:
         admin_orgs = user.child_organizations
