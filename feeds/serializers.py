@@ -20,6 +20,8 @@ from .utils import (
 DEPARTMENT_MODEL = import_string(settings.DEPARTMENT_MODEL)
 Organization = import_string(settings.ORGANIZATION_MODEL)
 UserModel = import_string(settings.CUSTOM_USER_MODEL)
+Question = import_string(settings.QUESTION_MODEL)
+Answer = import_string(settings.ANSWER_MODEL)
 Nominations = import_string(settings.NOMINATIONS_MODEL)
 TrophyBadge = import_string(settings.TROPHY_BADGE_MODEL)
 UserStrength = import_string(settings.USER_STRENGTH_MODEL)
@@ -245,10 +247,39 @@ class ECardSerializer(serializers.ModelSerializer):
         return list(obj.tags.values_list("name", flat=True))
 
 
+class AnswerSerializer(serializers.ModelSerializer):
+    supporting_doc = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Answer
+        fields = ("id", "question", "answer", "supporting_doc")
+
+    def get_supporting_doc(self, instance):
+        try:
+            doc = instance.supporting_doc.supporting_doc.url
+        except (ValueError, AttributeError):
+            doc = ""
+        return doc
+
+
+class QuestionSerializer(serializers.ModelSerializer):
+    answer = serializers.SerializerMethodField(source="answer_set")
+
+    def get_answer(self, instance):
+        nomination_id = self.context.get("nomination_id")
+        answers = Answer.objects.filter(question=instance, nomination_id=nomination_id)
+        return AnswerSerializer(answers, many=True).data
+
+    class Meta:
+        model = Question
+        fields = ("pk", "question_lable", "question_type", "answer")
+
+
 class NominationsSerializer(DynamicFieldsModelSerializer):
     nomination_icon = serializers.SerializerMethodField()
     review_level = serializers.SerializerMethodField()
     nominator_name = serializers.SerializerMethodField()
+    question = serializers.SerializerMethodField()
     badges = serializers.SerializerMethodField()
     badge = TrophyBadgeSerializer(read_only=True)
     user_strength = UserStrengthSerializer()
@@ -264,6 +295,7 @@ class NominationsSerializer(DynamicFieldsModelSerializer):
                   "nomination_icon",
                   "review_level",
                   "nominator_name",
+                  "question",
                   "comment",
                   "created",
                   "badges",
@@ -288,6 +320,11 @@ class NominationsSerializer(DynamicFieldsModelSerializer):
             return question_obj.icon.url
         except (ValueError, AttributeError):
             return ""
+
+    def get_question(self, instance):
+        questions = instance.question.all()
+        serializer = QuestionSerializer(instance=questions, many=True, context={'nomination_id': instance.id})
+        return serializer.data
 
     def get_badges(self, instance):
         # ToDo : once app updated, remove it

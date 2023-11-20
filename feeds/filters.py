@@ -13,6 +13,7 @@ class PostFilterBase(django_filters.FilterSet):
     created_on_before = django_filters.DateFilter(name="created_on__lte", method="date_range_filter")
     created_during = django_filters.CharFilter(name="created_during", method="date_period_filter")
     nom_status = django_filters.CharFilter(name="nom_status", method="nom_status_filter")
+    category = django_filters.CharFilter(name="category", method="category_filter")
     job_family = django_filters.CharFilter(name="job_family", method="job_family_filter")
 
     class Meta:
@@ -50,6 +51,12 @@ class PostFilterBase(django_filters.FilterSet):
         else:
             return queryset
         return queryset.filter(nomination__nom_status__in=nom_choices)
+
+    def category_filter(self, queryset, name, value):
+        if value and value.isdigit():
+            return queryset.filter(nomination__category_id=value)
+        else:
+            return queryset
 
 
 class PostFilter(PostFilterBase):
