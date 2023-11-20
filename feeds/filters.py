@@ -14,10 +14,16 @@ class PostFilterBase(django_filters.FilterSet):
     created_during = django_filters.CharFilter(name="created_during", method="date_period_filter")
     nom_status = django_filters.CharFilter(name="nom_status", method="nom_status_filter")
     category = django_filters.CharFilter(name="category", method="category_filter")
+    job_family = django_filters.CharFilter(name="job_family", method="job_family_filter")
 
     class Meta:
         model = Post
         fields = ['post_type', 'organizations', 'shared_with']
+
+    @staticmethod
+    def job_family_filter(queryset, name, value):
+        value = value.split(",")
+        return queryset.filter(job_families__in=value)
 
     def date_range_filter(self, queryset, name, value):
         return queryset.filter(**{name: value})
