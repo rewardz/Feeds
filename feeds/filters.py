@@ -47,8 +47,8 @@ class PostFilterBase(django_filters.FilterSet):
         return queryset.filter(nomination__nom_status__in=nom_choices)
 
     def category_filter(self, queryset, name, value):
-        if isinstance(value, int):
-            return queryset.filter(nomination__category=value)
+        if value and value.isdigit():
+            return queryset.filter(nomination__category_id=value)
         else:
             return queryset
 
