@@ -14,7 +14,7 @@ from rest_framework.decorators import api_view, detail_route, list_route, permis
 from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
-
+from feeds.constants import SHARED_WITH
 from .filters import PostFilter, PostFilterBase
 from .constants import POST_TYPE, SHARED_WITH
 from .models import (
@@ -81,7 +81,7 @@ class PostViewSet(viewsets.ModelViewSet):
 
         data = {}
         for key, value in payload.items():
-            if key in ["organizations", "departments"] and isinstance(payload.get(key), unicode):
+            if key in ["organizations", "departments", "job_families"] and isinstance(payload.get(key), unicode):
                 data.update({key: loads(value)})
                 continue
             data.update({key: value})
@@ -225,13 +225,23 @@ class PostViewSet(viewsets.ModelViewSet):
             instance.job_families.add(*job_families)
         tags = data.get('tags', None)
         data["created_by"] = instance.created_by.id
+        shared_with = data.get("shared_with")
         if "organizations" in data:
             instance.organizations.clear()
+            if shared_with and int(shared_with) in (SHARED_WITH.ALL_DEPARTMENTS, SHARED_WITH.SELF_JOB_FAMILY):
+                data["organizations"] = [user.organization_id]
             instance.organizations.add(*data.get("organizations"))
 
         if "departments" in data:
             instance.departments.clear()
+            if shared_with and int(shared_with) == SHARED_WITH.SELF_DEPARTMENT:
+                data["departments"] = list(user.departments.values_list("id", flat=True))
             instance.departments.add(*data.get("departments"))
+
+        if "job_families" in data:
+            job_families = data.get("job_families")
+            instance.job_families.clear()
+            instance.job_families.add(*job_families)
         serializer = self.get_serializer(instance, data=data)
         serializer.is_valid(raise_exception=True)
         if tag_users:
@@ -1271,6 +1281,14 @@ class UserFeedViewSet(viewsets.ModelViewSet):
                 filter_appreciations = self.filter_appreciations(feeds)
         feeds = PostFilter(self.request.GET, queryset=feeds).qs
         search = self.request.query_params.get("search", None)
+        if filter_appreciations.exists():
+            feeds = (feeds | filter_appreciations).distinct()
+        feeds = self.get_filtered_feeds_according_to_shared_with(
+            feeds=feeds, user=user, post_polls=post_polls).order_by('-priority', '-created_on')
+        if post_polls:
+            feeds = (feeds | posts_shared_with_org_department(
+                user, [POST_TYPE.USER_CREATED_POST, POST_TYPE.USER_CREATED_POLL],
+                feeds.values_list("id", flat=True))).distinct()
         if search:
             feeds = feeds.filter(
                 Q(user__first_name__icontains=search) |
@@ -1280,15 +1298,6 @@ class UserFeedViewSet(viewsets.ModelViewSet):
                 Q(user__email__icontains=search) |
                 Q(created_by__email__icontains=search)
             )
-
-        if filter_appreciations.exists():
-            feeds = (feeds | filter_appreciations).distinct()
-        feeds = self.get_filtered_feeds_according_to_shared_with(
-            feeds=feeds, user=user, post_polls=post_polls).order_by('-priority', '-created_on')
-        if post_polls:
-            feeds = (feeds | posts_shared_with_org_department(
-                user, [POST_TYPE.USER_CREATED_POST, POST_TYPE.USER_CREATED_POLL],
-                feeds.values_list("id", flat=True))).distinct()
         page = self.paginate_queryset(feeds)
         serializer = GreetingSerializer if greeting else OrganizationRecognitionSerializer
         serializer = serializer(page, context={"request": request}, many=True)
