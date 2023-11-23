@@ -43,7 +43,8 @@ def accessible_posts_by_user(user, organization, allow_feedback=False, appreciat
     post_query = (
             Q(organizations__in=organization) |
             Q(departments__in=user_depts) |
-            Q(shared_with=SHARED_WITH.SELF_DEPARTMENT) & Q(created_by__departments__in=user.departments.all())
+            Q(shared_with=SHARED_WITH.SELF_DEPARTMENT, created_by__departments__in=user.departments.all()) |
+            Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS, job_families__in=user.job_families)
     )
 
     if user.is_staff:
@@ -280,7 +281,7 @@ def notify_new_post_poll_created(poll, is_post=False):
                 if emp_id_store.user in accessible_users:
                     continue
                 accessible_users.append(emp_id_store.user)
-        except AttributeError:
+        except Exception:
             # User does not have any job family No need to send notification
             pass
 
@@ -482,7 +483,7 @@ def posts_not_shared_with_job_family(posts, user):
             Q(shared_with=SHARED_WITH.SELF_JOB_FAMILY) &
             ~Q(created_by__employee_id_store__job_family=user.employee_id_store.job_family)
         )
-    except AttributeError:
+    except Exception:
         return posts.filter(shared_with=SHARED_WITH.SELF_JOB_FAMILY)
 
 
@@ -562,13 +563,9 @@ def posts_shared_with_org_department(user, post_types, excluded_ids):
         query = Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS,
                   created_by__organization__in=user.child_organizations)
     else:
-        try:
-            job_families = [user.employee_id_store.job_family]
-        except AttributeError:
-            job_families = []
         query = Q(created_by=user)
         query.add(Q(departments__in=[user.department]), Q.OR)
-        query.add(Q(job_families__in=job_families), Q.OR)
+        query.add(Q(job_families__in=user.job_families), Q.OR)
         query.add(Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS, post_type__in=post_types), Q.AND)
 
     posts = Post.objects.filter(query)
