@@ -40,7 +40,12 @@ def accessible_posts_by_user(user, organization, allow_feedback=False, appreciat
 
     # get the departments to which this user belongs
     user_depts = getattr(user, USER_DEPARTMENT_RELATED_NAME).all()
-    post_query = Q(organizations__in=organization) | Q(departments__in=user_depts)
+    post_query = (
+            Q(organizations__in=organization) |
+            Q(departments__in=user_depts) |
+            Q(shared_with=SHARED_WITH.SELF_DEPARTMENT, created_by__departments__in=user.departments.all()) |
+            Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS, job_families__in=user.job_families)
+    )
 
     if user.is_staff:
         admin_orgs = user.child_organizations
@@ -96,7 +101,7 @@ def accessible_posts_by_user(user, organization, allow_feedback=False, appreciat
         ):
             post_ids.append(post_id)
 
-    return Post.objects.filter(id__in=post_ids)
+    return Post.objects.filter(id__in=post_ids, mark_delete=False)
 
 
 def validate_priority(data):
@@ -278,7 +283,7 @@ def notify_new_post_poll_created(poll, is_post=False):
                 if emp_id_store.user in accessible_users:
                     continue
                 accessible_users.append(emp_id_store.user)
-        except AttributeError:
+        except Exception:
             # User does not have any job family No need to send notification
             pass
 
@@ -443,6 +448,28 @@ def posts_not_shared_with_self_department(posts, user):
     )
 
 
+def posts_not_shared_with_org_department(posts, user):
+    """
+    Returns filtered (posts which are not shared with organization department i.e. Custom) queryset of Post
+    if user is superuser then empty QS (no need to exclude anything)
+    posts: QuerySet[Post]
+    user: CustomUser
+    """
+    if user.is_staff:
+        query = (
+                Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS) &
+                ~Q(created_by__organization__in=user.child_organizations)
+        )
+    else:
+        query = (
+                Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS) &
+                ~Q(departments__in=user.departments.all()) &
+                ~Q(organizations__in=[user.organization])
+        )
+
+    return posts.filter(query)
+
+
 def posts_not_shared_with_job_family(posts, user):
     """
     Returns the posts to exclude which is shared with my job family
@@ -458,7 +485,7 @@ def posts_not_shared_with_job_family(posts, user):
             Q(shared_with=SHARED_WITH.SELF_JOB_FAMILY) &
             ~Q(created_by__employee_id_store__job_family=user.employee_id_store.job_family)
         )
-    except AttributeError:
+    except Exception:
         return posts.filter(shared_with=SHARED_WITH.SELF_JOB_FAMILY)
 
 
@@ -515,6 +542,7 @@ def posts_not_visible_to_user(posts, user, post_polls):
     """
     posts_ids_to_exclude = list(posts_not_shared_with_self_department(posts, user).values_list("id", flat=True))
     posts_ids_to_exclude.extend(list(admin_feeds_to_exclude(posts, user).values_list("id", flat=True)))
+    posts_ids_to_exclude.extend(list(posts_not_shared_with_org_department(posts, user).values_list("id", flat=True)))
     if post_polls:
         posts_ids_to_exclude.extend(list(shared_with_all_departments_but_not_belongs_to_user_org(
             posts, user).values_list("id", flat=True)))
@@ -537,13 +565,9 @@ def posts_shared_with_org_department(user, post_types, excluded_ids):
         query = Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS,
                   created_by__organization__in=user.child_organizations)
     else:
-        try:
-            job_families = [user.employee_id_store.job_family]
-        except AttributeError:
-            job_families = []
         query = Q(created_by=user)
         query.add(Q(departments__in=[user.department]), Q.OR)
-        query.add(Q(job_families__in=job_families), Q.OR)
+        query.add(Q(job_families__in=user.job_families), Q.OR)
         query.add(Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS, post_type__in=post_types), Q.AND)
 
     posts = Post.objects.filter(query)

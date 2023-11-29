@@ -747,7 +747,7 @@ class PostFeedSerializer(PostSerializer):
             "is_owner", "can_edit", "can_delete", "has_appreciated",
             "appreciation_count", "comments_count", "tagged_users", "is_admin", "tags", "reaction_type", "nomination",
             "feed_type", "user_strength", "user", "user_reaction_type", "gif", "ecard", "points", "time_left",
-            "images_with_ecard", "greeting_info"
+            "images_with_ecard", "greeting_info",  "departments", "job_families"
         )
 
 
@@ -764,7 +764,7 @@ class OrganizationRecognitionSerializer(PostFeedSerializer):
             "is_owner", "can_edit", "can_delete", "has_appreciated",
             "appreciation_count", "comments_count", "is_admin", "reaction_type", "nomination",
             "feed_type", "user_strength", "user", "user_reaction_type", "gif", "ecard", "points",
-            "images_with_ecard", "greeting_info"
+            "images_with_ecard", "greeting_info",  "departments", "job_families"
         )
 
 
