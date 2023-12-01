@@ -464,7 +464,7 @@ def posts_not_shared_with_org_department(posts, user):
         query = (
                 Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS) &
                 ~Q(departments__in=user.departments.all()) &
-                ~Q(organizations__in=[user.organization])
+                ~Q(organizations__in=[user.organization]) & ~Q(created_by=user)
         )
 
     return posts.filter(query)
