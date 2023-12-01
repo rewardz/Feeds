@@ -43,6 +43,7 @@ def accessible_posts_by_user(user, organization, allow_feedback=False, appreciat
     post_query = (
             Q(organizations__in=organization) |
             Q(departments__in=user_depts) |
+            Q(shared_with=SHARED_WITH.ALL_DEPARTMENTS, created_by__organization__in=organization) |
             Q(shared_with=SHARED_WITH.SELF_DEPARTMENT, created_by__departments__in=user.departments.all()) |
             Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS, job_families__in=user.job_families)
     )
