@@ -1219,7 +1219,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
 
         # sometimes user_strength coming as empty string,
         if strength_id == '':
-            raise ValidationError(_('user strength should not be empty string'))
+            return Post.objects.none()
 
         strength_id = int(strength_id) if isinstance(strength_id, (str, unicode)) else strength_id
         feeds = feeds.filter(transaction__context__isnull=False, transaction__isnull=False)
