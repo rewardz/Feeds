@@ -286,7 +286,8 @@ class PostViewSet(viewsets.ModelViewSet):
                 txn.user = appreciation_trxn.creator
                 txn.points = appreciation_trxn.points
                 context = txn.context
-                context.update({"use_own_points": True, "transaction_against_sender": txn.id})
+                context.update(
+                    {"use_own_points": True, "transaction_against_sender": txn.id, "transaction_against_creator": True})
                 txn.context = context
                 txn.id = None  # When we assign id None and save it will create a transaction again
                 txn.save()
