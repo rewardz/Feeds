@@ -282,15 +282,13 @@ class PostViewSet(viewsets.ModelViewSet):
                 context={"appreciation_trxn": appreciation_trxn.id, "message": message}
             )
             if appreciation_trxn.context.get("use_own_points"):
-                # Create transaction against creator to give his points back
-                txn.user = appreciation_trxn.creator
-                txn.points = appreciation_trxn.points
-                context = txn.context
-                context.update(
-                    {"use_own_points": True, "transaction_against_sender": txn.id, "is_creator_transaction": True})
-                txn.context = context
-                txn.id = None  # When we assign id None and save it will create a transaction again
-                txn.save()
+                Transaction.objects.create(
+                    user=txn.creator, creator=appreciation_trxn.user,
+                    organization=appreciation_trxn.user.organization,
+                    points=appreciation_trxn.points, reason=reason, message=message,
+                    context={"appreciation_trxn": appreciation_trxn.id, "message": message, "use_own_points": True,
+                             "transaction_against_sender": txn.id, "is_creator_transaction": True}
+                )
 
         instance.mark_as_delete(user)
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -1201,7 +1199,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         strength_id = self.request.GET.get("user_strength", 0)
 
         # sometimes user_strength coming as empty string,
-        if strength_id == '':
+        if strength_id == "":
             raise ValidationError(_('user strength should not be empty string'))
 
         strength_id = int(strength_id) if isinstance(strength_id, (str, unicode)) else strength_id
