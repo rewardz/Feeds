@@ -220,7 +220,7 @@ class PostViewSet(viewsets.ModelViewSet):
         data = self._create_or_update(request)
         tag_users = data.get('tag_users', None)
         if "job_families" in data and int(data.get("shared_with")) == SHARED_WITH.ORGANIZATION_DEPARTMENTS:
-            job_families = get_job_families(user, data.get("shared_with"), data)
+            job_families = get_job_families(user, data.get("shared_with"), data) or []
             instance.job_families.clear()
             instance.job_families.add(*job_families)
         tags = data.get('tags', None)
