@@ -308,11 +308,11 @@ class Post(UserInfo):
         """
         transaction = self.transaction
         if not transaction:
-            return "0"
+            return 0
 
         hide_points = user.organization.appreciation_screen_setting.get("hide_points") in (True, "true", "True")
         points = transaction.points
-        points = str(int(points) if points - int(points) == 0 else float(points))
+        points = int(points) if points - int(points) == 0 else float(points)
 
         if not hide_points:
             return points
@@ -320,7 +320,7 @@ class Post(UserInfo):
         if user in (transaction.user, transaction.creator):
             return points
 
-        return "0"
+        return 0
 
     @property
     def category(self):

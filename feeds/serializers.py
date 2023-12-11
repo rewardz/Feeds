@@ -557,7 +557,7 @@ class PostSerializer(DynamicFieldsModelSerializer):
         return NominationsSerializer(instance=instance.nomination, fields=self.context.get('nomination_fields')).data
 
     def get_points(self, instance):
-        return instance.points(self.context['request'].user)
+        return str(instance.points(self.context['request'].user))
 
     @staticmethod
     def get_time_left(instance):
