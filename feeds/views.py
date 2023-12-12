@@ -1035,9 +1035,8 @@ class UserFeedViewSet(viewsets.ModelViewSet):
                 nomination__nominator=user, nomination__nom_status=NOMINATION_STATUS.approved))
         elif feed_flag == "approvals":
             feeds = feeds.filter(
-                Q(nomination__assigned_reviewer=user) | Q(nomination__alternate_reviewer=user)).exclude(
-                post_type=POST_TYPE.USER_CREATED_NOMINATION, nomination__nom_status__in=[
-                    NOMINATION_STATUS.approved, NOMINATION_STATUS.rejected])
+                Q(nomination__assigned_reviewer=user) | Q(nomination__alternate_reviewer=user) |
+                Q(nomination__histories__reviewer_user=user))
         elif feed_flag == "my_nomination":
             feeds = feeds.filter(nomination__nominator=user)
         else:
