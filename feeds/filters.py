@@ -4,6 +4,9 @@ from .models import Post
 from .utils import get_date_range
 
 
+NOMINATION_STATUS = import_string(settings.NOMINATION_STATUS)
+
+
 class PostFilterBase(django_filters.FilterSet):
     post_type = django_filters.BaseInFilter(name="post_type")
     shared_with = django_filters.BaseInFilter(name="shared_with")
@@ -14,6 +17,7 @@ class PostFilterBase(django_filters.FilterSet):
     created_during = django_filters.CharFilter(name="created_during", method="date_period_filter")
     nom_status = django_filters.CharFilter(name="nom_status", method="nom_status_filter")
     category = django_filters.CharFilter(name="category", method="category_filter")
+    nom_status_approvals = django_filters.CharFilter(name="nom_status_approvals", method="nom_status_approvals_filter")
     job_family = django_filters.CharFilter(name="job_family", method="job_family_filter")
 
     class Meta:
@@ -57,6 +61,16 @@ class PostFilterBase(django_filters.FilterSet):
             return queryset.filter(nomination__category_id=value)
         else:
             return queryset
+
+    def nom_status_approvals_filter(self, queryset, name, value):
+        if value == "pending":
+            queryset = queryset.exclude(
+                nomination__histories__status__in=[NOMINATION_STATUS.approved, NOMINATION_STATUS.rejected])
+        elif value == "approved":
+            queryset = queryset.filter(nomination__histories__status=NOMINATION_STATUS.approved)
+        elif value == "rejected":
+            queryset = queryset.filter(nomination__histories__status=NOMINATION_STATUS.rejected)
+        return queryset
 
 
 class PostFilter(PostFilterBase):
