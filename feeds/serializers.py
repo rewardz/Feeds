@@ -285,7 +285,8 @@ class NominationsSerializer(DynamicFieldsModelSerializer):
     badge = TrophyBadgeSerializer(read_only=True)
     user_strength = UserStrengthSerializer()
     strength = serializers.SerializerMethodField()
-    nominated_team_member = UserInfoSerializer()
+    # nominated_team_member = UserInfoSerializer()
+    nominees = UserInfoSerializer(many=True)
     nom_status = serializers.SerializerMethodField()
     nom_status_color = serializers.SerializerMethodField()
 
@@ -302,7 +303,8 @@ class NominationsSerializer(DynamicFieldsModelSerializer):
                   "badges",
                   "badge",
                   "user_strength",
-                  "nominated_team_member",
+                #   "nominated_team_member",
+                  "nominees",
                   "message_to_reviewer",
                   "strength",
                   "nom_status",
