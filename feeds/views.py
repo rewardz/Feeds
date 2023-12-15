@@ -1037,7 +1037,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             if self.request.version >= 13:
                 feeds = feeds.filter(
                     Q(nomination__assigned_reviewer=user) | Q(nomination__alternate_reviewer=user) |
-                    Q(nomination__histories__reviewer_user=user))
+                    Q(nomination__histories__reviewer=user))
             else:
                 feeds = feeds.filter(
                     Q(nomination__assigned_reviewer=user) | Q(nomination__alternate_reviewer=user)).exclude(
