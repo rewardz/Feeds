@@ -528,10 +528,8 @@ def assigned_nomination_post_ids(user):
     Return List of post ids of nomination which assigned to reviewer
     """
     assigned_nomination_post_ids =  Post.objects.filter(
-        Q(nomination__assigned_reviewer=user) | Q(nomination__alternate_reviewer=user)
-    ).exclude(post_type=POST_TYPE.USER_CREATED_NOMINATION,
-              nomination__nom_status__in=[NOMINATION_STATUS.approved, NOMINATION_STATUS.rejected]
-    ).values_list("id", flat=True)
+        Q(nomination__assigned_reviewer=user) | Q(nomination__alternate_reviewer=user) |
+        Q(nomination__histories__reviewer=user)).values_list("id", flat=True)
     return assigned_nomination_post_ids
 
 
