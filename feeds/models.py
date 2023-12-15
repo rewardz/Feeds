@@ -310,14 +310,11 @@ class Post(UserInfo):
         if not transaction:
             return 0
 
-        hide_points = user.organization.appreciation_screen_setting.get("hide_points") in (True, "true", "True")
+        hide_points = str(user.organization.appreciation_screen_setting.get("hide_points")).lower() == "true"
         points = transaction.points
         points = int(points) if points - int(points) == 0 else float(points)
 
-        if not hide_points:
-            return points
-
-        if user in (transaction.user, transaction.creator):
+        if (not hide_points) or (user in (transaction.user, transaction.creator)):
             return points
 
         return 0
