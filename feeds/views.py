@@ -1047,7 +1047,8 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             feeds = feeds.filter(nomination__nominator=user)
         else:
             feeds = feeds.filter(Q(nomination__nominator=user) | Q(user=user) |
-                Q(nomination__assigned_reviewer=user) | Q(nomination__alternate_reviewer=user))
+                Q(nomination__assigned_reviewer=user) | Q(nomination__alternate_reviewer=user) |
+                Q(nomination__histories__reviewer_user=user))
         if search:
             feeds = feeds.filter(Q(user__first_name__istartswith=search) | Q(
                 user__last_name__istartswith=search) | Q(created_by__first_name__istartswith=search) | Q(
