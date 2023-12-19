@@ -220,7 +220,7 @@ class PostViewSet(viewsets.ModelViewSet):
         data = self._create_or_update(request)
         tag_users = data.get('tag_users', None)
         if "job_families" in data and int(data.get("shared_with")) == SHARED_WITH.ORGANIZATION_DEPARTMENTS:
-            job_families = get_job_families(user, data.get("shared_with"), data)
+            job_families = get_job_families(user, data.get("shared_with"), data) or []
             instance.job_families.clear()
             instance.job_families.add(*job_families)
         tags = data.get('tags', None)
@@ -1225,7 +1225,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
 
         # sometimes user_strength coming as empty string,
         if strength_id == '':
-            raise ValidationError(_('user strength should not be empty string'))
+            return Post.objects.none()
 
         strength_id = int(strength_id) if isinstance(strength_id, (str, unicode)) else strength_id
         feeds = feeds.filter(transaction__context__isnull=False, transaction__isnull=False)
