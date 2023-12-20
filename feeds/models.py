@@ -26,6 +26,7 @@ Department = import_string(settings.DEPARTMENT_MODEL)
 Transaction = import_string(settings.TRANSACTION_MODEL)
 Nominations = import_string(settings.NOMINATIONS_MODEL)
 RepeatedEvent = import_string(settings.REPEATED_EVENT_MODEL)
+UserJobFamily = import_string(settings.USER_JOB_FAMILY)
 
 
 def post_upload_to_path(instance, filename):
@@ -177,6 +178,7 @@ class Post(UserInfo):
         default=1, validators=[MinValueValidator(1), MaxValueValidator(30)]
     )
     departments = models.ManyToManyField(Department, related_name="posts")
+    job_families = models.ManyToManyField(UserJobFamily, related_name="posts")
     modified_by = models.ForeignKey(CustomUser, related_name="post_modifier", null=True)
     modified_on = models.DateTimeField(auto_now=True, null=True, blank=True)
     mark_delete = models.BooleanField(default=False)
@@ -297,6 +299,25 @@ class Post(UserInfo):
         if not feedback_post:
             return
         return feedback_post.feedback if feedback_post.feedback else None
+
+    def points(self, user):
+        """
+        Returns points based on organization appreciation screen setting
+        If no transaction returns 0
+        If hide_points is True then points will be shown to the sender and receiver
+        """
+        transaction = self.transaction
+        if not transaction:
+            return 0
+
+        hide_points = str(user.organization.appreciation_screen_setting.get("hide_points")).lower() == "true"
+        points = transaction.points
+        points = int(points) if points - int(points) == 0 else float(points)
+
+        if (not hide_points) or (user in (transaction.user, transaction.creator)):
+            return points
+
+        return 0
 
     @property
     def category(self):
