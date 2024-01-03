@@ -300,6 +300,25 @@ class Post(UserInfo):
             return
         return feedback_post.feedback if feedback_post.feedback else None
 
+    def points(self, user):
+        """
+        Returns points based on organization appreciation screen setting
+        If no transaction returns 0
+        If hide_points is True then points will be shown to the sender and receiver
+        """
+        transaction = self.transaction
+        if not transaction:
+            return 0
+
+        hide_points = str(user.organization.appreciation_screen_setting.get("hide_points")).lower() == "true"
+        points = transaction.points
+        points = int(points) if points - int(points) == 0 else float(points)
+
+        if (not hide_points) or (user in (transaction.user, transaction.creator)):
+            return points
+
+        return 0
+
     @property
     def category(self):
         """
