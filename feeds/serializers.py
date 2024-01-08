@@ -26,6 +26,7 @@ Nominations = import_string(settings.NOMINATIONS_MODEL)
 TrophyBadge = import_string(settings.TROPHY_BADGE_MODEL)
 UserStrength = import_string(settings.USER_STRENGTH_MODEL)
 NOMINATION_STATUS_COLOR_CODE = import_string(settings.NOMINATION_STATUS_COLOR_CODE)
+REVIEWER_LEVEL = import_string(settings.REVIEWER_LEVEL)
 ORGANIZATION_SETTINGS_MODEL = import_string(settings.ORGANIZATION_SETTINGS_MODEL)
 MULTI_ORG_POST_ENABLE_FLAG = settings.MULTI_ORG_POST_ENABLE_FLAG
 RepeatedEventSerializer = import_string(settings.REPEATED_EVENT_SERIALIZER)
@@ -307,7 +308,7 @@ class NominationsSerializer(DynamicFieldsModelSerializer):
 
     @staticmethod
     def get_review_level(instance):
-        return instance.badge.reviewer_level if instance.badge else instance.category.reviewer_level
+        return instance.badge.reviewer_level if instance.badge else REVIEWER_LEVEL.none
 
     def get_nominator_name(self, instance):
         return instance.nominator.full_name
@@ -548,16 +549,8 @@ class PostSerializer(DynamicFieldsModelSerializer):
     def get_nomination(self, instance):
         return NominationsSerializer(instance=instance.nomination, fields=self.context.get('nomination_fields')).data
 
-    @staticmethod
-    def get_points(instance):
-        points = 0
-        if instance.transaction:
-            points = instance.transaction.points
-            if points - int(points) == 0:
-                points = int(points)
-            else:
-                points = float(points)
-        return str(points)
+    def get_points(self, instance):
+        return str(instance.points(self.context['request'].user))
 
     @staticmethod
     def get_time_left(instance):
