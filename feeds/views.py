@@ -1111,7 +1111,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
                 badge_id = int(badge_id)
             except ValueError:
                 raise ValidationError(_('badge should be numeric value.'))
-            my_appreciations_user = user.nominated_user.filter(
+            my_appreciations_user = user.nominees.filter(
                 badge=badge_id, nom_status=NOMINATION_STATUS.approved).values_list('nominator', flat=True)
 
         users = CustomUser.objects.filter(id__in=my_appreciations_user)
