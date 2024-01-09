@@ -1302,7 +1302,9 @@ class UserFeedViewSet(viewsets.ModelViewSet):
                 Q(created_by__first_name__icontains=search) |
                 Q(created_by__last_name__icontains=search) |
                 Q(user__email__icontains=search) |
-                Q(created_by__email__icontains=search)
+                Q(created_by__email__icontains=search) |
+                Q(title__icontains=search) |
+                Q(description__icontains=search)
             )
         page = self.paginate_queryset(feeds)
         serializer = GreetingSerializer if greeting else OrganizationRecognitionSerializer
