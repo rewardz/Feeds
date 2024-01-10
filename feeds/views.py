@@ -286,18 +286,19 @@ class PostViewSet(viewsets.ModelViewSet):
         user = request.user
         if not user_can_delete(user, instance):
             raise serializers.ValidationError(_("You do not have permission to delete"))
-        appreciation_trxn = instance.transaction
+        appreciation_trxns = instance.transactions.all()
         message = "reverting transaction for appreciation post {}".format(instance.title)
         if request.data.get("revert_transaction", False):
             reason, _ = PointsTable.objects.get_or_create(
                 point_source=POINT_SOURCE.revoked_feed, organization=user.organization
             )
-            Transaction.objects.create(
-                user=appreciation_trxn.user, creator=appreciation_trxn.creator,
-                organization=appreciation_trxn.user.organization,
-                points=-appreciation_trxn.points, reason=reason, message=message,
-                context={"appreciation_trxn": appreciation_trxn.id, "message": message}
-            )
+            for appreciation_trxn in appreciation_trxns:
+                Transaction.objects.create(
+                    user=appreciation_trxn.user, creator=appreciation_trxn.creator,
+                    organization=appreciation_trxn.user.organization,
+                    points=-appreciation_trxn.points, reason=reason, message=message,
+                    context={"appreciation_trxn": appreciation_trxn.id, "message": message}
+                )
         instance.mark_as_delete(user)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -1100,10 +1101,10 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             posts = accessible_posts_by_user(user, organization, False, True, None)
             user_appreciations = posts.filter(
                 user=user, post_type=POST_TYPE.USER_CREATED_APPRECIATION).values(
-                'transaction__context', 'transaction__creator')
+                'transactions__context', 'transactions__creator')
 
-            my_appreciations_user = [user_appreciation.get('transaction__creator') for user_appreciation in
-                                     user_appreciations if loads(user_appreciation.get('transaction__context')).get(
+            my_appreciations_user = [user_appreciation.get('transactions__creator') for user_appreciation in
+                                     user_appreciations if loads(user_appreciation.get('transactions__context')).get(
                 'strength_id') == strength_id]
 
         if badge_id:
@@ -1140,9 +1141,9 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(created_by=user)
         else:
             raise ValidationError(_('User does not exist'))
-        transactions = queryset.values('id', 'transaction__context')
+        transactions = queryset.values('id', 'transactions__context')
         posts = [transaction.get('id') for transaction in transactions if loads(
-            transaction.get('transaction__context')).get('strength_id') == strength_id]
+            transaction.get('transactions__context')).get('strength_id') == strength_id]
         queryset = queryset.filter(id__in=posts)
         serializer = PostFeedSerializer(queryset, many=True, context={"request": request}, fields=[
             "id", "ecard", "gif", "images", "description", "points", "images_with_ecard"])
@@ -1228,11 +1229,11 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             return Post.objects.none()
 
         strength_id = int(strength_id) if isinstance(strength_id, (str, unicode)) else strength_id
-        feeds = feeds.filter(transaction__context__isnull=False, transaction__isnull=False)
+        feeds = feeds.filter(transactions__context__isnull=False, transactions__isnull=False)
         return PostFilterBase(self.request.GET, queryset=feeds.filter(id__in=[
             feed.get("id")
-            for feed in feeds.values("transaction__context", "id")
-            if loads(feed.get("transaction__context", {})).get("strength_id") == strength_id
+            for feed in feeds.values("transactions__context", "id")
+            if loads(feed.get("transactions__context", {})).get("strength_id") == strength_id
         ])).qs
 
     def merge_querset(self, feeds, filter_appreciations):
