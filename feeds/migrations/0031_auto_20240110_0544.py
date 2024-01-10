@@ -20,6 +20,11 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        migrations.AlterField(
+            model_name='post',
+            name='transaction',
+            field=models.ForeignKey(related_name='posts', to='finance.Transaction', blank=True, null=True),
+        ),
         migrations.AddField(
             model_name='post',
             name='transactions',
