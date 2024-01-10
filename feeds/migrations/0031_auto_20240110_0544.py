@@ -3,7 +3,7 @@ from __future__ import unicode_literals
 
 from django.db import migrations, models
 
-def migrate_data_for_transactions(app, schema_editor):
+def migrate_data_for_transactions(apps, schema_editor):
     Post = apps.get_model("feeds", "Post")
     posts = Post.objects.filter(transaction__isnull=False)
     for post in posts.iterator():
