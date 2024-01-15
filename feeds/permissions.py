@@ -1,6 +1,6 @@
 from __future__ import division, print_function, unicode_literals
 
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, BasePermission
 
 
 class IsOptionsOrAuthenticated(IsAuthenticated):
