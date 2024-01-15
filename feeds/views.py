@@ -22,7 +22,7 @@ from .models import (
     Post, PostLiked, PollsAnswer, Images, CommentLiked,
 )
 from .paginator import FeedsResultsSetPagination, FeedsCommentsSetPagination
-from .permissions import IsOptionsOrAuthenticated
+from .permissions import IsOptionsOrAuthenticated, IsOptionsOrStaffOrReadOnly
 from .serializers import (
     CommentDetailSerializer, CommentSerializer, CommentCreateSerializer,
     DocumentsSerializer, ECardCategorySerializer, ECardSerializer,
@@ -912,13 +912,13 @@ def search_user(request):
 class ECardCategoryViewSet(viewsets.ModelViewSet):
     queryset = ECardCategory.objects.none()
     serializer_class = ECardCategorySerializer
-    permission_classes = [IsOptionsOrAuthenticated, ]
+    permission_classes = [IsOptionsOrStaffOrReadOnly, ]
 
     def get_queryset(self):
         user = self.request.user
         query = Q(organization=user.organization) | Q(organization__isnull=True)
         if self.request.query_params.get('admin_function'):
-            query =  Q(organization=user.organization)
+            query = Q(organization=user.organization)
         queryset = ECardCategory.objects.filter(query)
         queryset = queryset.annotate(custom_order=Case(When(organization=user.organization, then=0),
                                      default=1, output_field=IntegerField())).order_by('custom_order')
@@ -928,13 +928,13 @@ class ECardCategoryViewSet(viewsets.ModelViewSet):
 class ECardViewSet(viewsets.ModelViewSet):
     queryset = ECard.objects.none()
     serializer_class = ECardSerializer
-    permission_classes = [IsOptionsOrAuthenticated, ]
+    permission_classes = [IsOptionsOrStaffOrReadOnly, ]
 
     def get_queryset(self):
         user = self.request.user
         query = Q(category__organization=user.organization) | Q(category__organization__isnull=True)
         if self.request.query_params.get('admin_function'):
-            query =  Q(category__organization=user.organization)
+            query = Q(category__organization=user.organization)
         queryset = ECard.objects.filter(query)
         queryset = queryset.annotate(custom_order=Case(When(category__organization=user.organization, then=0),
                                      default=1, output_field=IntegerField())).order_by('custom_order')
@@ -1190,7 +1190,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         serializer = PostFeedSerializer(page, context={"request": request}, many=True)
         feeds = self.get_paginated_response(serializer.data)
         user_appreciation = posts.filter(post_type=POST_TYPE.USER_CREATED_APPRECIATION,
-                                                created_by=request.user).first()
+                                         created_by=request.user).first()
         if user_appreciation:
             days_passed = since_last_appreciation(user_appreciation.created_on)
             if 3 <= days_passed <= 120:
