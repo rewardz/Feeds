@@ -1,6 +1,6 @@
 from __future__ import division, print_function, unicode_literals
 
-from rest_framework.permissions import IsAuthenticated, BasePermission
+from rest_framework.permissions import IsAuthenticated, BasePermission, SAFE_METHODS
 
 
 class IsOptionsOrAuthenticated(IsAuthenticated):
@@ -51,4 +51,3 @@ class IsOptionsOrEcardEnabled(BasePermission):
             return False
 
         return user.organization.enable_ecards
-    
