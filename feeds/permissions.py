@@ -39,3 +39,16 @@ class IsOptionsOrStaffOrReadOnly(IsStaffOrReadOnly):
             return True
 
         return super(IsOptionsOrStaffOrReadOnly, self).has_permission(request, view)
+
+
+class IsOptionsOrEcardEnabled(BasePermission):
+    def has_permission(self, request, view):
+        if request.method == 'OPTIONS' or request.method == 'options':
+            return True
+
+        user = request.user
+        if not user.is_authenticated():
+            return False
+
+        return user.organization.enable_ecards
+    
