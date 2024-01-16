@@ -292,12 +292,21 @@ class PostViewSet(viewsets.ModelViewSet):
             reason, _ = PointsTable.objects.get_or_create(
                 point_source=POINT_SOURCE.revoked_feed, organization=user.organization
             )
-            Transaction.objects.create(
+            txn = Transaction.objects.create(
                 user=appreciation_trxn.user, creator=appreciation_trxn.creator,
                 organization=appreciation_trxn.user.organization,
                 points=-appreciation_trxn.points, reason=reason, message=message,
                 context={"appreciation_trxn": appreciation_trxn.id, "message": message}
             )
+            if appreciation_trxn.context.get("use_own_points"):
+                Transaction.objects.create(
+                    user=txn.creator, creator=appreciation_trxn.user,
+                    organization=appreciation_trxn.user.organization,
+                    points=appreciation_trxn.points, reason=reason, message=message,
+                    context={"appreciation_trxn": appreciation_trxn.id, "message": message, "use_own_points": True,
+                             "transaction_against_sender": txn.id, "is_creator_transaction": True}
+                )
+
         instance.mark_as_delete(user)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
