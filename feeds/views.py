@@ -293,12 +293,21 @@ class PostViewSet(viewsets.ModelViewSet):
                 point_source=POINT_SOURCE.revoked_feed, organization=user.organization
             )
             for appreciation_trxn in appreciation_trxns:
-                Transaction.objects.create(
+                txn = Transaction.objects.create(
                     user=appreciation_trxn.user, creator=appreciation_trxn.creator,
                     organization=appreciation_trxn.user.organization,
                     points=-appreciation_trxn.points, reason=reason, message=message,
                     context={"appreciation_trxn": appreciation_trxn.id, "message": message}
                 )
+                if appreciation_trxn.context.get("use_own_points"):
+                    Transaction.objects.create(
+                        user=txn.creator, creator=appreciation_trxn.user,
+                        organization=appreciation_trxn.user.organization,
+                        points=appreciation_trxn.points, reason=reason, message=message,
+                        context={"appreciation_trxn": appreciation_trxn.id, "message": message, "use_own_points": True,
+                                "transaction_against_sender": txn.id, "is_creator_transaction": True}
+                    )
+
         instance.mark_as_delete(user)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -1302,7 +1311,9 @@ class UserFeedViewSet(viewsets.ModelViewSet):
                 Q(created_by__first_name__icontains=search) |
                 Q(created_by__last_name__icontains=search) |
                 Q(user__email__icontains=search) |
-                Q(created_by__email__icontains=search)
+                Q(created_by__email__icontains=search) |
+                Q(title__icontains=search) |
+                Q(description__icontains=search)
             )
         page = self.paginate_queryset(feeds)
         serializer = GreetingSerializer if greeting else OrganizationRecognitionSerializer
