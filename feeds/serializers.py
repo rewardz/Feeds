@@ -13,7 +13,7 @@ from .models import (
     Post, PostLiked, PollsAnswer, Images, Videos, Voter,
 )
 from .utils import (
-    extract_tagged_users, get_departments, get_profile_image, tag_users_to_comment,
+    extract_tagged_users, FileValidator, get_departments, get_profile_image, tag_users_to_comment,
     validate_priority, user_can_delete, user_can_edit, get_absolute_url, get_job_families
 )
 
@@ -133,6 +133,12 @@ class ImagesSerializer(serializers.ModelSerializer):
     def get_name(self, instance):
         return instance.image.name
 
+    @staticmethod
+    def validate_image(val):
+        if val and not FileValidator(settings.ALLOWED_IMAGE_EXTENSIONS).is_valid_file(val):
+            raise serializers.ValidationError("Unsupported File Format")
+        return val
+
 
 class DocumentsSerializer(serializers.ModelSerializer):
     name = serializers.SerializerMethodField()
@@ -246,6 +252,12 @@ class ECardSerializer(serializers.ModelSerializer):
 
     def get_tags(self, obj):
         return list(obj.tags.values_list("name", flat=True))
+
+    @staticmethod
+    def validate_image(val):
+        if val and not FileValidator(settings.ALLOWED_IMAGE_EXTENSIONS).is_valid_file(val):
+            raise serializers.ValidationError("Unsupported File Format")
+        return val
 
 
 class AnswerSerializer(serializers.ModelSerializer):
