@@ -1,6 +1,7 @@
 from __future__ import division, print_function, unicode_literals
 
 import json
+from mimetypes import guess_extension
 import re
 from django.conf import settings
 from django.db.models import Q
@@ -596,3 +597,83 @@ def get_job_families(user, shared_with, data):
         job_families = json.loads(job_families)
 
     return validate_job_families(job_families, user.get_affiliated_orgs())
+
+
+class FileValidator:
+    """
+    A class to validate uploaded files based on their extensions and content types.
+
+    Attributes:
+        allowed_extensions (tuple): Tuple of allowed file extensions.
+        allowed_content_types (tuple): Tuple of allowed MIME content types.
+    """
+
+    def __init__(self, allowed_extensions=None, allowed_content_types=None):
+        """
+        Initializes the FileValidator with given or default allowed extensions and content types.
+
+        Args:
+            allowed_extensions (tuple, optional): Custom tuple of allowed file extensions.
+            allowed_content_types (tuple, optional): Custom tuple of allowed MIME content types.
+        """
+        self.allowed_extensions = allowed_extensions or (
+            settings.ALLOWED_IMAGE_EXTENSIONS +
+            settings.ALLOWED_FILE_EXTENSIONS +
+            settings.ALLOWED_VIDEO_EXTENSIONS
+        )
+        self.allowed_content_types = allowed_content_types or settings.ALLOWED_FILE_CONTENT_TYPES
+
+    def extract_info_from_base64(self, data):
+        """
+        Extracts the content type and file extension from a base64 encoded string.
+
+        Args:
+            data (str): The base64 encoded string.
+
+        Returns:
+            tuple: A tuple containing the content type and file extension.
+        """
+        try:
+            header, _ = data.split(',', 1)
+            content_type = header.split(';')[0].split(':')[1]
+            # Custom mapping for certain MIME types
+            extension_map = {
+                'image/jpeg': '.jpeg',
+            }
+            extension = extension_map.get(content_type, guess_extension(content_type))
+            return content_type, extension if extension else None
+        except (IndexError, ValueError):
+            return None, None
+
+    def is_valid_file(self, file, is_base_64=False):
+        """
+        Validates if the file has an allowed extension and content type.
+
+        Args:
+            file (UploadedFile): The file to validate.
+
+        Returns:
+            bool: True if the file is valid, False otherwise.
+        """
+        if is_base_64:
+            content_type, ext = self.extract_info_from_base64(file)
+        else:
+            ext = self.get_extension(file.name)
+            content_type = file.content_type
+        return (
+            ext and ext.lower() in self.allowed_extensions and
+            (content_type and content_type in self.allowed_content_types or not content_type)
+        )
+
+    @staticmethod
+    def get_extension(filename):
+        """
+        Extracts the file extension from a filename.
+
+        Args:
+            filename (str): The name of the file.
+
+        Returns:
+            str: The file extension, including the leading dot.
+        """
+        return '.' + filename.rsplit('.', 1)[-1].lower()
