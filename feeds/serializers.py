@@ -160,6 +160,12 @@ class VideosSerializer(serializers.ModelSerializer):
             'post', 'video',
         )
 
+    @staticmethod
+    def validate_video(val):
+        if val and not FileValidator(settings.ALLOWED_IMAGE_EXTENSIONS).is_valid_file(val):
+            raise serializers.ValidationError("Unsupported File Format")
+        return val
+
 
 class PollSerializer(serializers.ModelSerializer):
     question = serializers.SerializerMethodField()
