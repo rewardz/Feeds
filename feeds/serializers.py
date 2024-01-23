@@ -162,7 +162,7 @@ class VideosSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def validate_video(val):
-        if val and not FileValidator(settings.ALLOWED_IMAGE_EXTENSIONS).is_valid_file(val):
+        if val and not FileValidator(settings.ALLOWED_VIDEO_EXTENSIONS).is_valid_file(val):
             raise serializers.ValidationError("Unsupported File Format")
         return val
 
