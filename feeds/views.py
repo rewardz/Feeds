@@ -79,6 +79,18 @@ class PostViewSet(viewsets.ModelViewSet):
         if not current_user.allow_user_post_feed:
             raise serializers.ValidationError(_('You are not allowed to create post.'))
 
+        orgs = payload.get("organizations", [])
+        deps = payload.get("departments", [])
+        if not current_user.is_superuser:
+            affiliated_orgs = Organization.objects.get_affiliated(current_user)
+            affiliated_orgs_id = affiliated_orgs.values_list('id', flat=True).distinct()
+            if orgs_id and not all(org in affiliated_orgs_id for org in orgs_id):
+                raise serializers.ValidationError(_('You are not allowed for selected organization.'))
+  
+            affiliated_deps_id = affiliated_orgs.values_list('departments', flat=True).distinct()
+            if deps_id and not all(dep in affiliated_deps_id for dep in deps_id):
+                raise serializers.ValidationError(_('You are not allowed for selected department.'))
+
         data = {}
         for key, value in payload.items():
             if key in ["organizations", "departments", "job_families"] and isinstance(payload.get(key), unicode):
@@ -978,6 +990,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
     serializer_class = PostFeedSerializer
     filter_backends = (filters.DjangoFilterBackend,)
     pagination_class = FeedsResultsSetPagination
+    http_method_names = ['get']
 
     @staticmethod
     def get_filtered_feeds_according_to_shared_with(feeds, user, post_polls):
