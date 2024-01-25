@@ -839,7 +839,9 @@ class CommentViewset(viewsets.ModelViewSet):
         posts = accessible_posts_by_user(user, user.organization, False,
                                          is_appreciation_post(post_id) if post_id else False)
 
-        result = Comment.objects.filter(post__in=posts, mark_delete=False, created_by=user)
+        result = Comment.objects.filter(post__in=posts, mark_delete=False)
+        if self.request.method != "POST":
+            result = result.filter(created_by=user)
         return result
 
     @detail_route(methods=["POST"], permission_classes=(IsOptionsOrAuthenticated,))
