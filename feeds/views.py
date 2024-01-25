@@ -86,7 +86,6 @@ class PostViewSet(viewsets.ModelViewSet):
             affiliated_orgs_id = affiliated_orgs.values_list('id', flat=True).distinct()
             if orgs_id and not all(org in affiliated_orgs_id for org in orgs_id):
                 raise serializers.ValidationError(_('You are not allowed for selected organization.'))
-
             affiliated_deps_id = affiliated_orgs.values_list('departments', flat=True).distinct()
             if deps_id and not all(dep in affiliated_deps_id for dep in deps_id):
                 raise serializers.ValidationError(_('You are not allowed for selected department.'))
@@ -840,6 +839,8 @@ class CommentViewset(viewsets.ModelViewSet):
                                          is_appreciation_post(post_id) if post_id else False)
 
         result = Comment.objects.filter(post__in=posts, mark_delete=False)
+        if self.request.method != "POST":
+            result = result.filter(created_by=user)
         return result
 
     @detail_route(methods=["POST"], permission_classes=(IsOptionsOrAuthenticated,))
