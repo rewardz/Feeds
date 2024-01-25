@@ -79,6 +79,18 @@ class PostViewSet(viewsets.ModelViewSet):
         if not current_user.allow_user_post_feed:
             raise serializers.ValidationError(_('You are not allowed to create post.'))
 
+        orgs = payload.get("organizations", [])
+        deps = payload.get("departments", [])
+        if not current_user.is_superuser:
+            affiliated_orgs = Organization.objects.get_affiliated(current_user)
+            affiliated_orgs_id = affiliated_orgs.values_list('id', flat=True).distinct()
+            if orgs_id and not all(org in affiliated_orgs_id for org in orgs_id):
+                raise serializers.ValidationError(_('You are not allowed for selected organization.'))
+  
+            affiliated_deps_id = affiliated_orgs.values_list('departments', flat=True).distinct()
+            if deps_id and not all(dep in affiliated_deps_id for dep in deps_id):
+                raise serializers.ValidationError(_('You are not allowed for selected department.'))
+
         data = {}
         for key, value in payload.items():
             if key in ["organizations", "departments", "job_families"] and isinstance(payload.get(key), unicode):
@@ -803,6 +815,7 @@ class VideosView(views.APIView):
 
 class CommentViewset(viewsets.ModelViewSet):
     permission_classes = (IsOptionsOrAuthenticated,)
+    http_method_names = ['patch', 'delete']
 
     def get_serializer(self, *args, **kwargs):
         if "pk" in self.kwargs:
@@ -826,7 +839,7 @@ class CommentViewset(viewsets.ModelViewSet):
         posts = accessible_posts_by_user(user, user.organization, False,
                                          is_appreciation_post(post_id) if post_id else False)
 
-        result = Comment.objects.filter(post__in=posts, mark_delete=False)
+        result = Comment.objects.filter(post__in=posts, mark_delete=False, created_by=user)
         return result
 
     @detail_route(methods=["POST"], permission_classes=(IsOptionsOrAuthenticated,))
@@ -835,12 +848,7 @@ class CommentViewset(viewsets.ModelViewSet):
         comment_id = self.kwargs.get("pk", None)
         if not comment_id:
             raise ValidationError(_('Comment ID is required'))
-        post_id = self.get_post_id_from_comment(self.kwargs.get("pk", 0))
-        organization = user.organization
-        posts = accessible_posts_by_user(
-            user, organization, False, is_appreciation_post(post_id) if post_id else False, post_id)
-        accessible_comments = Comment.objects.filter(post__in=posts) \
-            .values_list('id', flat=True)
+        accessible_comments = self.get_queryset().values_list('id', flat=True)
 
         comment_id = int(comment_id)
         if comment_id not in accessible_comments:
@@ -982,6 +990,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
     serializer_class = PostFeedSerializer
     filter_backends = (filters.DjangoFilterBackend,)
     pagination_class = FeedsResultsSetPagination
+    http_method_names = ['get']
 
     @staticmethod
     def get_filtered_feeds_according_to_shared_with(feeds, user, post_polls):
