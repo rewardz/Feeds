@@ -86,7 +86,7 @@ class PostViewSet(viewsets.ModelViewSet):
             affiliated_orgs_id = affiliated_orgs.values_list('id', flat=True).distinct()
             if orgs_id and not all(org in affiliated_orgs_id for org in orgs_id):
                 raise serializers.ValidationError(_('You are not allowed for selected organization.'))
-  
+
             affiliated_deps_id = affiliated_orgs.values_list('departments', flat=True).distinct()
             if deps_id and not all(dep in affiliated_deps_id for dep in deps_id):
                 raise serializers.ValidationError(_('You are not allowed for selected department.'))
@@ -990,7 +990,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
     serializer_class = PostFeedSerializer
     filter_backends = (filters.DjangoFilterBackend,)
     pagination_class = FeedsResultsSetPagination
-    http_method_names = ['get']
+    http_method_names = ['get', 'options', 'head']
 
     @staticmethod
     def get_filtered_feeds_according_to_shared_with(feeds, user, post_polls):
