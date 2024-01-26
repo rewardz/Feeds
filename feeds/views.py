@@ -79,8 +79,8 @@ class PostViewSet(viewsets.ModelViewSet):
         if not current_user.allow_user_post_feed:
             raise serializers.ValidationError(_('You are not allowed to create post.'))
 
-        orgs = payload.get("organizations", [])
-        deps = payload.get("departments", [])
+        orgs_id = payload.get("organizations", [])
+        deps_id = payload.get("departments", [])
         if not current_user.is_superuser:
             affiliated_orgs = Organization.objects.get_affiliated(current_user)
             affiliated_orgs_id = affiliated_orgs.values_list('id', flat=True).distinct()
