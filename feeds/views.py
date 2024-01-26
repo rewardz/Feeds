@@ -814,7 +814,7 @@ class VideosView(views.APIView):
 
 class CommentViewset(viewsets.ModelViewSet):
     permission_classes = (IsOptionsOrAuthenticated,)
-    http_method_names = ['patch', 'delete']
+    http_method_names = ['patch', 'delete', 'options']
 
     def get_serializer(self, *args, **kwargs):
         if "pk" in self.kwargs:
