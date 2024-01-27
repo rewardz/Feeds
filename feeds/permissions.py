@@ -51,3 +51,21 @@ class IsOptionsOrEcardEnabled(BasePermission):
             return False
 
         return user.organization.enable_ecards
+
+
+class CommentPermission(BasePermission):
+    def has_object_permission(self, request, view, obj):
+        """The obj has to be a CustomUser instance"""
+        if request.method in SAFE_METHODS:
+            return True
+
+        if request.user.is_employer(obj.created_by.organization):
+            return True
+
+        return obj.created_by == request.user
+
+    def has_permission(self, request, view):
+        if request.method in SAFE_METHODS:
+            return True
+
+        return False

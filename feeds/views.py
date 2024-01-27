@@ -2,42 +2,38 @@ from __future__ import division, print_function, unicode_literals
 
 import datetime
 from json import loads
+
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Case, IntegerField, Q, Count, When
+from django.db.models import Case, Count, IntegerField, Q, When
 from django.http import Http404
 from django.utils.module_loading import import_string
 from django.utils.translation import ugettext as _
-
-from rest_framework import permissions, viewsets, serializers, status, views, filters
+from rest_framework import filters, permissions, serializers, status, views, viewsets
 from rest_framework.decorators import api_view, detail_route, list_route, permission_classes
 from rest_framework.exceptions import ValidationError
-from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
+
 from feeds.constants import SHARED_WITH
-from .filters import PostFilter, PostFilterBase
+
 from .constants import POST_TYPE, SHARED_WITH
-from .models import (
-    Comment, Documents, ECard, ECardCategory,
-    Post, PostLiked, PollsAnswer, Images, CommentLiked,
-)
-from .paginator import FeedsResultsSetPagination, FeedsCommentsSetPagination
-from .permissions import IsOptionsOrAuthenticated, IsOptionsOrStaffOrReadOnly, IsOptionsOrEcardEnabled
-from .serializers import (
-    CommentDetailSerializer, CommentSerializer, CommentCreateSerializer,
-    DocumentsSerializer, ECardCategorySerializer, ECardSerializer,
-    FlagPostSerializer, PostLikedSerializer, PostSerializer,
-    PostDetailSerializer, PollsAnswerSerializer, ImagesSerializer,
-    UserInfoSerializer, VideosSerializer, PostFeedSerializer, GreetingSerializer, OrganizationRecognitionSerializer
-)
-from .utils import (
-    accessible_posts_by_user, extract_tagged_users, get_user_name, notify_new_comment,
-    notify_new_post_poll_created, notify_flagged_post, push_notification, tag_users_to_comment,
-    tag_users_to_post, user_can_delete, user_can_edit, get_date_range, since_last_appreciation,
-    get_current_month_end_date, get_absolute_url, posts_not_visible_to_user, assigned_nomination_post_ids,
-    posts_not_shared_with_self_department, posts_shared_with_org_department, posts_not_shared_with_job_family,
-    get_job_families,
-)
+from .filters import PostFilter, PostFilterBase
+from .models import Comment, CommentLiked, Documents, ECard, ECardCategory, Images, PollsAnswer, Post, PostLiked
+from .paginator import FeedsCommentsSetPagination, FeedsResultsSetPagination
+from .permissions import (CommentPermission, IsOptionsOrAuthenticated, IsOptionsOrEcardEnabled,
+                          IsOptionsOrStaffOrReadOnly)
+from .serializers import (CommentCreateSerializer, CommentDetailSerializer, CommentSerializer, DocumentsSerializer,
+                          ECardCategorySerializer, ECardSerializer, FlagPostSerializer, GreetingSerializer,
+                          ImagesSerializer, OrganizationRecognitionSerializer, PollsAnswerSerializer,
+                          PostDetailSerializer, PostFeedSerializer, PostLikedSerializer, PostSerializer,
+                          UserInfoSerializer, VideosSerializer)
+from .utils import (accessible_posts_by_user, assigned_nomination_post_ids, extract_tagged_users, get_absolute_url,
+                    get_current_month_end_date, get_date_range, get_job_families, get_user_name, notify_flagged_post,
+                    notify_new_comment, notify_new_post_poll_created, posts_not_shared_with_job_family,
+                    posts_not_shared_with_self_department, posts_not_visible_to_user, posts_shared_with_org_department,
+                    push_notification, since_last_appreciation, tag_users_to_comment, tag_users_to_post,
+                    user_can_delete, user_can_edit)
 
 CustomUser = import_string(settings.CUSTOM_USER_MODEL)
 DEPARTMENT_MODEL = import_string(settings.DEPARTMENT_MODEL)
@@ -813,7 +809,7 @@ class VideosView(views.APIView):
 
 
 class CommentViewset(viewsets.ModelViewSet):
-    permission_classes = (IsOptionsOrAuthenticated,)
+    permission_classes = (CommentPermission,)
     http_method_names = ['patch', 'delete', 'options', 'post']
 
     def get_serializer(self, *args, **kwargs):
