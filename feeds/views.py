@@ -1078,10 +1078,8 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         organization = user.organization
         posts = accessible_posts_by_user(user, organization)
         approvals_count = posts.filter(
-            Q(nomination__assigned_reviewer=user) | Q(nomination__alternate_reviewer=user),
-            post_type=POST_TYPE.USER_CREATED_NOMINATION
-        ).exclude(nomination__nom_status__in=[NOMINATION_STATUS.approved, NOMINATION_STATUS.rejected]).count()
-        if approvals_count > 0:
+            Q(nomination__assigned_reviewer=user) | Q(nomination__alternate_reviewer=user)).count()
+        if approvals_count > 0 or user.is_nomination_reviewer:
             show_approvals = True
         if user.supervisor_remaining_budget is not None:
             supervisor_remaining_budget = str(user.supervisor_remaining_budget)
