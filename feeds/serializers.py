@@ -304,6 +304,7 @@ class NominationsSerializer(DynamicFieldsModelSerializer):
     user_strength = UserStrengthSerializer()
     strength = serializers.SerializerMethodField()
     nominated_team_member = UserInfoSerializer()
+    nominees = UserInfoSerializer(many=True)
     nom_status = serializers.SerializerMethodField()
     nom_status_color = serializers.SerializerMethodField()
 
@@ -321,6 +322,7 @@ class NominationsSerializer(DynamicFieldsModelSerializer):
                   "badge",
                   "user_strength",
                   "nominated_team_member",
+                  "nominees",
                   "message_to_reviewer",
                   "strength",
                   "nom_status",
@@ -549,8 +551,9 @@ class PostSerializer(DynamicFieldsModelSerializer):
         return instance.post_type
 
     def get_user_strength(self, instance):
-        if instance.transaction:
-            strength_id = instance.transaction.context.get('strength_id')
+        transaction = instance.transactions.first()
+        if transaction:
+            strength_id = transaction.context.get('strength_id')
             if strength_id:
                 return UserStrengthSerializer(instance=UserStrength.objects.filter(id=strength_id).first()).data
         elif instance.nomination and instance.nomination.user_strength:

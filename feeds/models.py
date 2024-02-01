@@ -157,7 +157,9 @@ class Post(UserInfo):
     description = models.TextField(null=True, blank=True)
     user = models.ForeignKey(CustomUser, related_name="appreciated_user", on_delete=models.CASCADE, null=True,
                              blank=True)
-    transaction = models.ForeignKey(Transaction, on_delete=models.CASCADE, null=True, blank=True)
+    transaction = models.ForeignKey(
+        Transaction, related_name="posts", on_delete=models.CASCADE, null=True, blank=True)
+    transactions = models.ManyToManyField(Transaction, blank=True)
     nomination = models.ForeignKey(Nominations, on_delete=models.CASCADE, null=True, blank=True)
     greeting = models.ForeignKey(RepeatedEvent, on_delete=models.CASCADE, null=True, blank=True, related_name="posts")
     ecard = models.ForeignKey(ECard, on_delete=models.CASCADE, null=True, blank=True)
@@ -306,7 +308,7 @@ class Post(UserInfo):
         If no transaction returns 0
         If hide_points is True then points will be shown to the sender and receiver
         """
-        transaction = self.transaction
+        transaction = self.transactions.first()
         if not transaction:
             return 0
 
@@ -529,7 +531,8 @@ class PostCertificateRecord(models.Model):
     image = models.ForeignKey(Images, on_delete=models.CASCADE, null=True, blank=True)
 
     def __str__(self):
-        return "{}: {}".format(self.post.title, self.post.user.email)
+        user_email = self.post.user.email if self.post.user else ""
+        return "{}: {}".format(self.post.title, user_email)
 
 
 auditlog.register(Post, include_fields=['shared_with'])
