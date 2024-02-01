@@ -836,7 +836,7 @@ class CommentViewset(viewsets.ModelViewSet):
                                          is_appreciation_post(post_id) if post_id else False)
 
         result = Comment.objects.filter(post__in=posts, mark_delete=False)
-        if self.request.method != "POST":
+        if self.request.method != "POST" and not self.request.user.is_staff:
             result = result.filter(created_by=user)
         return result
 
