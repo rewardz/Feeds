@@ -59,7 +59,7 @@ class CommentPermission(BasePermission):
         if request.method in SAFE_METHODS:
             return True
 
-        if request.user.is_employer(obj.created_by.organization):
+        if request.user.is_employer(obj.created_by.organization.id):
             return True
 
         return obj.created_by == request.user
