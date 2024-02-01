@@ -892,6 +892,7 @@ class CommentViewset(viewsets.ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
+        self.check_object_permissions(request, instance)
         user = request.user
         if not user_can_delete(user, instance):
             raise serializers.ValidationError(_("You do not have permission to delete"))

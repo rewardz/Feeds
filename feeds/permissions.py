@@ -59,6 +59,9 @@ class CommentPermission(BasePermission):
         if request.method in SAFE_METHODS:
             return True
 
+        if request.method == 'PATCH':
+            return obj.created_by == request.user
+
         if request.user.is_employer(obj.created_by.organization.id):
             return True
 
@@ -68,4 +71,6 @@ class CommentPermission(BasePermission):
         if request.method in SAFE_METHODS:
             return True
 
+        if request.user.is_authenticated():
+            return True
         return False
