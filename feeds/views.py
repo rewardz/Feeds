@@ -2,6 +2,7 @@ from __future__ import division, print_function, unicode_literals
 
 import datetime
 from json import loads
+import ast
 
 from django.conf import settings
 from django.db import transaction
@@ -75,8 +76,8 @@ class PostViewSet(viewsets.ModelViewSet):
         if not current_user.allow_user_post_feed:
             raise serializers.ValidationError(_('You are not allowed to create post.'))
 
-        orgs_id = payload.get("organizations", [])
-        deps_id = payload.get("departments", [])
+        orgs_id = ast.literal_eval(payload.get("organizations", "[]"))
+        deps_id = ast.literal_eval(payload.get("departments", "[]"))
         if not current_user.is_superuser:
             affiliated_orgs = Organization.objects.get_affiliated(current_user)
             affiliated_orgs_id = affiliated_orgs.values_list('id', flat=True).distinct()
