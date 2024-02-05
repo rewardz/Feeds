@@ -1081,7 +1081,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             Q(nomination__assigned_reviewer=user) | Q(nomination__alternate_reviewer=user),
             post_type=POST_TYPE.USER_CREATED_NOMINATION
         ).exclude(nomination__nom_status__in=[NOMINATION_STATUS.approved, NOMINATION_STATUS.rejected]).count()
-        if approvals_count > 0:
+        if approvals_count > 0 or user.is_nomination_reviewer:
             show_approvals = True
         if user.supervisor_remaining_budget is not None:
             supervisor_remaining_budget = str(user.supervisor_remaining_budget)
