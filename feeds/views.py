@@ -2,42 +2,39 @@ from __future__ import division, print_function, unicode_literals
 
 import datetime
 from json import loads
+import ast
+
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Case, IntegerField, Q, Count, When
+from django.db.models import Case, Count, IntegerField, Q, When
 from django.http import Http404
 from django.utils.module_loading import import_string
 from django.utils.translation import ugettext as _
-
-from rest_framework import permissions, viewsets, serializers, status, views, filters
+from rest_framework import filters, permissions, serializers, status, views, viewsets
 from rest_framework.decorators import api_view, detail_route, list_route, permission_classes
 from rest_framework.exceptions import ValidationError
-from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
+
 from feeds.constants import SHARED_WITH
-from .filters import PostFilter, PostFilterBase
+
 from .constants import POST_TYPE, SHARED_WITH
-from .models import (
-    Comment, Documents, ECard, ECardCategory,
-    Post, PostLiked, PollsAnswer, Images, CommentLiked,
-)
-from .paginator import FeedsResultsSetPagination, FeedsCommentsSetPagination
-from .permissions import IsOptionsOrAuthenticated
-from .serializers import (
-    CommentDetailSerializer, CommentSerializer, CommentCreateSerializer,
-    DocumentsSerializer, ECardCategorySerializer, ECardSerializer,
-    FlagPostSerializer, PostLikedSerializer, PostSerializer,
-    PostDetailSerializer, PollsAnswerSerializer, ImagesSerializer,
-    UserInfoSerializer, VideosSerializer, PostFeedSerializer, GreetingSerializer, OrganizationRecognitionSerializer
-)
-from .utils import (
-    accessible_posts_by_user, extract_tagged_users, get_user_name, notify_new_comment,
-    notify_new_post_poll_created, notify_flagged_post, push_notification, tag_users_to_comment,
-    tag_users_to_post, user_can_delete, user_can_edit, get_date_range, since_last_appreciation,
-    get_current_month_end_date, get_absolute_url, posts_not_visible_to_user, assigned_nomination_post_ids,
-    posts_not_shared_with_self_department, posts_shared_with_org_department, posts_not_shared_with_job_family,
-    get_job_families,
-)
+from .filters import PostFilter, PostFilterBase
+from .models import Comment, CommentLiked, Documents, ECard, ECardCategory, Images, PollsAnswer, Post, PostLiked
+from .paginator import FeedsCommentsSetPagination, FeedsResultsSetPagination
+from .permissions import (CommentPermission, IsOptionsOrAuthenticated, IsOptionsOrEcardEnabled,
+                          IsOptionsOrStaffOrReadOnly)
+from .serializers import (CommentCreateSerializer, CommentDetailSerializer, CommentSerializer, DocumentsSerializer,
+                          ECardCategorySerializer, ECardSerializer, FlagPostSerializer, GreetingSerializer,
+                          ImagesSerializer, OrganizationRecognitionSerializer, PollsAnswerSerializer,
+                          PostDetailSerializer, PostFeedSerializer, PostLikedSerializer, PostSerializer,
+                          UserInfoSerializer, VideosSerializer)
+from .utils import (accessible_posts_by_user, assigned_nomination_post_ids, extract_tagged_users, get_absolute_url,
+                    get_current_month_end_date, get_date_range, get_job_families, get_user_name, notify_flagged_post,
+                    notify_new_comment, notify_new_post_poll_created, posts_not_shared_with_job_family,
+                    posts_not_shared_with_self_department, posts_not_visible_to_user, posts_shared_with_org_department,
+                    push_notification, since_last_appreciation, tag_users_to_comment, tag_users_to_post,
+                    user_can_delete, user_can_edit)
 
 CustomUser = import_string(settings.CUSTOM_USER_MODEL)
 DEPARTMENT_MODEL = import_string(settings.DEPARTMENT_MODEL)
@@ -78,6 +75,17 @@ class PostViewSet(viewsets.ModelViewSet):
 
         if not current_user.allow_user_post_feed:
             raise serializers.ValidationError(_('You are not allowed to create post.'))
+
+        orgs_id = ast.literal_eval(payload.get("organizations", "[]"))
+        deps_id = ast.literal_eval(payload.get("departments", "[]"))
+        if not current_user.is_superuser:
+            affiliated_orgs = Organization.objects.get_affiliated(current_user)
+            affiliated_orgs_id = affiliated_orgs.values_list('id', flat=True).distinct()
+            if orgs_id and not all(org in affiliated_orgs_id for org in orgs_id):
+                raise serializers.ValidationError(_('You are not allowed for selected organization.'))
+            affiliated_deps_id = affiliated_orgs.values_list('departments', flat=True).distinct()
+            if deps_id and not all(dep in affiliated_deps_id for dep in deps_id):
+                raise serializers.ValidationError(_('You are not allowed for selected department.'))
 
         data = {}
         for key, value in payload.items():
@@ -803,7 +811,8 @@ class VideosView(views.APIView):
 
 
 class CommentViewset(viewsets.ModelViewSet):
-    permission_classes = (IsOptionsOrAuthenticated,)
+    permission_classes = (CommentPermission,)
+    http_method_names = ['patch', 'delete', 'options', 'post']
 
     def get_serializer(self, *args, **kwargs):
         if "pk" in self.kwargs:
@@ -828,6 +837,8 @@ class CommentViewset(viewsets.ModelViewSet):
                                          is_appreciation_post(post_id) if post_id else False)
 
         result = Comment.objects.filter(post__in=posts, mark_delete=False)
+        if self.request.method != "POST" and not self.request.user.is_staff:
+            result = result.filter(created_by=user)
         return result
 
     @detail_route(methods=["POST"], permission_classes=(IsOptionsOrAuthenticated,))
@@ -836,12 +847,7 @@ class CommentViewset(viewsets.ModelViewSet):
         comment_id = self.kwargs.get("pk", None)
         if not comment_id:
             raise ValidationError(_('Comment ID is required'))
-        post_id = self.get_post_id_from_comment(self.kwargs.get("pk", 0))
-        organization = user.organization
-        posts = accessible_posts_by_user(
-            user, organization, False, is_appreciation_post(post_id) if post_id else False, post_id)
-        accessible_comments = Comment.objects.filter(post__in=posts) \
-            .values_list('id', flat=True)
+        accessible_comments = self.get_queryset().values_list('id', flat=True)
 
         comment_id = int(comment_id)
         if comment_id not in accessible_comments:
@@ -887,6 +893,7 @@ class CommentViewset(viewsets.ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
+        self.check_object_permissions(request, instance)
         user = request.user
         if not user_can_delete(user, instance):
             raise serializers.ValidationError(_("You do not have permission to delete"))
@@ -922,13 +929,13 @@ def search_user(request):
 class ECardCategoryViewSet(viewsets.ModelViewSet):
     queryset = ECardCategory.objects.none()
     serializer_class = ECardCategorySerializer
-    permission_classes = [IsOptionsOrAuthenticated, ]
+    permission_classes = [IsOptionsOrStaffOrReadOnly, IsOptionsOrEcardEnabled]
 
     def get_queryset(self):
         user = self.request.user
         query = Q(organization=user.organization) | Q(organization__isnull=True)
         if self.request.query_params.get('admin_function'):
-            query =  Q(organization=user.organization)
+            query = Q(organization=user.organization)
         queryset = ECardCategory.objects.filter(query)
         queryset = queryset.annotate(custom_order=Case(When(organization=user.organization, then=0),
                                      default=1, output_field=IntegerField())).order_by('custom_order')
@@ -938,13 +945,13 @@ class ECardCategoryViewSet(viewsets.ModelViewSet):
 class ECardViewSet(viewsets.ModelViewSet):
     queryset = ECard.objects.none()
     serializer_class = ECardSerializer
-    permission_classes = [IsOptionsOrAuthenticated, ]
+    permission_classes = [IsOptionsOrStaffOrReadOnly, IsOptionsOrEcardEnabled]
 
     def get_queryset(self):
         user = self.request.user
         query = Q(category__organization=user.organization) | Q(category__organization__isnull=True)
         if self.request.query_params.get('admin_function'):
-            query =  Q(category__organization=user.organization)
+            query = Q(category__organization=user.organization)
         queryset = ECard.objects.filter(query)
         queryset = queryset.annotate(custom_order=Case(When(category__organization=user.organization, then=0),
                                      default=1, output_field=IntegerField())).order_by('custom_order')
@@ -983,6 +990,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
     serializer_class = PostFeedSerializer
     filter_backends = (filters.DjangoFilterBackend,)
     pagination_class = FeedsResultsSetPagination
+    http_method_names = ['get', 'options', 'head']
 
     @staticmethod
     def get_filtered_feeds_according_to_shared_with(feeds, user, post_polls):
@@ -1200,7 +1208,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         serializer = PostFeedSerializer(page, context={"request": request}, many=True)
         feeds = self.get_paginated_response(serializer.data)
         user_appreciation = posts.filter(post_type=POST_TYPE.USER_CREATED_APPRECIATION,
-                                                created_by=request.user).first()
+                                         created_by=request.user).first()
         if user_appreciation:
             days_passed = since_last_appreciation(user_appreciation.created_on)
             if 3 <= days_passed <= 120:
