@@ -285,7 +285,7 @@ class CategoriesSerializer(serializers.ModelSerializer):
 
 
 class NominationsSerializer(DynamicFieldsModelSerializer):
-    category = CategoriesSerializer()
+    category_data = CategoriesSerializer(source="category")
     nomination_icon = serializers.SerializerMethodField()
     review_level = serializers.SerializerMethodField()
     nominator_name = serializers.SerializerMethodField()
@@ -303,6 +303,7 @@ class NominationsSerializer(DynamicFieldsModelSerializer):
         model = Nominations
         fields = ("id",
                   "category",
+                  "category_data",
                   "nomination_icon",
                   "review_level",
                   "nominator_name",
