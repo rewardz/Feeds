@@ -1329,7 +1329,7 @@ class InspireMeViewSet(viewsets.ModelViewSet):
 
     @list_route(methods=["POST"], permission_classes=(IsOptionsOrAuthenticated,))
     def amplify_core_value_recognition(self, request, *args, **kwargs):
-        response = InspireMe.amplify_core_value_recognition(request.data)
+        response = InspireMe.amplify_core_value_recognition(request.data, request.user)
 
         return Response(response, status=status.HTTP_200_OK)
 
