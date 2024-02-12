@@ -1316,7 +1316,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
                 Q(title__icontains=search) |
                 Q(description__icontains=search)
             )
-        page = self.paginate_queryset(feeds)
+        page = self.paginate_queryset(feeds.distinct())
         serializer = GreetingSerializer if greeting else OrganizationRecognitionSerializer
         serializer = serializer(page, context={"request": request}, many=True)
         return self.get_paginated_response(serializer.data)
