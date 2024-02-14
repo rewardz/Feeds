@@ -22,6 +22,7 @@ Organization = import_string(settings.ORGANIZATION_MODEL)
 UserModel = import_string(settings.CUSTOM_USER_MODEL)
 Question = import_string(settings.QUESTION_MODEL)
 Answer = import_string(settings.ANSWER_MODEL)
+NominationCategory = import_string(settings.NOMINATION_CATEGORY_MODEL)
 Nominations = import_string(settings.NOMINATIONS_MODEL)
 TrophyBadge = import_string(settings.TROPHY_BADGE_MODEL)
 UserStrength = import_string(settings.USER_STRENGTH_MODEL)
@@ -276,7 +277,15 @@ class QuestionSerializer(serializers.ModelSerializer):
         fields = ("pk", "question_lable", "question_type", "answer")
 
 
+class CategoriesSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = NominationCategory
+        fields = ("id", "name", "img", "is_group_nomination")
+
+
 class NominationsSerializer(DynamicFieldsModelSerializer):
+    category_data = CategoriesSerializer(source="category")
     nomination_icon = serializers.SerializerMethodField()
     review_level = serializers.SerializerMethodField()
     nominator_name = serializers.SerializerMethodField()
@@ -294,6 +303,7 @@ class NominationsSerializer(DynamicFieldsModelSerializer):
         model = Nominations
         fields = ("id",
                   "category",
+                  "category_data",
                   "nomination_icon",
                   "review_level",
                   "nominator_name",
