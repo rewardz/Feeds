@@ -701,8 +701,6 @@ class PostDetailSerializer(PostSerializer):
 
     def get_comments(self, instance):
         request = self.context.get('request')
-        if request.version > 12:
-            return
         serializer_context = {'request': request}
         post_id = instance.id
         comments = Comment.objects.filter(post=post_id).order_by('-created_on')[:20]
@@ -710,8 +708,6 @@ class PostDetailSerializer(PostSerializer):
             comments, many=True, read_only=True, context=serializer_context).data
 
     def get_appreciated_by(self, instance):
-        if self.context.get('request').version > 12:
-            return
         post_id = instance.id
         posts_liked = PostLiked.objects.filter(post_id=post_id).order_by('-created_on')
         return PostLikedSerializer(posts_liked, many=True, read_only=True).data
