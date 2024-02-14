@@ -525,9 +525,10 @@ class PostSerializer(DynamicFieldsModelSerializer):
 
     def to_representation(self, instance):
         representation = super(PostSerializer, self).to_representation(instance)
-        representation["created_on"] = get_user_localtime(instance.created_on, instance.user.organization.timezone)
+        user = self.context['request']
+        representation["created_on"] = get_user_localtime(instance.created_on, user.organization.timezone)
         representation["modified_on"] = get_user_localtime(
-            instance.modified_on, instance.user.organization.timezone) if instance.modified_on else None
+            instance.modified_on, user.organization.timezone) if instance.modified_on else None
         return representation
 
     def get_feed_type(self, instance):
@@ -607,7 +608,7 @@ class CommentsLikedSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         representation = super(CommentsLikedSerializer, self).to_representation(instance)
-        representation["created_on"] = get_user_localtime(instance.created_on, instance.user.organization.timezone)
+        representation["created_on"] = get_user_localtime(instance.created_on, instance.created_by.organization.timezone)
         return representation
 
 
@@ -833,9 +834,10 @@ class CommentSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         representation = super(CommentSerializer, self).to_representation(instance)
-        representation["created_on"] = get_user_localtime(instance.created_on, instance.user.organization.timezone)
+        request = self.context['request']
+        representation["created_on"] = get_user_localtime(instance.created_on, request.user.organization.timezone)
         representation["modified_on"] = get_user_localtime(
-            instance.modified_on, instance.user.organization.timezone) if instance.modified_on else None
+            instance.modified_on, request.user.organization.timezone) if instance.modified_on else None
         return representation
 
 
@@ -888,7 +890,7 @@ class PostLikedSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         representation = super(PostLikedSerializer, self).to_representation(instance)
-        representation["created_on"] = get_user_localtime(instance.created_on, instance.user.organization.timezone)
+        representation["created_on"] = get_user_localtime(instance.created_on, instance.created_by.organization.timezone)
         return representation
 
 
