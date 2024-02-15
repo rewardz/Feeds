@@ -353,7 +353,7 @@ class NominationsSerializer(DynamicFieldsModelSerializer):
     def get_nom_status(instance):
         if instance.nom_status == 4:
             return "Rejected"
-        elif instance.nom_status == 3:
+        elif instance.nom_status in [3, 6]:
             return "Approved"
         return "Pending"
 
