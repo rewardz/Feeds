@@ -311,9 +311,9 @@ def notify_new_post_poll_created(poll, is_post=False):
     notify_user_via_push_notification.delay(
         creator.id,
         message,
-        list(set(accessible_users.values_list('id', flat=True))),
-        object_type=object_type,
-        object_id=poll.id,
+        list({user.id for user in accessible_users}),
+        object_type,
+        poll.id,
         extra_context={"redirect_screen": "Poll"}
     )
 
