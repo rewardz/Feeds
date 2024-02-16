@@ -7,8 +7,7 @@ from django.utils.module_loading import import_string
 from celery import shared_task
 
 from feeds.models import Comment
-from feeds.utils import push_notification
-
+from .utils import push_notification
 
 check_org_email = import_string(settings.CHECK_ORG_EMAIL)
 PendingEmail = import_string(settings.PENDING_EMAIL)
