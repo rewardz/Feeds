@@ -15,7 +15,7 @@ from rest_framework import exceptions, serializers
 
 from .constants import POST_TYPE, SHARED_WITH
 from .models import Comment, Post
-from feeds.tasks import notify_user_via_email
+from feeds.tasks import notify_user_via_email, notify_user_via_push_notification
 
 
 DEPARTMENT_MODEL = import_string(settings.DEPARTMENT_MODEL)
@@ -307,10 +307,15 @@ def notify_new_post_poll_created(poll, is_post=False):
     user_name = get_user_name(creator)
     message = _("'%s' created a new post." % user_name) if is_post else _("'%s' started a new poll." % user_name)
     object_type = NOTIFICATION_OBJECT_TYPE
-    accessible_users = list(set(accessible_users))
-    for usr in accessible_users:
-        push_notification(creator, message, usr, object_type=object_type, object_id=poll.id,
-                          extra_context={"redirect_screen": "Poll"})
+
+    notify_user_via_push_notification.delay(
+        creator.id,
+        message,
+        list(set(accessible_users.values_list('id', flat=True))),
+        object_type=object_type,
+        object_id=poll.id,
+        extra_context={"redirect_screen": "Poll"}
+    )
 
 
 def notify_flagged_post(post, user, reason):
