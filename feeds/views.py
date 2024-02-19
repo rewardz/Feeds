@@ -1007,7 +1007,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             feeds = posts.filter(post_type__in=[POST_TYPE.USER_CREATED_APPRECIATION,
                                                 POST_TYPE.USER_CREATED_NOMINATION])
         filter_appreciations = self.filter_appreciations(feeds)
-        feeds = PostFilter(self.request.GET, queryset=feeds).qs
+        feeds = PostFilter(self.request.GET, queryset=feeds, user=user).qs
         feeds = (feeds | filter_appreciations).distinct()
 
         if feed_flag == "received":
