@@ -298,6 +298,7 @@ class NominationsSerializer(DynamicFieldsModelSerializer):
     nominees = UserInfoSerializer(many=True)
     nom_status = serializers.SerializerMethodField()
     nom_status_color = serializers.SerializerMethodField()
+    nom_status_approvals = serializers.SerializerMethodField()
 
     class Meta:
         model = Nominations
@@ -318,7 +319,8 @@ class NominationsSerializer(DynamicFieldsModelSerializer):
                   "message_to_reviewer",
                   "strength",
                   "nom_status",
-                  "nom_status_color")
+                  "nom_status_color",
+                  "nom_status_approvals")
 
     @staticmethod
     def get_review_level(instance):
@@ -355,11 +357,24 @@ class NominationsSerializer(DynamicFieldsModelSerializer):
             return "Rejected"
         elif instance.nom_status in [3, 6]:
             return "Approved"
-        return "Pending"
+        else:
+            return "Pending"
 
     @staticmethod
     def get_nom_status_color(instance):
         return NOMINATION_STATUS_COLOR_CODE.get(instance.nom_status)
+
+    def get_nom_status_approvals(self, instance):
+        user = self.context['request'].user
+        history = instance.histories.filter(reviewer=user).first()
+        if not history:
+            return ""
+        elif history.status == 4:
+            return "Rejected"
+        elif history.status in [3, 6]:
+            return "Approved"
+        else:
+            return "Pending"
 
 
 class PostSerializer(DynamicFieldsModelSerializer):
@@ -568,7 +583,9 @@ class PostSerializer(DynamicFieldsModelSerializer):
         return None
 
     def get_nomination(self, instance):
-        return NominationsSerializer(instance=instance.nomination, fields=self.context.get('nomination_fields')).data
+        return NominationsSerializer(instance=instance.nomination,
+            context={"request": self.context['request']},
+            fields=self.context.get('nomination_fields')).data
 
     def get_points(self, instance):
         return str(instance.points(self.context['request'].user))
