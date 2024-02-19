@@ -365,7 +365,7 @@ class NominationsSerializer(DynamicFieldsModelSerializer):
         return NOMINATION_STATUS_COLOR_CODE.get(instance.nom_status)
 
     def get_nom_status_approvals(self, instance):
-        user = self.context['request'].user
+        user = self.context.get("user", None)
         history = instance.histories.filter(reviewer=user).first()
         if not history:
             return ""
@@ -584,7 +584,7 @@ class PostSerializer(DynamicFieldsModelSerializer):
 
     def get_nomination(self, instance):
         return NominationsSerializer(instance=instance.nomination,
-            context={"request": self.context['request']},
+            context={"user": self.context['request'].user},
             fields=self.context.get('nomination_fields')).data
 
     def get_points(self, instance):
