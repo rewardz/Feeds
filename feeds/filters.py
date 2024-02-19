@@ -26,6 +26,10 @@ class PostFilterBase(django_filters.FilterSet):
         model = Post
         fields = ['post_type', 'organizations', 'shared_with']
 
+    def __init__(self, *args, **kwargs):
+        self.user = kwargs.pop('user') if 'user' in kwargs.keys() else None
+        super(PostFilterBase, self).__init__(*args, **kwargs)
+
     @staticmethod
     def job_family_filter(queryset, name, value):
         value = value.split(",")
@@ -66,12 +70,16 @@ class PostFilterBase(django_filters.FilterSet):
 
     def nom_status_approvals_filter(self, queryset, name, value):
         if value == "pending":
-            queryset = queryset.exclude(
-                nomination__histories__status__in=[NOMINATION_STATUS.approved, NOMINATION_STATUS.rejected])
+            queryset = queryset.filter(
+                Q(nomination__assigned_reviewer=self.user) | Q(nomination__alternate_reviewer=self.user))
         elif value == "approved":
-            queryset = queryset.filter(nomination__histories__status=NOMINATION_STATUS.approved)
+            queryset = queryset.filter(
+                nomination__histories__reviewer=self.user,
+                nomination__histories__status=NOMINATION_STATUS.approved)
         elif value == "rejected":
-            queryset = queryset.filter(nomination__histories__status=NOMINATION_STATUS.rejected)
+            queryset = queryset.filter(
+                nomination__histories__reviewer=self.user,
+                nomination__histories__status=NOMINATION_STATUS.rejected)
         return queryset
 
 
