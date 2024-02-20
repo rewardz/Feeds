@@ -8,11 +8,11 @@ from celery import shared_task
 
 from feeds.models import Comment
 
-
 check_org_email = import_string(settings.CHECK_ORG_EMAIL)
 PendingEmail = import_string(settings.PENDING_EMAIL)
 EMAIL_TYPE = import_string(settings.EMAIL_TYPE)
 TEMPLATE_MODEL = import_string(settings.TEMPLATE_MODEL)
+CustomUser = import_string(settings.CUSTOM_USER_MODEL)
 
 
 logger = logging.getLogger(__name__)
@@ -53,3 +53,14 @@ def notify_user_via_email(self, comment_id):
         body=email_body,
         email_type=EMAIL_TYPE.html
     )
+
+
+@shared_task(bind=True)
+def notify_user_via_push_notification(self, creator_id, message, user_ids, object_type, poll_id, extra_context):
+    from feeds.utils import push_notification
+
+    creator = CustomUser.objects.get(id=creator_id)
+    accessible_users = CustomUser.objects.filter(id__in=user_ids)
+    for usr in accessible_users:
+        push_notification(creator, message, usr, object_type=object_type, object_id=poll_id,
+                          extra_context=extra_context)
