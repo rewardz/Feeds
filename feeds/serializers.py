@@ -366,12 +366,13 @@ class NominationsSerializer(DynamicFieldsModelSerializer):
 
     def get_nom_status_approvals(self, instance):
         user = self.context.get("user", None)
-        history = instance.histories.filter(reviewer=user).first()
-        if not history:
+        if not user or not user.is_nomination_reviewer:
             return ""
-        elif history.status == 4:
+
+        history = instance.histories.filter(reviewer=user).first()
+        if history and history.status == 4:
             return "Rejected"
-        elif history.status in [3, 6]:
+        elif history and history.status in [3, 6]:
             return "Approved"
         else:
             return "Pending"
