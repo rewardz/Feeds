@@ -600,4 +600,4 @@ def get_job_families(user, shared_with, data):
 
 
 def get_user_localtime(date, org_timezone):
-    return timezone.localtime(date, pytz.timezone(org_timezone)).strftime("%Y-%m-%d %H:%M:%S")
+    return timezone.localtime(date, pytz.timezone(org_timezone)).strftime("%Y-%m-%d")
