@@ -264,56 +264,9 @@ def notify_new_comment(comment, creator):
 
 
 def notify_new_post_poll_created(poll, is_post=False):
-    creator = poll.created_by
-    if not creator.is_staff:
-        return
-    accessible_users = []
-    if poll.shared_with == SHARED_WITH.SELF_DEPARTMENT:
-        departments = creator.departments.all()
-        for dept in departments:
-            accessible_users.extend(list(dept.users.all()))
-
-    elif poll.shared_with == SHARED_WITH.ALL_DEPARTMENTS:
-        accessible_users.extend(list(creator.organization.users.all()))
-
-    elif poll.shared_with == SHARED_WITH.SELF_JOB_FAMILY:
-        try:
-            employee_id_store = EmployeeIDStore.objects.filter(
-                user__is_active=True, job_family=creator.employee_id_store.job_family, signed_up=True)
-            for emp_id_store in employee_id_store:
-                if emp_id_store.user in accessible_users:
-                    continue
-                accessible_users.append(emp_id_store.user)
-        except Exception:
-            # User does not have any job family No need to send notification
-            pass
-
-    elif poll.shared_with == SHARED_WITH.ORGANIZATION_DEPARTMENTS:
-        departments = poll.departments.all()
-        organizations = poll.organizations.all()
-        employee_ids_store = EmployeeIDStore.objects.filter(job_family__in=poll.job_families.all())
-        for department in departments:
-            accessible_users.extend(list(department.users.all()))
-
-        for organization in organizations:
-            accessible_users.extend(list(organization.users.all()))
-
-        for employee_id_store in employee_ids_store:
-            user = employee_id_store.user
-            if user and employee_id_store.signed_up and user not in accessible_users:
-                accessible_users.append(user)
-
-    user_name = get_user_name(creator)
-    message = _("'%s' created a new post." % user_name) if is_post else _("'%s' started a new poll." % user_name)
-    object_type = NOTIFICATION_OBJECT_TYPE
-
     notify_user_via_push_notification.delay(
-        creator.id,
-        message,
-        list({user.id for user in accessible_users}),
-        object_type,
-        poll.id,
-        extra_context={"redirect_screen": "Poll"}
+        poll_id=poll.id,
+        is_post=is_post
     )
 
 
