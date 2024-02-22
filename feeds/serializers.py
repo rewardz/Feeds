@@ -22,6 +22,7 @@ Organization = import_string(settings.ORGANIZATION_MODEL)
 UserModel = import_string(settings.CUSTOM_USER_MODEL)
 Question = import_string(settings.QUESTION_MODEL)
 Answer = import_string(settings.ANSWER_MODEL)
+NominationCategory = import_string(settings.NOMINATION_CATEGORY_MODEL)
 Nominations = import_string(settings.NOMINATIONS_MODEL)
 TrophyBadge = import_string(settings.TROPHY_BADGE_MODEL)
 UserStrength = import_string(settings.USER_STRENGTH_MODEL)
@@ -276,7 +277,15 @@ class QuestionSerializer(serializers.ModelSerializer):
         fields = ("pk", "question_lable", "question_type", "answer")
 
 
+class CategoriesSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = NominationCategory
+        fields = ("id", "name", "img", "is_group_nomination")
+
+
 class NominationsSerializer(DynamicFieldsModelSerializer):
+    category_data = CategoriesSerializer(source="category")
     nomination_icon = serializers.SerializerMethodField()
     review_level = serializers.SerializerMethodField()
     nominator_name = serializers.SerializerMethodField()
@@ -289,11 +298,13 @@ class NominationsSerializer(DynamicFieldsModelSerializer):
     nominees = UserInfoSerializer(many=True)
     nom_status = serializers.SerializerMethodField()
     nom_status_color = serializers.SerializerMethodField()
+    nom_status_approvals = serializers.SerializerMethodField()
 
     class Meta:
         model = Nominations
         fields = ("id",
                   "category",
+                  "category_data",
                   "nomination_icon",
                   "review_level",
                   "nominator_name",
@@ -308,7 +319,8 @@ class NominationsSerializer(DynamicFieldsModelSerializer):
                   "message_to_reviewer",
                   "strength",
                   "nom_status",
-                  "nom_status_color")
+                  "nom_status_color",
+                  "nom_status_approvals")
 
     @staticmethod
     def get_review_level(instance):
@@ -343,9 +355,10 @@ class NominationsSerializer(DynamicFieldsModelSerializer):
     def get_nom_status(instance):
         if instance.nom_status == 4:
             return "Rejected"
-        elif instance.nom_status == 3:
+        elif instance.nom_status in [3, 6]:
             return "Approved"
-        return "Pending"
+        else:
+            return "Pending"
 
     @staticmethod
     def get_nom_status_color(instance):
@@ -355,6 +368,19 @@ class NominationsSerializer(DynamicFieldsModelSerializer):
         representation = super(NominationsSerializer, self).to_representation(instance)
         representation["created"] = get_user_localtime(instance.created, instance.nominator.organization.timezone)
         return representation
+
+    def get_nom_status_approvals(self, instance):
+        user = self.context.get("user", None)
+        if not user or not user.is_nomination_reviewer:
+            return ""
+
+        history = instance.histories.filter(reviewer=user).first()
+        if history and history.status == 4:
+            return "Rejected"
+        elif history and history.status in [3, 6]:
+            return "Approved"
+        else:
+            return "Pending"
 
 
 class PostSerializer(DynamicFieldsModelSerializer):
@@ -564,7 +590,9 @@ class PostSerializer(DynamicFieldsModelSerializer):
         return None
 
     def get_nomination(self, instance):
-        return NominationsSerializer(instance=instance.nomination, fields=self.context.get('nomination_fields')).data
+        return NominationsSerializer(instance=instance.nomination,
+            context={"user": self.context['request'].user},
+            fields=self.context.get('nomination_fields')).data
 
     def get_points(self, instance):
         return str(instance.points(self.context['request'].user))
@@ -697,8 +725,6 @@ class PostDetailSerializer(PostSerializer):
 
     def get_comments(self, instance):
         request = self.context.get('request')
-        if request.version > 12:
-            return
         serializer_context = {'request': request}
         post_id = instance.id
         comments = Comment.objects.filter(post=post_id).order_by('-created_on')[:20]
@@ -706,8 +732,6 @@ class PostDetailSerializer(PostSerializer):
             comments, many=True, read_only=True, context=serializer_context).data
 
     def get_appreciated_by(self, instance):
-        if self.context.get('request').version > 12:
-            return
         post_id = instance.id
         posts_liked = PostLiked.objects.filter(post_id=post_id).order_by('-created_on')
         return PostLikedSerializer(posts_liked, many=True, read_only=True).data

@@ -255,32 +255,6 @@ class PostViewSet(viewsets.ModelViewSet):
         self.perform_update(serializer)
         return Response(serializer.data)
 
-    def retrieve(self, request, *args, **kwargs):
-        instance = self.get_object()
-        serializer = self.get_serializer(instance)
-        data = serializer.data
-        if request.version > 12 and data["comments"] is None:
-            site_url = settings.SITE_URL
-            serializer = CommentSerializer(
-                self.paginate_queryset(
-                    Comment.objects.filter(post=instance.id, mark_delete=False).order_by('created_on')
-                ), many=True, read_only=True, context={"request": request}
-            )
-            data["comments"] = self.get_paginated_response(serializer.data).data
-            if data["comments"] and data["comments"].get("count") > len(data["comments"].get("results")):
-                data["comments"]["next"] = "{}feeds/api/posts/{}/comments/?page=2".format(site_url, instance.id)
-
-            serializer = PostLikedSerializer(
-                self.paginate_queryset(PostLiked.objects.filter(post_id=instance.id).order_by('-created_on')),
-                many=True, read_only=True)
-            data["appreciated_by"] = self.get_paginated_response(serializer.data).data
-            if data["appreciated_by"] and data["appreciated_by"].get("count") > len(
-                    data["appreciated_by"].get("results")):
-                data["appreciated_by"]["next"] = "{}feeds/api/posts/{}/post_appreciations/?page=2".format(site_url,
-                                                                                                          instance.id)
-
-        return Response(data)
-
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
         user = request.user
@@ -1033,7 +1007,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             feeds = posts.filter(post_type__in=[POST_TYPE.USER_CREATED_APPRECIATION,
                                                 POST_TYPE.USER_CREATED_NOMINATION])
         filter_appreciations = self.filter_appreciations(feeds)
-        feeds = PostFilter(self.request.GET, queryset=feeds).qs
+        feeds = PostFilter(self.request.GET, queryset=feeds, user=user).qs
         feeds = (feeds | filter_appreciations).distinct()
 
         if feed_flag == "received":
@@ -1081,7 +1055,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             Q(nomination__assigned_reviewer=user) | Q(nomination__alternate_reviewer=user),
             post_type=POST_TYPE.USER_CREATED_NOMINATION
         ).exclude(nomination__nom_status__in=[NOMINATION_STATUS.approved, NOMINATION_STATUS.rejected]).count()
-        if approvals_count > 0:
+        if approvals_count > 0 or user.is_nomination_reviewer:
             show_approvals = True
         if user.supervisor_remaining_budget is not None:
             supervisor_remaining_budget = str(user.supervisor_remaining_budget)
@@ -1211,7 +1185,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             Q(nomination__assigned_reviewer=user) | Q(nomination__alternate_reviewer=user),
             post_type=POST_TYPE.USER_CREATED_NOMINATION
         ).exclude(nomination__nom_status__in=[NOMINATION_STATUS.approved, NOMINATION_STATUS.rejected]).count()
-        if approvals_count > 0:
+        if approvals_count > 0 or user.is_nomination_reviewer:
             show_approvals = True
         feeds.data['approvals_count'] = approvals_count
         feeds.data['show_approvals'] = show_approvals
@@ -1316,7 +1290,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
                 Q(title__icontains=search) |
                 Q(description__icontains=search)
             )
-        page = self.paginate_queryset(feeds)
+        page = self.paginate_queryset(feeds.distinct())
         serializer = GreetingSerializer if greeting else OrganizationRecognitionSerializer
         serializer = serializer(page, context={"request": request}, many=True)
         return self.get_paginated_response(serializer.data)
