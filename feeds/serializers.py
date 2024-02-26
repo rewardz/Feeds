@@ -636,7 +636,8 @@ class CommentsLikedSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         representation = super(CommentsLikedSerializer, self).to_representation(instance)
-        representation["created_on"] = get_user_localtime(instance.created_on, instance.created_by.organization.timezone)
+        representation["created_on"] = get_user_localtime(instance.created_on,
+                                                          instance.created_by.organization.timezone)
         return representation
 
 
@@ -858,10 +859,17 @@ class CommentSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         representation = super(CommentSerializer, self).to_representation(instance)
-        request = self.context['request']
-        representation["created_on"] = get_user_localtime(instance.created_on, request.user.organization.timezone)
-        representation["modified_on"] = get_user_localtime(
-            instance.modified_on, request.user.organization.timezone) if instance.modified_on else None
+        request = self.context.get('request')
+        created_on = get_user_localtime(instance.created_on,
+                                        request.user.organization.timezone) if request else instance.created_on
+
+        if instance.modified_on:
+            modified_on = get_user_localtime(instance.modified_on,
+                                             request.user.organization.timezone) if request else instance.modified_on
+        else:
+            modified_on = None
+        representation["created_on"] = created_on
+        representation["modified_on"] = modified_on
         return representation
 
 
