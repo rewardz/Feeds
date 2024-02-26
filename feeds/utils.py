@@ -2,7 +2,6 @@ from __future__ import division, print_function, unicode_literals
 
 import json
 import re
-import pytz
 from django.conf import settings
 from django.db.models import Q
 from django.utils.translation import ugettext as _
@@ -602,7 +601,3 @@ def get_job_families(user, shared_with, data):
         job_families = json.loads(job_families)
 
     return validate_job_families(job_families, user.get_affiliated_orgs())
-
-
-def get_user_localtime(date, org_timezone):
-    return timezone.localtime(date, pytz.timezone(org_timezone)).strftime("%Y-%m-%d")
