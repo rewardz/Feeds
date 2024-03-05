@@ -1126,7 +1126,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             raise ValidationError(_('User does not exist'))
         transactions = queryset.values('id', 'transactions__context')
         posts = [transaction.get('id') for transaction in transactions if loads(
-            transaction.get('transactions__context')).get('strength_id') == strength_id]
+            transaction.get('transactions__context') or '{}').get('strength_id') == strength_id]
         queryset = queryset.filter(id__in=posts)
         serializer = PostFeedSerializer(queryset, many=True, context={"request": request}, fields=[
             "id", "ecard", "gif", "images", "description", "points", "images_with_ecard"])
@@ -1216,7 +1216,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         return PostFilterBase(self.request.GET, queryset=feeds.filter(id__in=[
             feed.get("id")
             for feed in feeds.values("transactions__context", "id")
-            if loads(feed.get("transactions__context", {})).get("strength_id") == strength_id
+            if loads(feed.get("transactions__context") or '{}').get("strength_id") == strength_id
         ])).qs
 
     def merge_querset(self, feeds, filter_appreciations):
