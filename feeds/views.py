@@ -1087,7 +1087,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
                 'transactions__context', 'transactions__creator')
 
             my_appreciations_user = [user_appreciation.get('transactions__creator') for user_appreciation in
-                                     user_appreciations if loads(user_appreciation.get('transactions__context')).get(
+                                     user_appreciations if loads(user_appreciation.get('transactions__context') or '{}').get(
                 'strength_id') == strength_id]
 
         if badge_id:
