@@ -63,13 +63,12 @@ def accessible_posts_by_user(user, organization, allow_feedback=False, appreciat
                     created_by__organization__in=user.get_affiliated_orgs(), mark_delete=False), Q.OR)
 
     # get the post belongs to organization
-    result = Post.objects.filter(query)
-
     # filter / exclude feedback based on the allow_feedback
     if not allow_feedback:
-        result = result.exclude(post_type=POST_TYPE.FEEDBACK_POST)
+        result = Post.objects.filter(query).exclude(post_type=POST_TYPE.FEEDBACK_POST)
     else:
-        result = result.filter(post_type=POST_TYPE.FEEDBACK_POST)
+        query.add(Q(post_type=POST_TYPE.FEEDBACK_POST), Q.AND)
+        result = Post.objects.filter(query)
 
     # possible that result might contains duplicate posts due to OR query
     # we can not apply distinct over here since order by is used at some places
@@ -96,11 +95,14 @@ def accessible_posts_by_user(user, organization, allow_feedback=False, appreciat
         # Added this condition because we are allowing admin to see the post if that post does not belongs
         # to his department then admin can access that post
         orgs = admin_orgs.values_list("id", flat=True) if allow_feedback else [user.organization_id]
-        if (
-                post_id not in post_ids
-                and Post.objects.filter(id=post_id, created_by__organization_id__in=orgs).exists()
-        ):
-            post_ids.append(post_id)
+        try:
+            if (
+                    post_id not in post_ids
+                    and Post.objects.get(id=post_id, created_by__organization_id__in=orgs)
+            ):
+                post_ids.append(post_id)
+        except Post.DoesNotExist:
+            pass
 
     return Post.objects.filter(id__in=post_ids, mark_delete=False)
 
@@ -601,3 +603,40 @@ def get_job_families(user, shared_with, data):
         job_families = json.loads(job_families)
 
     return validate_job_families(job_families, user.get_affiliated_orgs())
+
+
+def get_feed_type(post):
+    """
+    Returns the feed type as per FE
+    :params: post: Post
+    :returns: str
+    """
+    if post.post_type == POST_TYPE.USER_CREATED_NOMINATION:
+        return "nomination"
+    elif post.post_type == POST_TYPE.USER_CREATED_APPRECIATION:
+        return "appreciation"
+    return post.post_type
+
+
+def get_user_reaction_type(user, post):
+    """
+    Returns if the user reacted on the post
+    :params: post: Post
+    :params: user: CustomUser
+    :returns: int/None
+    """
+    post_like = post.postliked_set.filter(created_by=user).first()
+    if post_like:
+        return post_like.reaction_type
+    return None
+
+
+def get_related_objects_qs(feeds):
+    """Returns the all related objects in same QS to enhance the performance"""
+    from django.db.models import Count
+    return feeds.select_related(
+            "user", "transaction", "nomination", "greeting", "ecard", "modified_by", "created_by"
+        ).prefetch_related(
+            "organizations", "transactions", "cc_users", "departments", "job_families", "tagged_users", "tags",
+            "images_set", "documents_set", "postliked_set", "comment_set").annotate(
+            appreciation_count=Count("postliked"))
