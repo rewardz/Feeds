@@ -340,7 +340,7 @@ class PostViewSet(viewsets.ModelViewSet):
 
         result = (result | posts_shared_with_org_department(
             user, [POST_TYPE.USER_CREATED_POST, POST_TYPE.USER_CREATED_POLL],
-            result.values_list("id", flat=True))).distinct()
+            [])).distinct()
 
         result = PostFilter(self.request.GET, queryset=result).qs
         result = result.order_by('-priority', '-modified_on', '-created_on')
@@ -1278,7 +1278,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         if post_polls:
             feeds = (feeds | posts_shared_with_org_department(
                 user, [POST_TYPE.USER_CREATED_POST, POST_TYPE.USER_CREATED_POLL],
-                feeds.values_list("id", flat=True))).distinct()
+                []).distinct()
         if search:
             feeds = feeds.filter(
                 Q(user__first_name__icontains=search) |
