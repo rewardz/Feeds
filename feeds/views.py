@@ -902,7 +902,7 @@ class ECardCategoryViewSet(viewsets.ModelViewSet):
         user = self.request.user
         query = Q(organization=user.organization) | Q(organization__isnull=True)
         if self.request.query_params.get('admin_function'):
-            query =  Q(organization=user.organization)
+            query = Q(organization=user.organization)
         queryset = ECardCategory.objects.filter(query)
         queryset = queryset.annotate(custom_order=Case(When(organization=user.organization, then=0),
                                      default=1, output_field=IntegerField())).order_by('custom_order')
@@ -918,7 +918,7 @@ class ECardViewSet(viewsets.ModelViewSet):
         user = self.request.user
         query = Q(category__organization=user.organization) | Q(category__organization__isnull=True)
         if self.request.query_params.get('admin_function'):
-            query =  Q(category__organization=user.organization)
+            query = Q(category__organization=user.organization)
         queryset = ECard.objects.filter(query)
         queryset = queryset.annotate(custom_order=Case(When(category__organization=user.organization, then=0),
                                      default=1, output_field=IntegerField())).order_by('custom_order')
@@ -1174,7 +1174,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         serializer = PostFeedSerializer(page, context={"request": request}, many=True)
         feeds = self.get_paginated_response(serializer.data)
         user_appreciation = posts.filter(post_type=POST_TYPE.USER_CREATED_APPRECIATION,
-                                                created_by=request.user).first()
+                                         created_by=request.user).first()
         if user_appreciation:
             days_passed = since_last_appreciation(user_appreciation.created_on)
             if 3 <= days_passed <= 120:
@@ -1278,7 +1278,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         if post_polls:
             feeds = (feeds | posts_shared_with_org_department(
                 user, [POST_TYPE.USER_CREATED_POST, POST_TYPE.USER_CREATED_POLL],
-                []).distinct()
+                [])).distinct()
         if search:
             feeds = feeds.filter(
                 Q(user__first_name__icontains=search) |
