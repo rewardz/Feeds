@@ -2,14 +2,11 @@ from __future__ import division, print_function, unicode_literals
 
 from django.conf import settings
 from django.utils import six
-
-from rest_framework.response import Response
-from rest_framework.pagination import PageNumberPagination
 from rest_framework.compat import OrderedDict
 from rest_framework.exceptions import NotFound
-from rest_framework.utils.urls import (
-    replace_query_param, remove_query_param
-)
+from rest_framework.pagination import PageNumberPagination
+from rest_framework.response import Response
+from rest_framework.utils.urls import remove_query_param, replace_query_param
 
 
 class FeedsResultsSetPagination(PageNumberPagination):
@@ -29,6 +26,9 @@ class FeedsResultsSetPagination(PageNumberPagination):
         except AttributeError as ae:
             page_size = 20
         return page_size
+
+
+class UserFeedsResultsSetPagination(FeedsResultsSetPagination):
 
     def get_next_link(self):
         url = self.request.build_absolute_uri()

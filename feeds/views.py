@@ -21,7 +21,8 @@ from .models import (
     Comment, Documents, ECard, ECardCategory,
     Post, PostLiked, PollsAnswer, Images, CommentLiked,
 )
-from .paginator import FeedsResultsSetPagination, FeedsCommentsSetPagination
+from .paginator import (
+    FeedsResultsSetPagination, FeedsCommentsSetPagination, UserFeedsResultsSetPagination)
 from .permissions import IsOptionsOrAuthenticated
 from .serializers import (
     CommentDetailSerializer, CommentSerializer, CommentCreateSerializer,
@@ -956,7 +957,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
     permission_classes = (IsOptionsOrAuthenticated,)
     serializer_class = PostFeedSerializer
     filter_backends = (filters.DjangoFilterBackend,)
-    pagination_class = FeedsResultsSetPagination
+    pagination_class = UserFeedsResultsSetPagination
 
     @staticmethod
     def get_filtered_feeds_according_to_shared_with(feeds, user, post_polls):
