@@ -491,9 +491,7 @@ class PostSerializer(DynamicFieldsModelSerializer):
         return list(obj.tags.values_list("name", flat=True))
 
     def get_is_admin(self, instance):
-        request = self.context['request']
-        user = request.user
-        return user.is_staff
+        return self.context['request'].user.is_staff
 
     def get_job_families(self, instance):
         return instance.job_families.values_list("id", flat=True)
@@ -520,16 +518,13 @@ class PostSerializer(DynamicFieldsModelSerializer):
         return VideosSerializer(instance.videos_set, many=True).data
 
     def get_created_by_user_info(self, instance):
-        request = self.context.get('request')
-        return UserInfoSerializer(instance.created_by, context={'request': request}).data
+        return UserInfoSerializer(instance.created_by, context={'request': self.context.get('request')}).data
 
     def get_is_owner(self, instance):
         return instance.created_by == self.context['request'].user
 
     def get_has_appreciated(self, instance):
-        request = self.context['request']
-        user = request.user
-        return instance.postliked_set.filter(created_by=user).exists()
+        return instance.postliked_set.filter(created_by=self.context['request'].user).exists()
 
     @staticmethod
     def get_appreciation_count(instance):
@@ -551,8 +546,7 @@ class PostSerializer(DynamicFieldsModelSerializer):
 
     @staticmethod
     def get_modified_on(instance):
-        modified_on = instance.modified_on
-        if modified_on:
+        if instance.modified_on:
             return instance.modified_on.strftime("%Y-%m-%d")
 
     @staticmethod
@@ -1033,8 +1027,7 @@ class OrganizationRecognitionSerializer(GreetingSerializerBase):
 
     @staticmethod
     def get_modified_on(instance):
-        modified_on = instance.modified_on
-        if modified_on:
+        if instance.modified_on:
             return instance.modified_on.strftime("%Y-%m-%d")
 
     @staticmethod
