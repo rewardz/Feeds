@@ -32,13 +32,11 @@ class FeedsResultsSetPagination(PageNumberPagination):
 
     def get_next_link(self):
         url = self.request.build_absolute_uri()
-        current_page_number = int(self.request.query_params.get(self.page_query_param, 1))
-        page_number = current_page_number + 1
+        page_number = self.current_page_number + 1
         return replace_query_param(url, self.page_query_param, page_number)
 
     def get_previous_link(self):
-        current_page_number = int(self.request.query_params.get(self.page_query_param, 1))
-        page_number = current_page_number - 1
+        page_number = self.current_page_number - 1
         if page_number == 0:
             return None
         url = self.request.build_absolute_uri()
@@ -47,6 +45,20 @@ class FeedsResultsSetPagination(PageNumberPagination):
         return replace_query_param(url, self.page_query_param, page_number)
 
     def get_paginated_response(self, data):
+        if len(data) == 0:
+            if self.current_page_number == 1:
+                return Response(OrderedDict([
+                    ('count', 0),
+                    ('next', None),
+                    ('previous', None),
+                    ('results', [])
+                ]))
+            else:
+                msg = self.invalid_page_message.format(
+                    page_number=self.current_page_number, message="Empty page"
+                )
+                raise NotFound(msg)
+
         return Response(OrderedDict([
             ('count', 1000),  # hard coded for now cause Android need it to be greater than 0 when not empty
             ('next', self.get_next_link()),
@@ -66,6 +78,7 @@ class FeedsResultsSetPagination(PageNumberPagination):
 
         try:
             page_number = int(request.query_params.get(self.page_query_param, 1))
+            self.current_page_number = page_number
         except ValueError as exc:
             msg = self.invalid_page_message.format(
                 page_number=page_number, message=six.text_type(exc)
@@ -73,12 +86,6 @@ class FeedsResultsSetPagination(PageNumberPagination):
             raise NotFound(msg)
 
         result = queryset[page_size * (page_number - 1):page_size * page_number]
-
-        if len(result) == 0:
-            msg = self.invalid_page_message.format(
-                page_number=page_number, message="Empty page"
-            )
-            raise NotFound(msg)
 
         self.request = request
         return list(result)
