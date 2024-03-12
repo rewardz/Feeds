@@ -28,7 +28,7 @@ class FeedsResultsSetPagination(PageNumberPagination):
         return page_size
 
 
-class UserFeedsResultsSetPagination(FeedsResultsSetPagination):
+class OrganizationRecognitionsPagination(FeedsResultsSetPagination):
 
     def get_next_link(self):
         url = self.request.build_absolute_uri()

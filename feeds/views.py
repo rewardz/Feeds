@@ -22,7 +22,7 @@ from .models import (
     Post, PostLiked, PollsAnswer, Images, CommentLiked,
 )
 from .paginator import (
-    FeedsResultsSetPagination, FeedsCommentsSetPagination, UserFeedsResultsSetPagination)
+    FeedsResultsSetPagination, FeedsCommentsSetPagination, OrganizationRecognitionsPagination)
 from .permissions import IsOptionsOrAuthenticated
 from .serializers import (
     CommentDetailSerializer, CommentSerializer, CommentCreateSerializer,
@@ -957,7 +957,23 @@ class UserFeedViewSet(viewsets.ModelViewSet):
     permission_classes = (IsOptionsOrAuthenticated,)
     serializer_class = PostFeedSerializer
     filter_backends = (filters.DjangoFilterBackend,)
-    pagination_class = UserFeedsResultsSetPagination
+    pagination_class = FeedsResultsSetPagination
+
+    @property
+    def paginator(self):
+        """The paginator instance associated with the view, or `None`."""
+        pagination_class = self.get_pagination_class()
+        if not hasattr(self, '_paginator'):
+            if pagination_class is None:
+                self._paginator = None
+            else:
+                self._paginator = pagination_class()
+        return self._paginator
+
+    def get_pagination_class(self):
+        if "organization_recognitions" in self.request.path:
+            return OrganizationRecognitionsPagination
+        return self.pagination_class
 
     @staticmethod
     def get_filtered_feeds_according_to_shared_with(feeds, user, post_polls):
