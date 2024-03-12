@@ -48,6 +48,7 @@ class FeedsResultsSetPagination(PageNumberPagination):
 
     def get_paginated_response(self, data):
         return Response(OrderedDict([
+            ('count', 1000),  # hard coded for now cause Android need it to be greater than 0 when not empty
             ('next', self.get_next_link()),
             ('previous', self.get_previous_link()),
             ('results', data)
