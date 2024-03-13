@@ -95,6 +95,8 @@ def accessible_posts_by_user(
             title__isnull=True
         )
 
+    post_query = post_query & Q(mark_delete=False)
+
     # get the post belongs to organization
     # filter / exclude feedback based on the allow_feedback
     if not allow_feedback:
