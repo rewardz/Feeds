@@ -62,7 +62,11 @@ def is_appreciation_post(post_id):
     """
     Returns True if post is user created appreciation
     """
-    return Post.objects.filter(post_type=POST_TYPE.USER_CREATED_APPRECIATION, id=post_id).exists()
+    try:
+        Post.objects.get(post_type=POST_TYPE.USER_CREATED_APPRECIATION, id=post_id)
+        return True
+    except Post.DoesNotExist:
+        return False
 
 
 class PostViewSet(viewsets.ModelViewSet):
@@ -302,16 +306,20 @@ class PostViewSet(viewsets.ModelViewSet):
         user = self.request.user
         org = user.organization
         query = Q(mark_delete=False, post_type=POST_TYPE.USER_CREATED_POST)
+        result = None
         if created_by == "user_org":
             query.add(Q(organizations=org, created_by__organization=org), query.connector)
         elif created_by == "user_dept":
             departments = user.departments.all()
             query.add(Q(departments__in=departments, created_by__departments__in=departments), query.connector)
         else:
-            if allow_feedback and user.is_staff:
+            if user.is_staff:
                 org = list(user.child_organizations.values_list("id", flat=True))
+
             result = accessible_posts_by_user(user, org, allow_feedback=allow_feedback,
-                                              appreciations=is_appreciation_post(post_id) if post_id else False)
+                                              appreciations=is_appreciation_post(post_id) if post_id else False,
+                                              post_id=None, departments=user.cached_departments,
+                                              version=int(self.request.version))
 
         if created_by in ("user_org", "user_dept"):
             if user.is_staff:
@@ -321,26 +329,15 @@ class PostViewSet(viewsets.ModelViewSet):
                 )
             result = Post.objects.filter(query)
 
-        if not post_id:
-            # For list api excluded personal greeting message (events.api.EventViewSet.message)
-            result = result.exclude(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting")
-
-        if int(self.request.version) < 12 and not post_id:
-            # For list api below version 12 we are excluding system created greeting post
-            result = result.exclude(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post")
-
-        posts_ids_to_exclude = list(posts_not_shared_with_self_department(result, user).values_list("id", flat=True))
-        posts_ids_to_exclude.extend(list(posts_not_shared_with_job_family(result, user).values_list("id", flat=True)))
-        posts_ids_not_to_exclude = assigned_nomination_post_ids(user)
-        posts_ids_to_exclude = list(set(posts_ids_to_exclude) - set(posts_ids_not_to_exclude))
-
-        result = result.exclude(id__in=posts_ids_to_exclude)
-
-        result = result | posts_shared_with_org_department(
-            user, [POST_TYPE.USER_CREATED_POST, POST_TYPE.USER_CREATED_POLL],
-            result.values_list("id", flat=True))
-
-        result = PostFilter(self.request.GET, queryset=result).qs
+        # posts_ids_not_to_exclude = assigned_nomination_post_ids(user)
+        #
+        # result = result.exclude(id__in=posts_ids_to_exclude)
+        #
+        # result = result | posts_shared_with_org_department(
+        #     user, [POST_TYPE.USER_CREATED_POST, POST_TYPE.USER_CREATED_POLL],
+        #     result.values_list("id", flat=True))
+        #
+        # result = PostFilter(self.request.GET, queryset=result).qs
         result = get_related_objects_qs(result).distinct().order_by(
             '-priority', '-modified_on', '-created_on')
 

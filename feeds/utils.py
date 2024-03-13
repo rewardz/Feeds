@@ -34,33 +34,40 @@ UserJobFamily = import_string(settings.USER_JOB_FAMILY)
 EmployeeIDStore = import_string(settings.EMPLOYEE_ID_STORE)
 
 
-def accessible_posts_by_user(user, organization, allow_feedback=False, appreciations=False, post_id=None):
+def accessible_posts_by_user(user, organization, allow_feedback=False, appreciations=False, post_id=None,
+                             departments=None, version=None):
     if not isinstance(organization, (list, tuple)):
         organization = [organization]
 
     # get the departments to which this user belongs
-    user_depts = getattr(user, USER_DEPARTMENT_RELATED_NAME).all()
+    user_depts = departments or getattr(user, USER_DEPARTMENT_RELATED_NAME).all()
     post_query = (
             Q(organizations__in=organization) |
             Q(departments__in=user_depts) |
             Q(shared_with=SHARED_WITH.ALL_DEPARTMENTS, created_by__organization__in=organization) |
             Q(shared_with=SHARED_WITH.SELF_DEPARTMENT, created_by__departments__in=user.departments.all()) |
-            Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS, job_families__in=user.job_families)
+            Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS, job_families__in=user.job_families) |
+            Q(shared_with=SHARED_WITH.SELF_JOB_FAMILY, created_by__employee_id_store__job_family=user.job_family)
     )
 
     if user.is_staff:
-        admin_orgs = user.child_organizations
         admin_query = (
-            Q(created_by__organization__in=admin_orgs,
+            Q(created_by__organization__in=organization,
               post_type__in=[POST_TYPE.USER_CREATED_POST, POST_TYPE.USER_CREATED_POLL, POST_TYPE.FEEDBACK_POST])
         )
         post_query = post_query | admin_query
 
-    query = Q(mark_delete=False) & post_query | Q(mark_delete=False, created_by=user)
+    query = Q(mark_delete=False) & post_query | Q(created_by=user) | Q(user=user) | Q(cc_users__in=[user])
 
     if appreciations:
         query.add(Q(post_type=POST_TYPE.USER_CREATED_APPRECIATION,
                     created_by__organization__in=user.get_affiliated_orgs(), mark_delete=False), Q.OR)
+
+    if not post_id:
+        query = query & ~Q(
+            post_type=POST_TYPE.GREETING_MESSAGE, title__in=["greeting", "greeting_post" if version < 12 else None]
+        )
+
 
     # get the post belongs to organization
     # filter / exclude feedback based on the allow_feedback
