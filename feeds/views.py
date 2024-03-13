@@ -302,7 +302,6 @@ class PostViewSet(viewsets.ModelViewSet):
         feedback = self.request.query_params.get('feedback', None)
         created_by = self.request.query_params.get('created_by', None)
         post_id = self.kwargs.get("pk", None)
-        allow_feedback = feedback is not None and feedback == "true"
         user = self.request.user
         org = user.organization
         query = Q(mark_delete=False, post_type=POST_TYPE.USER_CREATED_POST)
@@ -310,29 +309,25 @@ class PostViewSet(viewsets.ModelViewSet):
         if created_by == "user_org":
             query.add(Q(organizations=org, created_by__organization=org), query.connector)
         elif created_by == "user_dept":
-            departments = user.departments.all()
+            departments = user.cached_departments
             query.add(Q(departments__in=departments, created_by__departments__in=departments), query.connector)
         else:
-            if user.is_staff:
-                org = list(user.child_organizations.values_list("id", flat=True))
+            result = accessible_posts_by_user(
+                user, org, allow_feedback=feedback is not None and feedback == "true",
+                appreciations=is_appreciation_post(post_id) if post_id else False,
+                post_id=None, departments=user.cached_departments, version=int(self.request.version)
+            )
 
-            result = accessible_posts_by_user(user, org, allow_feedback=allow_feedback,
-                                              appreciations=is_appreciation_post(post_id) if post_id else False,
-                                              post_id=None, departments=user.cached_departments,
-                                              version=int(self.request.version))
-
-        if created_by in ("user_org", "user_dept"):
+        if not result:
             if user.is_staff:
-                query.add(Q(
-                    mark_delete=False,
-                    post_type=POST_TYPE.USER_CREATED_POST, created_by__organizations__in=user.child_organizations), Q.OR
-                )
-            result = Post.objects.filter(query)
+                query.add(
+                    Q(mark_delete=False,
+                      post_type=POST_TYPE.USER_CREATED_POST, created_by__organizations__in=user.child_organizations),
+                    Q.OR)
+            result = get_related_objects_qs(Post.objects.filter(query)).order_by(
+                '-priority', '-modified_on', '-created_on')
 
         result = PostFilter(self.request.GET, queryset=result).qs
-        result = get_related_objects_qs(result).distinct().order_by(
-            '-priority', '-modified_on', '-created_on')
-
         return result
 
     @list_route(methods=["POST"], permission_classes=(IsOptionsOrAuthenticated,))
