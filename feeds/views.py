@@ -21,7 +21,8 @@ from .models import (
     Comment, Documents, ECard, ECardCategory,
     Post, PostLiked, PollsAnswer, Images, CommentLiked,
 )
-from .paginator import FeedsResultsSetPagination, FeedsCommentsSetPagination
+from .paginator import (
+    FeedsResultsSetPagination, FeedsCommentsSetPagination, OrganizationRecognitionsPagination)
 from .permissions import IsOptionsOrAuthenticated
 from .serializers import (
     CommentDetailSerializer, CommentSerializer, CommentCreateSerializer,
@@ -340,7 +341,7 @@ class PostViewSet(viewsets.ModelViewSet):
 
         result = (result | posts_shared_with_org_department(
             user, [POST_TYPE.USER_CREATED_POST, POST_TYPE.USER_CREATED_POLL],
-            result.values_list("id", flat=True))).distinct()
+            [])).distinct()
 
         result = PostFilter(self.request.GET, queryset=result).qs
         result = result.order_by('-priority', '-modified_on', '-created_on')
@@ -902,7 +903,7 @@ class ECardCategoryViewSet(viewsets.ModelViewSet):
         user = self.request.user
         query = Q(organization=user.organization) | Q(organization__isnull=True)
         if self.request.query_params.get('admin_function'):
-            query =  Q(organization=user.organization)
+            query = Q(organization=user.organization)
         queryset = ECardCategory.objects.filter(query)
         queryset = queryset.annotate(custom_order=Case(When(organization=user.organization, then=0),
                                      default=1, output_field=IntegerField())).order_by('custom_order')
@@ -918,7 +919,7 @@ class ECardViewSet(viewsets.ModelViewSet):
         user = self.request.user
         query = Q(category__organization=user.organization) | Q(category__organization__isnull=True)
         if self.request.query_params.get('admin_function'):
-            query =  Q(category__organization=user.organization)
+            query = Q(category__organization=user.organization)
         queryset = ECard.objects.filter(query)
         queryset = queryset.annotate(custom_order=Case(When(category__organization=user.organization, then=0),
                                      default=1, output_field=IntegerField())).order_by('custom_order')
@@ -957,6 +958,22 @@ class UserFeedViewSet(viewsets.ModelViewSet):
     serializer_class = PostFeedSerializer
     filter_backends = (filters.DjangoFilterBackend,)
     pagination_class = FeedsResultsSetPagination
+
+    @property
+    def paginator(self):
+        """The paginator instance associated with the view, or `None`."""
+        pagination_class = self.get_pagination_class()
+        if not hasattr(self, '_paginator'):
+            if pagination_class is None:
+                self._paginator = None
+            else:
+                self._paginator = pagination_class()
+        return self._paginator
+
+    def get_pagination_class(self):
+        if "organization_recognitions" in self.request.path:
+            return OrganizationRecognitionsPagination
+        return self.pagination_class
 
     @staticmethod
     def get_filtered_feeds_according_to_shared_with(feeds, user, post_polls):
@@ -1174,7 +1191,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         serializer = PostFeedSerializer(page, context={"request": request}, many=True)
         feeds = self.get_paginated_response(serializer.data)
         user_appreciation = posts.filter(post_type=POST_TYPE.USER_CREATED_APPRECIATION,
-                                                created_by=request.user).first()
+                                         created_by=request.user).first()
         if user_appreciation:
             days_passed = since_last_appreciation(user_appreciation.created_on)
             if 3 <= days_passed <= 120:
@@ -1278,7 +1295,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         if post_polls:
             feeds = (feeds | posts_shared_with_org_department(
                 user, [POST_TYPE.USER_CREATED_POST, POST_TYPE.USER_CREATED_POLL],
-                feeds.values_list("id", flat=True))).distinct()
+                [])).distinct()
         if search:
             feeds = feeds.filter(
                 Q(user__first_name__icontains=search) |
