@@ -329,15 +329,7 @@ class PostViewSet(viewsets.ModelViewSet):
                 )
             result = Post.objects.filter(query)
 
-        # posts_ids_not_to_exclude = assigned_nomination_post_ids(user)
-        #
-        # result = result.exclude(id__in=posts_ids_to_exclude)
-        #
-        # result = result | posts_shared_with_org_department(
-        #     user, [POST_TYPE.USER_CREATED_POST, POST_TYPE.USER_CREATED_POLL],
-        #     result.values_list("id", flat=True))
-        #
-        # result = PostFilter(self.request.GET, queryset=result).qs
+        result = PostFilter(self.request.GET, queryset=result).qs
         result = get_related_objects_qs(result).distinct().order_by(
             '-priority', '-modified_on', '-created_on')
 

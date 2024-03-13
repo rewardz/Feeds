@@ -47,7 +47,14 @@ def accessible_posts_by_user(user, organization, allow_feedback=False, appreciat
             Q(shared_with=SHARED_WITH.ALL_DEPARTMENTS, created_by__organization__in=organization) |
             Q(shared_with=SHARED_WITH.SELF_DEPARTMENT, created_by__departments__in=user.departments.all()) |
             Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS, job_families__in=user.job_families) |
-            Q(shared_with=SHARED_WITH.SELF_JOB_FAMILY, created_by__employee_id_store__job_family=user.job_family)
+            Q(shared_with=SHARED_WITH.SELF_JOB_FAMILY, created_by__employee_id_store__job_family=user.job_family) |
+            Q(nomination__assigned_reviewer=user) | Q(nomination__alternate_reviewer=user) |
+            Q(nomination__histories__reviewer=user) |
+            ((
+                    Q(created_by=user) | Q(departments__in=[user.department] | Q(job_families__in=user.job_families))
+            ) &
+             Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS,
+               post_type__in=[POST_TYPE.USER_CREATED_POST, POST_TYPE.USER_CREATED_POLL]))
     )
 
     if user.is_staff:
@@ -55,7 +62,8 @@ def accessible_posts_by_user(user, organization, allow_feedback=False, appreciat
             Q(created_by__organization__in=organization,
               post_type__in=[POST_TYPE.USER_CREATED_POST, POST_TYPE.USER_CREATED_POLL, POST_TYPE.FEEDBACK_POST])
         )
-        post_query = post_query | admin_query
+        post_query = post_query | admin_query | Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS,
+                                                  created_by__organization__in=user.child_organizations)
 
     query = Q(mark_delete=False) & post_query | Q(created_by=user) | Q(user=user) | Q(cc_users__in=[user])
 
