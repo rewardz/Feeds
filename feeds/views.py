@@ -318,7 +318,7 @@ class PostViewSet(viewsets.ModelViewSet):
                 post_id=None, departments=user.cached_departments, version=int(self.request.version)
             )
 
-        if not result:
+        if created_by in ("user_org", "user_dept"):
             if user.is_staff:
                 query.add(
                     Q(mark_delete=False,
