@@ -75,14 +75,24 @@ def accessible_posts_by_user(
     )
 
     if user.is_staff:
-        admin_query = Q(
-            created_by__organization__in=organization,
-            post_type__in=[POST_TYPE.USER_CREATED_POST, POST_TYPE.USER_CREATED_POLL, POST_TYPE.FEEDBACK_POST]
+        child_orgs = user.child_organizations
+        admin_query = (
+            Q(created_by__organization__in=organization,
+              post_type__in=[POST_TYPE.USER_CREATED_POST, POST_TYPE.USER_CREATED_POLL, POST_TYPE.FEEDBACK_POST]) |
+            # If the post is shared with self department and admin's department is another than creators department
+            # then post org will be None, so we have to allow that post to admin
+            Q(organizations=None, shared_with=SHARED_WITH.SELF_DEPARTMENT) |
+            # Admin can see custom post of its child organizations
+            Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS, created_by__organization__in=child_orgs)
         )
-        post_query = post_query | admin_query | Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS,
-                                                  created_by__organization__in=user.child_organizations)
-
-    # query = Q(mark_delete=False) & post_query
+        if post_id:
+            # Added this condition because we are allowing admin to see the post if that post does not belongs
+            # to his department then admin can access that post
+            admin_query = (
+                admin_query |
+                Q(id=post_id, created_by__organization_id__in=child_orgs if allow_feedback else [user.organization_id])
+            )
+        post_query = post_query | admin_query
 
     if appreciations:
         post_query = post_query | Q(
@@ -95,7 +105,7 @@ def accessible_posts_by_user(
             title__isnull=True
         )
 
-    post_query = post_query & Q(mark_delete=False)
+    post_query = (post_query | nomination_query) & Q(mark_delete=False)
 
     # get the post belongs to organization
     # filter / exclude feedback based on the allow_feedback
@@ -104,41 +114,7 @@ def accessible_posts_by_user(
     else:
         result = get_related_objects_qs(Post.objects.filter(post_query, post_type=POST_TYPE.FEEDBACK_POST))
 
-    # possible that result might contains duplicate posts due to OR query
-    # we can not apply distinct over here since order by is used at some places
-    # after calling this method
-    if not user.is_staff:
-        return result
-    post_ids = list(set(result.values_list("id", flat=True)))
-
-    # If the post is shared with self department and admin's department is another than creators department
-    # then post org will be None, so we have to allow that post to admin
-
-    post_query = Q(organizations=None, shared_with=SHARED_WITH.SELF_DEPARTMENT)
-    if user.is_staff:
-        post_query = post_query & admin_query
-    else:
-        post_query = post_query & Q(created_by__organization=user.organization)
-
-    posts = Post.objects.filter(post_query).exclude(id__in=post_ids).values_list("id", flat=True)
-
-    if posts:
-        post_ids.extend(list(posts))
-
-    if post_id:
-        # Added this condition because we are allowing admin to see the post if that post does not belongs
-        # to his department then admin can access that post
-        orgs = admin_orgs.values_list("id", flat=True) if allow_feedback else [user.organization_id]
-        try:
-            if (
-                    post_id not in post_ids
-                    and Post.objects.get(id=post_id, created_by__organization_id__in=orgs)
-            ):
-                post_ids.append(post_id)
-        except Post.DoesNotExist:
-            pass
-
-    return Post.objects.filter(id__in=post_ids, mark_delete=False)
+    return result
 
 
 def validate_priority(data):
