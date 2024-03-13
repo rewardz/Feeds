@@ -51,8 +51,8 @@ def accessible_posts_by_user(user, organization, allow_feedback=False, appreciat
             Q(nomination__assigned_reviewer=user) | Q(nomination__alternate_reviewer=user) |
             Q(nomination__histories__reviewer=user) |
             ((
-                    Q(created_by=user) | Q(departments__in=[user.department] | Q(job_families__in=user.job_families))
-            ) &
+                    Q(created_by=user) | Q(departments__in=[user.department]) | Q(job_families__in=user.job_families))
+             &
              Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS,
                post_type__in=[POST_TYPE.USER_CREATED_POST, POST_TYPE.USER_CREATED_POLL]))
     )
