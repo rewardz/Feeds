@@ -35,9 +35,8 @@ from .utils import (
     accessible_posts_by_user, extract_tagged_users, get_user_name, notify_new_comment,
     notify_new_post_poll_created, notify_flagged_post, push_notification, tag_users_to_comment,
     tag_users_to_post, user_can_delete, user_can_edit, get_date_range, since_last_appreciation,
-    get_current_month_end_date, get_absolute_url, posts_not_visible_to_user, assigned_nomination_post_ids,
-    posts_not_shared_with_self_department, posts_shared_with_org_department, posts_not_shared_with_job_family,
-    get_job_families, get_related_objects_qs,
+    get_current_month_end_date, get_absolute_url, posts_not_visible_to_user,
+    posts_shared_with_org_department, get_job_families, get_related_objects_qs,
 )
 
 CustomUser = import_string(settings.CUSTOM_USER_MODEL)
@@ -1268,14 +1267,12 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             if self.request.GET.get("user_strength", 0):
                 filter_appreciations = self.filter_appreciations(feeds)
 
-        feeds = get_related_objects_qs(feeds)
-
         feeds = PostFilter(self.request.GET, queryset=feeds).qs
         search = self.request.query_params.get("search", None)
         if filter_appreciations.exists():
             feeds = (feeds | filter_appreciations).distinct()
-        feeds = self.get_filtered_feeds_according_to_shared_with(
-            feeds=feeds, user=user, post_polls=post_polls).order_by('-priority', '-created_on')
+        # feeds = self.get_filtered_feeds_according_to_shared_with(
+        #     feeds=feeds, user=user, post_polls=post_polls).order_by('-priority', '-created_on')
         if post_polls:
             feeds = (feeds | posts_shared_with_org_department(
                 user, [POST_TYPE.USER_CREATED_POST, POST_TYPE.USER_CREATED_POLL],
