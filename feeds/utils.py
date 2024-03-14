@@ -117,6 +117,14 @@ def accessible_posts_by_user(
     if user.is_staff:
         post_query = post_query | (
                 admin_query & Q(organizations=None, shared_with=SHARED_WITH.SELF_DEPARTMENT, mark_delete=False))
+
+        if post_id:
+            post_query = post_query | Q(id=post_id, created_by__organization_id__in=admin_orgs, mark_delete=False)
+
+    if appreciations:
+        post_query.add(Q(post_type=POST_TYPE.USER_CREATED_APPRECIATION,
+                         created_by__organization__in=user.get_affiliated_orgs(), mark_delete=False), Q.OR)
+
     result = get_related_objects_qs(Post.objects.filter(post_query).exclude(exclude_query or Q(id=None)).distinct())
     return result
 
