@@ -111,7 +111,7 @@ def posts_shared_with_org_department_query(user, admin_orgs):
 
 def accessible_posts_by_user(
         user, organization, allow_feedback=False, appreciations=False, post_id=None,
-        departments=None, version=None, org_reco=False
+        departments=None, version=None, org_reco=False, feeds_api=False
 ):
     if not isinstance(organization, (list, tuple)):
         organization = [organization]
@@ -138,7 +138,7 @@ def accessible_posts_by_user(
     feedback_query = Q(post_type=POST_TYPE.FEEDBACK_POST)
     post_query = post_query & (feedback_query if allow_feedback else ~feedback_query)
 
-    if not post_id:
+    if feeds_api and not post_id:
         # For list api excluded personal greeting message (events.api.EventViewSet.message)
         post_query = post_query & ~Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting")
 

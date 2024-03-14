@@ -314,7 +314,8 @@ class PostViewSet(viewsets.ModelViewSet):
             result = accessible_posts_by_user(
                 user, org, allow_feedback=feedback is not None and feedback == "true",
                 appreciations=is_appreciation_post(post_id) if post_id else False,
-                post_id=None, departments=user.cached_departments, version=int(self.request.version)
+                post_id=None, departments=user.cached_departments, version=int(self.request.version), org_reco=False,
+                feeds_api=True
             )
 
         if created_by in ("user_org", "user_dept"):
@@ -1229,7 +1230,8 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         organizations = user.organization
         filter_appreciations = Post.objects.none()
         posts = accessible_posts_by_user(
-            user, organizations, False, False if post_polls else True, None, None, request.version
+            user, organizations, False, False if post_polls else True, None, None, request.version,
+            True, False
         )
         if post_polls:
             query_post = Q(post_type=POST_TYPE.USER_CREATED_POST)
@@ -1267,7 +1269,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             if self.request.GET.get("user_strength", 0):
                 filter_appreciations = self.filter_appreciations(feeds)
 
-        feeds = PostFilter(self.request.GET, queryset=feeds).qs
+        # feeds = PostFilter(self.request.GET, queryset=feeds).qs
         search = self.request.query_params.get("search", None)
         if filter_appreciations.exists():
             feeds = (feeds | filter_appreciations).distinct()
