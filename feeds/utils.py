@@ -63,13 +63,33 @@ def accessible_posts_by_user(
             # For list api below version 12 we are excluding system created greeting post
             post_query = post_query & ~Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post")
 
+    exclude_query = (
+        Q(shared_with=SHARED_WITH.SELF_DEPARTMENT) & ~Q(created_by__departments__in=user.departments.all()) &
+        ~Q(user=user) & ~Q(cc_users__in=[user])
+    )
+    if not user.is_staff:
+        if user.job_family:
+            exclude_query = exclude_query | (
+                Q(shared_with=SHARED_WITH.SELF_JOB_FAMILY) &
+                ~Q(created_by__employee_id_store__job_family=user.employee_id_store.job_family)
+            )
+        else:
+            exclude_query | Q(shared_with=SHARED_WITH.SELF_JOB_FAMILY)
 
+    post_query = (post_query | ((Q(created_by=user) | Q(departments__in=[user.department]) |
+                                       Q(job_families__in=user.job_families)) &
+                                      Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS, post_type__in=[
+                                          POST_TYPE.USER_CREATED_POST, POST_TYPE.USER_CREATED_POLL]))
+                     )
 
+    nomination_query = (
+                               Q(nomination__assigned_reviewer=user) | Q(nomination__alternate_reviewer=user) |
+                               Q(nomination__histories__reviewer=user)
+                       ) & Q(post_type=POST_TYPE.USER_CREATED_NOMINATION, mark_delete=False)
 
+    post_query = post_query | nomination_query
     # Making query here only
-    result = get_related_objects_qs(Post.objects.filter(post_query))
-
-
+    result = get_related_objects_qs(Post.objects.filter(post_query).exclude(exclude_query).distinct())
     return result
 
 
