@@ -860,12 +860,16 @@ class CommentSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         representation = super(CommentSerializer, self).to_representation(instance)
         request = self.context.get('request')
+        if request:
+            user = request.user
+        else:
+            user = instance.created_by
         created_on = get_user_localtime(instance.created_on,
-                                        request.user.organization.timezone) if request else instance.created_on
+                                        user.organization.timezone) if user else instance.created_on
 
         if instance.modified_on:
             modified_on = get_user_localtime(instance.modified_on,
-                                             request.user.organization.timezone) if request else instance.modified_on
+                                             user.organization.timezone) if user else instance.modified_on
         else:
             modified_on = None
         representation["created_on"] = created_on
