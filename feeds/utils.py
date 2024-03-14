@@ -34,6 +34,43 @@ UserJobFamily = import_string(settings.USER_JOB_FAMILY)
 EmployeeIDStore = import_string(settings.EMPLOYEE_ID_STORE)
 
 
+def posts_not_shared_with_self_department_query(user):
+    if user.is_staff:
+        return None
+    return (
+        Q(shared_with=SHARED_WITH.SELF_DEPARTMENT) & ~Q(created_by__departments__in=user.departments.all()) &
+        ~Q(user=user) & ~Q(cc_users__in=[user])
+    )
+
+
+def posts_not_shared_with_job_family_query(user):
+    if user.job_family:
+        return (
+                Q(shared_with=SHARED_WITH.SELF_JOB_FAMILY) &
+                ~Q(created_by__employee_id_store__job_family=user.employee_id_store.job_family)
+        )
+    else:
+        return Q(shared_with=SHARED_WITH.SELF_JOB_FAMILY)
+
+
+def get_exclusion_query(user):
+    exclude_query = posts_not_shared_with_self_department_query(user)
+    if not exclude_query:
+        return
+    return exclude_query | posts_not_shared_with_job_family_query(user)
+
+
+def get_nomination_query(user):
+    return (Q(nomination__assigned_reviewer=user) | Q(nomination__alternate_reviewer=user) |
+            Q(nomination__histories__reviewer=user)) & Q(post_type=POST_TYPE.USER_CREATED_NOMINATION, mark_delete=False)
+
+
+def posts_shared_with_org_department_query(user):
+    return ((Q(created_by=user) | Q(departments__in=[user.department]) | Q(job_families__in=user.job_families)) &
+            Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS,
+              post_type__in=[POST_TYPE.USER_CREATED_POST, POST_TYPE.USER_CREATED_POLL]))
+
+
 def accessible_posts_by_user(
         user, organization, allow_feedback=False, appreciations=False, post_id=None,
         departments=None, version=None
@@ -63,33 +100,11 @@ def accessible_posts_by_user(
             # For list api below version 12 we are excluding system created greeting post
             post_query = post_query & ~Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post")
 
-    exclude_query = (
-        Q(shared_with=SHARED_WITH.SELF_DEPARTMENT) & ~Q(created_by__departments__in=user.departments.all()) &
-        ~Q(user=user) & ~Q(cc_users__in=[user])
-    )
-    if not user.is_staff:
-        if user.job_family:
-            exclude_query = exclude_query | (
-                Q(shared_with=SHARED_WITH.SELF_JOB_FAMILY) &
-                ~Q(created_by__employee_id_store__job_family=user.employee_id_store.job_family)
-            )
-        else:
-            exclude_query | Q(shared_with=SHARED_WITH.SELF_JOB_FAMILY)
+    exclude_query = get_exclusion_query(user)
+    post_query = post_query | posts_shared_with_org_department_query(user) | get_nomination_query(user)
 
-    post_query = (post_query | ((Q(created_by=user) | Q(departments__in=[user.department]) |
-                                       Q(job_families__in=user.job_families)) &
-                                      Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS, post_type__in=[
-                                          POST_TYPE.USER_CREATED_POST, POST_TYPE.USER_CREATED_POLL]))
-                     )
-
-    nomination_query = (
-                               Q(nomination__assigned_reviewer=user) | Q(nomination__alternate_reviewer=user) |
-                               Q(nomination__histories__reviewer=user)
-                       ) & Q(post_type=POST_TYPE.USER_CREATED_NOMINATION, mark_delete=False)
-
-    post_query = post_query | nomination_query
     # Making query here only
-    result = get_related_objects_qs(Post.objects.filter(post_query).exclude(exclude_query).distinct())
+    result = get_related_objects_qs(Post.objects.filter(post_query).exclude(exclude_query or Q(id=None)).distinct())
     return result
 
 
