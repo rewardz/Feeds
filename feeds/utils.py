@@ -111,7 +111,7 @@ def posts_shared_with_org_department_query(user, admin_orgs):
 
 def accessible_posts_by_user(
         user, organization, allow_feedback=False, appreciations=False, post_id=None,
-        departments=None, version=None, org_reco=False, feeds_api=False
+        departments=None, version=None, org_reco=False, feeds_api=False, post_polls=False
 ):
     if not isinstance(organization, (list, tuple)):
         organization = [organization]
@@ -147,7 +147,9 @@ def accessible_posts_by_user(
             post_query = post_query & ~Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post")
 
     exclude_query = get_exclusion_query(user, org_reco, admin_orgs, departments)
-    post_query = post_query | posts_shared_with_org_department_query(user, admin_orgs) | get_nomination_query(user)
+    post_query = post_query | get_nomination_query(user)
+    if post_polls:
+        post_query = posts_shared_with_org_department_query(user, admin_orgs) | post_query
 
     # Making query here only
     if user.is_staff:
