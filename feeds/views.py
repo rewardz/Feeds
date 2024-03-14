@@ -317,6 +317,7 @@ class PostViewSet(viewsets.ModelViewSet):
                 appreciations=is_appreciation_post(post_id) if post_id else False,
                 post_id=None, departments=user.cached_departments, version=int(self.request.version)
             )
+            print(result.count())
 
         if created_by in ("user_org", "user_dept"):
             if user.is_staff:

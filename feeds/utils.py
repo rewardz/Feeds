@@ -44,75 +44,31 @@ def accessible_posts_by_user(
     # get the departments to which this user belongs
     user_depts = departments or getattr(user, USER_DEPARTMENT_RELATED_NAME).all()
     job_family = user.job_family
-    nomination_query = (
-            Q(nomination__assigned_reviewer=user) | Q(nomination__alternate_reviewer=user) |
-            Q(nomination__histories__reviewer=user)
-    )
-
     post_query = (
-
-        # Post-creator /receiver / cc user can see the post and if user's department, organization, job family belongs
-        # to post, then user can see the post
-        Q(created_by=user) | Q(user=user) | Q(cc_users__in=[user]) | Q(organizations__in=organization) |
-        Q(departments__in=user_depts) | Q(job_families__in=[job_family], job_families__isnull=True) |
-
-        # Public Post means anybody across user's ORG can see the post
-        Q(shared_with=SHARED_WITH.ALL_DEPARTMENTS, organizations__in=organization) |
+        Q(organizations__in=organization) |
+        Q(departments__in=user_depts) |
         Q(shared_with=SHARED_WITH.ALL_DEPARTMENTS, created_by__organization__in=organization) |
-
-        # Teams Post means anybody across user's DEPT can see the post
         Q(shared_with=SHARED_WITH.SELF_DEPARTMENT, created_by__departments__in=user_depts) |
-        Q(shared_with=SHARED_WITH.SELF_DEPARTMENT, departments__in=user_depts) |
-
-        # Job family Post means anybody across user's DEPT can see the post
-        Q(shared_with=SHARED_WITH.SELF_JOB_FAMILY, created_by__employee_id_store__job_family=job_family) |
-
-        # Custom Post means selected ORG and Department and JOB Families in the post and user belongs to one of them
-        # can see the post
-        Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS, organizations__in=organization) |
-        Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS, departments__in=user_depts) |
-        Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS, job_families__in=[job_family], job_families__isnull=True)
+        Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS, job_families__in=[job_family], job_families__isnull=False)
     )
-
-    if user.is_staff:
-        child_orgs = user.child_organizations
-        admin_query = (
-            Q(created_by__organization__in=organization,
-              post_type__in=[POST_TYPE.USER_CREATED_POST, POST_TYPE.USER_CREATED_POLL, POST_TYPE.FEEDBACK_POST]) |
-            # If the post is shared with self department and admin's department is another than creators department
-            # then post org will be None, so we have to allow that post to admin
-            Q(organizations=None, shared_with=SHARED_WITH.SELF_DEPARTMENT) |
-            # Admin can see custom post of its child organizations
-            Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS, created_by__organization__in=child_orgs)
-        )
-        if post_id:
-            # Added this condition because we are allowing admin to see the post if that post does not belongs
-            # to his department then admin can access that post
-            admin_query = (
-                admin_query |
-                Q(id=post_id, created_by__organization_id__in=child_orgs if allow_feedback else [user.organization_id])
-            )
-        post_query = post_query | admin_query
-
-    if appreciations:
-        post_query = post_query | Q(
-            post_type=POST_TYPE.USER_CREATED_APPRECIATION, created_by__organization__in=user.get_affiliated_orgs()
-        )
+    post_query = Q(mark_delete=False) & post_query | Q(mark_delete=False, created_by=user)
+    feedback_query = Q(post_type=POST_TYPE.FEEDBACK_POST)
+    post_query = post_query & (feedback_query if allow_feedback else ~feedback_query)
 
     if not post_id:
-        post_query = post_query & ~Q(
-            post_type=POST_TYPE.GREETING_MESSAGE, title__in=["greeting", "greeting_post" if version < 12 else None],
-            title__isnull=True
-        )
+        # For list api excluded personal greeting message (events.api.EventViewSet.message)
+        post_query = post_query & ~Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting")
 
-    post_query = (post_query | nomination_query) & Q(mark_delete=False)
+        if int(version) < 12:
+            # For list api below version 12 we are excluding system created greeting post
+            post_query = post_query & ~Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post")
 
-    # get the post belongs to organization
-    # filter / exclude feedback based on the allow_feedback
-    if not allow_feedback:
-        result = get_related_objects_qs(Post.objects.filter(post_query).exclude(post_type=POST_TYPE.FEEDBACK_POST))
-    else:
-        result = get_related_objects_qs(Post.objects.filter(post_query, post_type=POST_TYPE.FEEDBACK_POST))
+
+
+
+    # Making query here only
+    result = get_related_objects_qs(Post.objects.filter(post_query))
+
 
     return result
 
@@ -643,10 +599,8 @@ def get_user_reaction_type(user, post):
 
 def get_related_objects_qs(feeds):
     """Returns the all related objects in same QS to enhance the performance"""
-    from django.db.models import Count
     return feeds.select_related(
             "user", "transaction", "nomination", "greeting", "ecard", "modified_by", "created_by"
         ).prefetch_related(
             "organizations", "transactions", "cc_users", "departments", "job_families", "tagged_users", "tags",
-            "images_set", "documents_set", "postliked_set", "comment_set").annotate(
-            appreciation_count=Count("postliked"))
+            "images_set", "documents_set", "postliked_set", "comment_set")
