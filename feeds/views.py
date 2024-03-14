@@ -1320,30 +1320,30 @@ class InspireMeViewSet(viewsets.ModelViewSet):
 
     @list_route(methods=["POST"], permission_classes=(IsOptionsOrAuthenticated,))
     def amplify_core_value_recognition(self, request, *args, **kwargs):
-        response = InspireMe.amplify_core_value_recognition(request.data)
+        response = InspireMe.amplify_core_value_recognition(request)
 
         return Response(response, status=status.HTTP_200_OK)
 
     @list_route(methods=["POST"], permission_classes=(IsOptionsOrAuthenticated,))
     def edit_tone(self, request, *args, **kwargs):
-        response = InspireMe.edit_tone(request.data)
+        response = InspireMe.edit_tone(request)
 
         return Response(response, status=status.HTTP_200_OK)
 
     @list_route(methods=["POST"], permission_classes=(IsOptionsOrAuthenticated,))
     def amplify_content_post(self, request, *args, **kwargs):
-        response = InspireMe.amplify_content_post(request.data)
+        response = InspireMe.amplify_content_post(request)
 
         return Response(response, status=status.HTTP_200_OK)
 
     @list_route(methods=["POST"], permission_classes=(IsOptionsOrAuthenticated,))
     def amplify_content_poll(self, request, *args, **kwargs):
-        response = InspireMe.amplify_content_poll(request.data)
+        response = InspireMe.amplify_content_poll(request)
 
         return Response(response, status=status.HTTP_200_OK)
 
     @list_route(methods=["POST"], permission_classes=(IsOptionsOrAuthenticated,))
     def proof_read_content(self, request, *args, **kwargs):
-        response = InspireMe.proof_read_content(request.data)
+        response = InspireMe.proof_read_content(request)
 
         return Response(response, status=status.HTTP_200_OK)
