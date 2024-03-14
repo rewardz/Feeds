@@ -115,8 +115,10 @@ def accessible_posts_by_user(
 
     # Making query here only
     if user.is_staff:
-        post_query = post_query | (Q(organizations=None, shared_with=SHARED_WITH.SELF_DEPARTMENT, created_by__organization__in=admin_orgs))
-    result = get_related_objects_qs(Post.objects.filter(post_query).exclude(exclude_query or Q(id=None)).distinct())
+        post_query = post_query | (
+                admin_query & Q(organizations=None, shared_with=SHARED_WITH.SELF_DEPARTMENT))
+    result = get_related_objects_qs(
+        Post.objects.filter(post_query, mark_delete=False).exclude(exclude_query or Q(id=None)).distinct())
     return result
 
 
