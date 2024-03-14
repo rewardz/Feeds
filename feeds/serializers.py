@@ -1032,7 +1032,7 @@ class OrganizationRecognitionSerializer(GreetingSerializerBase):
 
     @staticmethod
     def get_appreciation_count(instance):
-        return instance.appreciation_count
+        return instance.postliked_set.count()
 
     def get_poll_info(self, instance):
         return get_poll_info(instance, self.context.get('request'))
@@ -1052,7 +1052,7 @@ class OrganizationRecognitionSerializer(GreetingSerializerBase):
 
     @staticmethod
     def get_reaction_type(instance):
-        if instance.appreciation_count > 0:
+        if instance.postliked_set.count() > 0:
             return instance.postliked_set.values('reaction_type').annotate(
                 reaction_count=Count('reaction_type')).order_by('-reaction_count')[:2]
         return list()

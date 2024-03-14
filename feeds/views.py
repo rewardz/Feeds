@@ -317,7 +317,6 @@ class PostViewSet(viewsets.ModelViewSet):
                 appreciations=is_appreciation_post(post_id) if post_id else False,
                 post_id=None, departments=user.cached_departments, version=int(self.request.version)
             )
-            print(result.count())
 
         if created_by in ("user_org", "user_dept"):
             if user.is_staff:
@@ -407,7 +406,7 @@ class PostViewSet(viewsets.ModelViewSet):
             if allow_feedback and user.is_staff else user.organization
         )
         accessible_posts_queryset = accessible_posts_by_user(
-            user, org, allow_feedback, is_appreciation_post(post_id), post_id
+            user, org, allow_feedback, is_appreciation_post(post_id), post_id, None, request.version
         ).values_list('id', flat=True)
         accessible_posts = accessible_posts_queryset.values_list('id', flat=True)
         if post_id not in accessible_posts:
@@ -494,7 +493,7 @@ class PostViewSet(viewsets.ModelViewSet):
             raise ValidationError(_('Post ID required to appreciate a post'))
         post_id = int(post_id)
         accessible_posts = accessible_posts_by_user(
-            user, user.organization, False, is_appreciation_post(post_id), post_id
+            user, user.organization, False, is_appreciation_post(post_id), post_id, None, request.version
         ).values_list('id', flat=True)
         if post_id not in accessible_posts:
             raise ValidationError(_('You do not have access to this post'))
@@ -549,8 +548,9 @@ class PostViewSet(viewsets.ModelViewSet):
         if not post_id:
             raise ValidationError(_('Post ID required to appreciate a post'))
         post_id = int(post_id)
-        accessible_posts = accessible_posts_by_user(user, organization, False, False, post_id). \
-            values_list('id', flat=True)
+        accessible_posts = accessible_posts_by_user(
+            user, organization, False, False, post_id, None, request.version
+        ).values_list('id', flat=True)
         if post_id not in accessible_posts:
             raise ValidationError(_('You do not have access to this post'))
         posts_liked = PostLiked.objects.filter(post_id=post_id)
@@ -570,7 +570,9 @@ class PostViewSet(viewsets.ModelViewSet):
         if not post_id:
             raise ValidationError(_('Post ID required to retrieve all the related answers'))
         post_id = int(post_id)
-        accessible_posts = accessible_posts_by_user(user, organization, False, False, post_id).values_list('id', flat=True)
+        accessible_posts = accessible_posts_by_user(
+            user, organization, False, False, post_id, None, request.version
+        ).values_list('id', flat=True)
         accessible_polls = accessible_posts.filter(post_type=POST_TYPE.USER_CREATED_POLL)
         if post_id not in accessible_polls:
             raise ValidationError(_('This is not a poll.'))
@@ -601,7 +603,9 @@ class PostViewSet(viewsets.ModelViewSet):
         if not post_id:
             raise ValidationError(_('Post ID required to vote'))
         post_id = int(post_id)
-        accessible_posts = accessible_posts_by_user(user, organization, False, False, post_id).values_list('id', flat=True)
+        accessible_posts = accessible_posts_by_user(
+            user, organization, False, False, post_id, None, request.version
+        ).values_list('id', flat=True)
         if post_id not in accessible_posts:
             raise ValidationError(_('You do not have access'))
         accessible_polls = accessible_posts.filter(
@@ -630,7 +634,7 @@ class PostViewSet(viewsets.ModelViewSet):
         payload = self.request.data
         data = {k: v for k, v in payload.items()}
         accessible_posts = accessible_posts_by_user(
-            user, user.organization, False, is_appreciation_post(post_id), post_id
+            user, user.organization, False, is_appreciation_post(post_id), post_id, None, request.version
         ).values_list('id', flat=True)
         if post_id not in accessible_posts:
             raise ValidationError(_('You do not have access'))
@@ -656,7 +660,8 @@ class PostViewSet(viewsets.ModelViewSet):
         if not post_id:
             raise ValidationError(_('Post ID required to set priority'))
         post_id = int(post_id)
-        accessible_posts = accessible_posts_by_user(user, organization, False, False, post_id).values_list('id', flat=True)
+        accessible_posts = accessible_posts_by_user(
+            user, organization, False, False, post_id, None, request.version).values_list('id', flat=True)
         if post_id not in accessible_posts:
             raise ValidationError(_('You do not have access'))
         try:
@@ -783,8 +788,10 @@ class CommentViewset(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         post_id = self.get_post_id_from_comment(self.kwargs.get("pk", 0))
-        posts = accessible_posts_by_user(user, user.organization, False,
-                                         is_appreciation_post(post_id) if post_id else False)
+        posts = accessible_posts_by_user(
+            user, user.organization, False,
+            is_appreciation_post(post_id) if post_id else False, None, None, self.request.version
+        )
 
         result = Comment.objects.filter(post__in=posts, mark_delete=False)
         return result
@@ -798,7 +805,8 @@ class CommentViewset(viewsets.ModelViewSet):
         post_id = self.get_post_id_from_comment(self.kwargs.get("pk", 0))
         organization = user.organization
         posts = accessible_posts_by_user(
-            user, organization, False, is_appreciation_post(post_id) if post_id else False, post_id)
+            user, organization, False, is_appreciation_post(post_id) if post_id else False, post_id, None,
+            request.version)
         accessible_comments = Comment.objects.filter(post__in=posts) \
             .values_list('id', flat=True)
 
@@ -981,7 +989,9 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         )
 
         organization = user.organization
-        posts = accessible_posts_by_user(user, organization, False, feed_flag != "post_polls")
+        posts = accessible_posts_by_user(
+            user, organization, False, feed_flag != "post_polls", None, None, self.request.version
+        )
         if feed_flag == "post_polls":
             feeds = posts.filter(post_type__in=[POST_TYPE.USER_CREATED_POST,
                                                 POST_TYPE.USER_CREATED_POLL], created_by=user)
@@ -1035,7 +1045,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         requested_user = self.request.user
         user = self.get_user_by_id(user_id, requested_user) if user_id else requested_user
         organization = user.organization
-        posts = accessible_posts_by_user(user, organization)
+        posts = accessible_posts_by_user(user, organization, False, False, None, None, request.version)
         approvals_count = posts.filter(
             Q(nomination__assigned_reviewer=user) | Q(nomination__alternate_reviewer=user),
             post_type=POST_TYPE.USER_CREATED_NOMINATION
@@ -1066,7 +1076,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             except ValueError:
                 raise ValidationError(_('strength should be numeric value.'))
 
-            posts = accessible_posts_by_user(user, organization, False, True, None)
+            posts = accessible_posts_by_user(user, organization, False, True, None, None, request.version)
             user_appreciations = posts.filter(
                 user=user, post_type=POST_TYPE.USER_CREATED_APPRECIATION).values(
                 'transactions__context', 'transactions__creator')
@@ -1150,7 +1160,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         show_cheer_msg, show_approvals = False, False
         user = self.request.user
         organization = user.organization
-        posts = accessible_posts_by_user(user, organization)
+        posts = accessible_posts_by_user(user, organization, False, False, None, None, request.version)
         feeds = posts.filter(post_type=POST_TYPE.USER_CREATED_APPRECIATION, user=request.user).distinct()
         # returns latest 5 appreciations from last 30 days
         start_date, end_date = get_date_range(30)
@@ -1219,7 +1229,9 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         user_id = request.query_params.get("user", None)
         organizations = user.organization
         filter_appreciations = Post.objects.none()
-        posts = accessible_posts_by_user(user, organizations, False, False if post_polls else True)
+        posts = accessible_posts_by_user(
+            user, organizations, False, False if post_polls else True, None, None, request.version
+        )
         if post_polls:
             query_post = Q(post_type=POST_TYPE.USER_CREATED_POST)
             query_poll = Q(post_type=POST_TYPE.USER_CREATED_POLL)
