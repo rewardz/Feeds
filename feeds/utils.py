@@ -55,7 +55,7 @@ def posts_not_shared_with_job_family_query(user):
 
 def get_exclusion_query(user):
     exclude_query = posts_not_shared_with_self_department_query(user)
-    if not exclude_query:
+    if exclude_query is None:
         return
     return exclude_query | posts_not_shared_with_job_family_query(user)
 
@@ -65,7 +65,9 @@ def get_nomination_query(user):
             Q(nomination__histories__reviewer=user)) & Q(post_type=POST_TYPE.USER_CREATED_NOMINATION, mark_delete=False)
 
 
-def posts_shared_with_org_department_query(user):
+def posts_shared_with_org_department_query(user, admin_orgs):
+    if user.is_staff:
+        return Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS, created_by__organization__in=admin_orgs)
     return ((Q(created_by=user) | Q(departments__in=[user.department]) | Q(job_families__in=user.job_families)) &
             Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS,
               post_type__in=[POST_TYPE.USER_CREATED_POST, POST_TYPE.USER_CREATED_POLL]))
@@ -88,6 +90,7 @@ def accessible_posts_by_user(
         Q(shared_with=SHARED_WITH.SELF_DEPARTMENT, created_by__departments__in=user_depts) |
         Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS, job_families__in=[job_family], job_families__isnull=False)
     )
+    admin_orgs = None
     if user.is_staff:
         admin_orgs = user.child_organizations
         admin_query = (
@@ -108,7 +111,7 @@ def accessible_posts_by_user(
             post_query = post_query & ~Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post")
 
     exclude_query = get_exclusion_query(user)
-    post_query = post_query | posts_shared_with_org_department_query(user) | get_nomination_query(user)
+    post_query = post_query | posts_shared_with_org_department_query(user, admin_orgs) | get_nomination_query(user)
 
     # Making query here only
     if user.is_staff:
