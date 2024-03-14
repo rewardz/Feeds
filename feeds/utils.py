@@ -88,6 +88,13 @@ def accessible_posts_by_user(
         Q(shared_with=SHARED_WITH.SELF_DEPARTMENT, created_by__departments__in=user_depts) |
         Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS, job_families__in=[job_family], job_families__isnull=False)
     )
+    if user.is_staff:
+        admin_orgs = user.child_organizations
+        admin_query = (
+            Q(created_by__organization__in=admin_orgs,
+              post_type__in=[POST_TYPE.USER_CREATED_POST, POST_TYPE.USER_CREATED_POLL, POST_TYPE.FEEDBACK_POST])
+        )
+        post_query = post_query | admin_query
     post_query = Q(mark_delete=False) & post_query | Q(mark_delete=False, created_by=user)
     feedback_query = Q(post_type=POST_TYPE.FEEDBACK_POST)
     post_query = post_query & (feedback_query if allow_feedback else ~feedback_query)
@@ -104,6 +111,8 @@ def accessible_posts_by_user(
     post_query = post_query | posts_shared_with_org_department_query(user) | get_nomination_query(user)
 
     # Making query here only
+    if user.is_staff:
+        post_query = post_query | (Q(organizations=None, shared_with=SHARED_WITH.SELF_DEPARTMENT, created_by__organization__in=admin_orgs))
     result = get_related_objects_qs(Post.objects.filter(post_query).exclude(exclude_query or Q(id=None)).distinct())
     return result
 
