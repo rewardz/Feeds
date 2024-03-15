@@ -223,6 +223,7 @@ def accessible_posts_by_user_v3(
     # Final version
     return post_query, get_exclusion_query(user, admin_orgs, user_depts), admin_orgs
 
+
 def post_api_query(version, allow_feedback, created_by, user, org, post_id, appreciations, departments):
     exclusion_query = Q(id=None)
     admin_orgs = user.child_organizations if user.is_staff else None
@@ -235,7 +236,7 @@ def post_api_query(version, allow_feedback, created_by, user, org, post_id, appr
         query.add(Q(departments__in=departments, created_by__departments__in=departments), query.connector)
     else:
         if allow_feedback and user.is_staff:
-            org = list(user.child_organizations.values_list("id", flat=True))
+            org = admin_orgs
         post_query, exclusion_query, admin_orgs = accessible_posts_by_user_v3(
             user, org, allow_feedback, appreciations, None, departments)
         print(admin_orgs, "admin_orgs")
@@ -244,7 +245,7 @@ def post_api_query(version, allow_feedback, created_by, user, org, post_id, appr
         if user.is_staff:
             query.add(Q(
                 mark_delete=False,
-                post_type=POST_TYPE.USER_CREATED_POST, created_by__organization__in=user.child_organizations), Q.OR
+                post_type=POST_TYPE.USER_CREATED_POST, created_by__organization__in=admin_orgs), Q.OR
             )
             post_query = query
 
@@ -256,11 +257,7 @@ def post_api_query(version, allow_feedback, created_by, user, org, post_id, appr
         # For list api below version 12 we are excluding system created greeting post
         exclusion_query = exclusion_query | Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post")
 
-    post_query = post_query | posts_shared_with_org_department_query(user, admin_orgs)
-    print(post_query, "@@@@@@")
-
-
-    print(exclusion_query, "###")
+    post_query = post_query | posts_shared_with_org_department_query(user, admin_orgs) | get_nomination_query(user)
 
     return get_related_objects_qs(
         Post.objects.filter(post_query).exclude(
