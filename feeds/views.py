@@ -323,7 +323,7 @@ class PostViewSet(viewsets.ModelViewSet):
                     Q(mark_delete=False,
                       post_type=POST_TYPE.USER_CREATED_POST, created_by__organization__in=user.child_organizations),
                     Q.OR)
-                result = get_related_objects_qs(Post.objects.filter(query)).order_by(order_by)
+                result = get_related_objects_qs(Post.objects.filter(query)).order_by(*order_by)
 
         result = PostFilter(self.request.GET, queryset=result).qs
         return result
