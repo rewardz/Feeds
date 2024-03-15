@@ -282,7 +282,7 @@ def accessible_posts_by_user_v2(
         )
 
     result = get_related_objects_qs(
-        Post.objects.filter(post_query).exclude(exclude_query or Q(id=None)).order_by(order_by).distinct()
+        Post.objects.filter(post_query).exclude(exclude_query or Q(id=None)).order_by(*order_by).distinct()
     )
     return result
 
