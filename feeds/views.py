@@ -1,7 +1,5 @@
 from __future__ import division, print_function, unicode_literals
 
-import datetime
-import time
 from json import loads
 from django.conf import settings
 from django.db import transaction
@@ -36,7 +34,7 @@ from .utils import (
     notify_new_post_poll_created, notify_flagged_post, push_notification, tag_users_to_comment,
     tag_users_to_post, user_can_delete, user_can_edit, get_date_range, since_last_appreciation,
     get_current_month_end_date, get_absolute_url, posts_not_visible_to_user,
-    posts_shared_with_org_department, get_job_families, get_related_objects_qs, accessible_posts_by_user_v2,
+    get_job_families, get_related_objects_qs, accessible_posts_by_user_v2,
 )
 
 CustomUser = import_string(settings.CUSTOM_USER_MODEL)
@@ -1218,15 +1216,15 @@ class UserFeedViewSet(viewsets.ModelViewSet):
     def organization_recognitions(self, request, *args, **kwargs):
         user = self.request.user
         post_polls = request.query_params.get("post_polls", None)
-        post_polls_filter = request.query_params.get("post_polls_filter", None)
         greeting = request.query_params.get("greeting", None)
-        user_id = request.query_params.get("user", None)
-        organizations = user.organization
         filter_appreciations = Post.objects.none()
         feeds = accessible_posts_by_user_v2(
-            user, organizations, False, False if post_polls else True, None, None, request.version,
-            True, False, post_polls, post_polls_filter, greeting, user_id,
-            self.request.query_params.get("search", None), ('-priority', '-created_on')
+            user=user, organization=user.organization, allow_feedback=False,
+            appreciations=False if post_polls else True,post_id=None, departments=None, version=request.version,
+            org_reco_api=True, feeds_api=False, post_polls=post_polls,
+            post_polls_filter=request.query_params.get("post_polls_filter", None), greeting=greeting,
+            user_id=request.query_params.get("user", None), search=self.request.query_params.get("search", None),
+            order_by=('-priority', '-created_on')
         )
         feeds = PostFilter(self.request.GET, queryset=feeds).qs
         if post_polls is None and greeting is None:
