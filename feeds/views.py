@@ -310,7 +310,7 @@ class PostViewSet(viewsets.ModelViewSet):
             result = accessible_posts_by_user_v2(
                 user, org, allow_feedback=feedback is not None and feedback == "true",
                 appreciations=is_appreciation_post(post_id) if post_id else False,
-                post_id=None, departments=user.cached_departments, version=int(self.request.version), org_reco=False,
+                post_id=None, departments=user.cached_departments, version=int(self.request.version), org_reco_api=False,
                 feeds_api=True, post_polls=True, post_polls_filter=None, greeting=None, user_id=None, search=None,
                 order_by=order_by)
         else:

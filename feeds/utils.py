@@ -184,7 +184,7 @@ def posts_shared_with_org_department_query(user, admin_orgs):
 
 def accessible_posts_by_user_v2(
         user, organization, allow_feedback=False, appreciations=False, post_id=None,
-        departments=None, version=None, org_reco=False, feeds_api=False, post_polls=False,
+        departments=None, version=None, org_reco_api=False, feeds_api=False, post_polls=False,
         post_polls_filter=None, greeting=None, user_id=None, search=None, order_by=()
 ):
     if not isinstance(organization, (list, tuple)):
@@ -223,31 +223,32 @@ def accessible_posts_by_user_v2(
     exclude_query = get_exclusion_query(user, post_polls, admin_orgs, departments)
     post_query = post_query | get_nomination_query(user)
     if post_polls:
-        query_post = Q(post_type=POST_TYPE.USER_CREATED_POST)
-        query_poll = Q(post_type=POST_TYPE.USER_CREATED_POLL)
-        if post_polls_filter == "post":
-            if version and version >= 12:
-                query_post.add(
-                    Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post", user__is_dob_public=True,
-                      greeting__event_type=REPEATED_EVENT_TYPES.event_birthday), Q.OR
-                )
-                query_post.add(
-                    Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post", user__is_anniversary_public=True,
-                      greeting__event_type=REPEATED_EVENT_TYPES.event_anniversary), Q.OR
-                )
-            post_query = post_query & query_post
-        elif post_polls_filter == "poll":
-            post_query = post_query & query_poll
-        else:
-            post_query = post_query & (query_post | query_poll)
+        if org_reco_api:
+            query_post = Q(post_type=POST_TYPE.USER_CREATED_POST)
+            query_poll = Q(post_type=POST_TYPE.USER_CREATED_POLL)
+            if post_polls_filter == "post":
+                if version and version >= 12:
+                    query_post.add(
+                        Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post", user__is_dob_public=True,
+                          greeting__event_type=REPEATED_EVENT_TYPES.event_birthday), Q.OR
+                    )
+                    query_post.add(
+                        Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post", user__is_anniversary_public=True,
+                          greeting__event_type=REPEATED_EVENT_TYPES.event_anniversary), Q.OR
+                    )
+                post_query = post_query & query_post
+            elif post_polls_filter == "poll":
+                post_query = post_query & query_poll
+            else:
+                post_query = post_query & (query_post | query_poll)
 
         post_query = posts_shared_with_org_department_query(user, admin_orgs) | post_query
-    elif greeting:
+    elif greeting and org_reco_api:
         post_query = post_query & Q(
             post_type=POST_TYPE.GREETING_MESSAGE, title="greeting", greeting_id=greeting, user=user,
             organizations__in=organization, created_on__year=timezone.now().year
         )
-    elif feeds_api is None and org_reco:
+    elif feeds_api is None and org_reco_api:
         query = (Q(post_type=POST_TYPE.USER_CREATED_APPRECIATION) |
                  Q(nomination__nom_status=NOMINATION_STATUS.approved, organizations__in=organization))
 
