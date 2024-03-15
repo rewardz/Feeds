@@ -178,6 +178,56 @@ def posts_shared_with_org_department_query(user, admin_orgs):
               post_type__in=[POST_TYPE.USER_CREATED_POST, POST_TYPE.USER_CREATED_POLL]))
 
 
+def accessible_posts_by_user_v3(user, organization, allow_feedback=False, appreciations=False, post_id=None, departments=None):
+    if not isinstance(organization, (list, tuple)):
+        organization = [organization]
+
+    # get the departments to which this user belongs
+    user_depts = departments or getattr(user, USER_DEPARTMENT_RELATED_NAME).all()
+    job_family = user.job_family
+    post_query = (
+            Q(organizations__in=organization) |
+            Q(departments__in=user_depts) |
+            Q(shared_with=SHARED_WITH.ALL_DEPARTMENTS, created_by__organization__in=organization) |
+            Q(shared_with=SHARED_WITH.SELF_DEPARTMENT, created_by__departments__in=user_depts) |
+            Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS, job_families__in=[job_family])
+    )
+    admin_orgs = None
+
+    if user.is_staff:
+        admin_orgs = user.child_organizations
+        admin_query = (
+            Q(created_by__organization__in=admin_orgs,
+              post_type__in=[POST_TYPE.USER_CREATED_POST, POST_TYPE.USER_CREATED_POLL, POST_TYPE.FEEDBACK_POST])
+        )
+        post_query = post_query | admin_query
+
+    post_query = Q(mark_delete=False) & post_query | Q(mark_delete=False, created_by=user)
+
+    if appreciations:
+        post_query.add(Q(post_type=POST_TYPE.USER_CREATED_APPRECIATION,
+                         created_by__organization__in=user.get_affiliated_orgs(), mark_delete=False), Q.OR)
+
+    feedback_query = Q(post_type=POST_TYPE.FEEDBACK_POST)
+    post_query = post_query & (feedback_query if allow_feedback else ~feedback_query)
+
+    if user.is_staff:
+        post_query = post_query | (Q(organizations=None, shared_with=SHARED_WITH.SELF_DEPARTMENT) & admin_query)
+        if post_id:
+            post_query = post_query | Q(mark_delete=False, id=post_id, created_by__organization_id__in=(
+                admin_orgs if allow_feedback else [user.organization]))
+
+    return post_query, get_exclusion_query(user, admin_orgs, user_depts)
+
+
+
+
+def org_reco_api_query()
+
+
+
+
+
 def accessible_posts_by_user_v2(
         user, organization, allow_feedback=False, appreciations=False, post_id=None,
         departments=None, version=None, org_reco_api=False, feeds_api=False, post_polls=False,
