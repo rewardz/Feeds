@@ -248,7 +248,7 @@ def org_reco_api_query(user, organization, departments, post_polls, version, pos
     elif greeting:
         post_query = post_query & Q(
             post_type=POST_TYPE.GREETING_MESSAGE, title="greeting", greeting_id=greeting, user=user,
-            organizations__in=organization, created_on__year=timezone.now().year
+            organizations__in=[organization], created_on__year=timezone.now().year
         )
     else:
         query = (Q(post_type=POST_TYPE.USER_CREATED_APPRECIATION) |
