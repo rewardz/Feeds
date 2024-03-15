@@ -268,7 +268,6 @@ def accessible_posts_by_user_v2(
             exclude_query = exclude_query | Q(user__hide_appreciation=True)
             post_query = post_query & query
 
-
     if search:
         post_query = post_query & Q(
            Q(user__first_name__icontains=search) |
