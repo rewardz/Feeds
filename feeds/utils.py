@@ -216,7 +216,7 @@ def accessible_posts_by_user_v2(
             # For list api below version 12 we are excluding system created greeting post
             post_query = post_query & ~Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post")
 
-    exclude_query = get_exclusion_query(user, admin_orgs, departments)
+    exclude_query = get_exclusion_query(user, admin_orgs, user_depts)
     post_query = post_query | get_nomination_query(user)
     if post_polls:
         if org_reco_api:
@@ -815,3 +815,4 @@ def get_related_objects_qs(feeds):
         ).prefetch_related(
             "organizations", "transactions", "cc_users", "departments", "job_families", "tagged_users", "tags",
             "images_set", "documents_set", "postliked_set", "comment_set")
+
