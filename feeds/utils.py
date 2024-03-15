@@ -212,17 +212,71 @@ def accessible_posts_by_user_v3(user, organization, allow_feedback=False, apprec
     post_query = post_query & (feedback_query if allow_feedback else ~feedback_query)
 
     if user.is_staff:
-        post_query = post_query | (Q(organizations=None, shared_with=SHARED_WITH.SELF_DEPARTMENT) & admin_query)
+        post_query =  post_query | (Q(organizations=None, shared_with=SHARED_WITH.SELF_DEPARTMENT, mark_delete=False) & ~Q(created_by__departments__in=user_depts) & admin_query)
         if post_id:
             post_query = post_query | Q(mark_delete=False, id=post_id, created_by__organization_id__in=(
                 admin_orgs if allow_feedback else [user.organization]))
 
-    return post_query, get_exclusion_query(user, admin_orgs, user_depts)
+    return post_query, get_exclusion_query(user, admin_orgs, user_depts), admin_orgs
 
 
+def org_reco_api_query(user, organization, departments, post_polls, version, post_polls_filter, greeting,user_id, search):
+    post_query, exclusion_query, admin_orgs = accessible_posts_by_user_v3(user, organization, False, False if post_polls else True,
+                                                              None, departments)
 
+    # import pdb;pdb.set_trace()
+    if post_polls:
+        query_post = Q(post_type=POST_TYPE.USER_CREATED_POST)
+        query_poll = Q(post_type=POST_TYPE.USER_CREATED_POLL)
+        if int(version) >= 12:
+            query_post.add(
+                Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post", user__is_dob_public=True,
+                  greeting__event_type=REPEATED_EVENT_TYPES.event_birthday), Q.OR
+            )
+            query_post.add(
+                Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post", user__is_anniversary_public=True,
+                  greeting__event_type=REPEATED_EVENT_TYPES.event_anniversary), Q.OR
+            )
 
-def org_reco_api_query()
+        if post_polls_filter == "post":
+            query = query_post
+        elif post_polls_filter == "poll":
+            query = query_poll
+        else:
+            query = query_post | query_poll
+        post_query = post_query & query
+    elif greeting:
+        post_query = post_query & Q(
+            post_type=POST_TYPE.GREETING_MESSAGE, title="greeting", greeting_id=greeting, user=user,
+            organizations__in=organization, created_on__year=timezone.now().year
+        )
+    else:
+        query = (Q(post_type=POST_TYPE.USER_CREATED_APPRECIATION) |
+                 Q(nomination__nom_status=NOMINATION_STATUS.approved, organizations__in=[organization]))
+
+        if user_id and str(user_id).isdigit():
+            query.add(Q(user_id=user_id), query.AND)
+
+        post_query =  post_query & query
+        exclusion_query = exclusion_query | Q(user__hide_appreciation=True)
+
+    if post_polls:
+        post_query = post_query | posts_shared_with_org_department_query(user, admin_orgs)
+    if search:
+        post_query = post_query & (
+            Q(user__first_name__icontains=search) |
+            Q(user__last_name__icontains=search) |
+            Q(created_by__first_name__icontains=search) |
+            Q(created_by__last_name__icontains=search) |
+            Q(user__email__icontains=search) |
+            Q(created_by__email__icontains=search) |
+            Q(title__icontains=search) |
+            Q(description__icontains=search)
+        )
+
+    return get_related_objects_qs(
+        Post.objects.filter(post_query).exclude(exclusion_query or Q(id=None)).order_by('-priority', '-created_on').distinct()
+    )
 
 
 
