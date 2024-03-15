@@ -3,7 +3,7 @@ from __future__ import division, print_function, unicode_literals
 import json
 import re
 from django.conf import settings
-from django.db.models import Q
+from django.db.models import Q, query as django_query
 from django.utils.translation import ugettext as _
 from django.utils.module_loading import import_string
 from django.utils import timezone
@@ -158,11 +158,11 @@ def posts_not_shared_with_job_family_query(user, exclude_query):
 def get_exclusion_query(user, admin_orgs, departments):
     exclude_query = posts_not_shared_with_self_department_query(user)
     exclude_query = posts_not_shared_with_job_family_query(user, exclude_query)
-    exclude_query = admin_feeds_to_exclude_query(user, exclude_query)
-    exclude_query = posts_not_shared_with_org_department_query(user, admin_orgs, departments, exclude_query)
-    exclude_query = shared_with_all_departments_but_not_belongs_to_user_org_query(user, exclude_query)
+    # exclude_query = admin_feeds_to_exclude_query(user, exclude_query)
+    # exclude_query = posts_not_shared_with_org_department_query(user, admin_orgs, departments, exclude_query)
+    # exclude_query = shared_with_all_departments_but_not_belongs_to_user_org_query(user, exclude_query)
 
-    return exclude_query
+    return exclude_query or Q(id=None)
 
 
 def get_nomination_query(user):
@@ -180,8 +180,9 @@ def posts_shared_with_org_department_query(user, admin_orgs):
 
 def accessible_posts_by_user_v3(
         user, organization, allow_feedback=False, appreciations=False, post_id=None, departments=None):
-    if not isinstance(organization, (list, tuple)):
+    if not isinstance(organization, (list, tuple, django_query.QuerySet)):
         organization = [organization]
+
 
     # get the departments to which this user belongs
     user_depts = departments or getattr(user, USER_DEPARTMENT_RELATED_NAME).all()
