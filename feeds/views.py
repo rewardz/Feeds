@@ -312,6 +312,7 @@ class PostViewSet(viewsets.ModelViewSet):
                 feeds_api=True, post_polls=True, post_polls_filter=None, greeting=None, user_id=None, search=None,
                 order_by=order_by)
         else:
+            query = Q(mark_delete=False, post_type=POST_TYPE.USER_CREATED_POST)
             if created_by == "user_org":
                 query.add(Q(organizations=org, created_by__organization=org), query.connector)
             elif created_by == "user_dept":
