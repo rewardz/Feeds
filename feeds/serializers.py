@@ -864,12 +864,12 @@ class CommentSerializer(serializers.ModelSerializer):
             user = request.user
         else:
             user = instance.created_by
-        created_on = get_user_localtime(instance.created_on,
-                                        user.organization.timezone) if user else instance.created_on
+        created_on = get_user_localtime(instance.created_on, user.organization.timezone,
+                                        date_format="%Y-%m-%d %H:%M:%S") if user else instance.created_on
 
         if instance.modified_on:
-            modified_on = get_user_localtime(instance.modified_on,
-                                             user.organization.timezone) if user else instance.modified_on
+            modified_on = get_user_localtime(instance.modified_on, user.organization.timezone,
+                                             date_format="%Y-%m-%d %H:%M:%S") if user else instance.modified_on
         else:
             modified_on = None
         representation["created_on"] = created_on

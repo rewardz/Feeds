@@ -604,5 +604,5 @@ def get_job_families(user, shared_with, data):
     return validate_job_families(job_families, user.get_affiliated_orgs())
 
 
-def get_user_localtime(date, org_timezone):
-    return timezone.localtime(date, pytz.timezone(org_timezone)).strftime("%Y-%m-%d")
+def get_user_localtime(date, org_timezone, date_format="%Y-%m-%d"):
+    return timezone.localtime(date, pytz.timezone(org_timezone)).strftime(date_format)
