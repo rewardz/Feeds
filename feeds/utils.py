@@ -32,6 +32,7 @@ ORGANIZATION_SETTINGS_MODEL = import_string(settings.ORGANIZATION_SETTINGS_MODEL
 NOMINATION_STATUS = import_string(settings.NOMINATION_STATUS)
 UserJobFamily = import_string(settings.USER_JOB_FAMILY)
 EmployeeIDStore = import_string(settings.EMPLOYEE_ID_STORE)
+REPEATED_EVENT_TYPES = import_string(settings.REPEATED_EVENT_TYPES_CHOICE)
 
 
 def accessible_posts_by_user(user, organization, allow_feedback=False, appreciations=False, post_id=None):
@@ -183,7 +184,8 @@ def posts_shared_with_org_department_query(user, admin_orgs):
 
 def accessible_posts_by_user_v2(
         user, organization, allow_feedback=False, appreciations=False, post_id=None,
-        departments=None, version=None, org_reco=False, feeds_api=False, post_polls=False
+        departments=None, version=None, org_reco=False, feeds_api=False, post_polls=False,
+        post_polls_filter=None, greeting=None, user_id=None, search=None, order_by=()
 ):
     if not isinstance(organization, (list, tuple)):
         organization = [organization]
@@ -221,7 +223,39 @@ def accessible_posts_by_user_v2(
     exclude_query = get_exclusion_query(user, post_polls, admin_orgs, departments)
     post_query = post_query | get_nomination_query(user)
     if post_polls:
+        query_post = Q(post_type=POST_TYPE.USER_CREATED_POST)
+        query_poll = Q(post_type=POST_TYPE.USER_CREATED_POLL)
+        if post_polls_filter == "post":
+            if version and version >= 12:
+                query_post.add(
+                    Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post", user__is_dob_public=True,
+                      greeting__event_type=REPEATED_EVENT_TYPES.event_birthday), Q.OR
+                )
+                query_post.add(
+                    Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post", user__is_anniversary_public=True,
+                      greeting__event_type=REPEATED_EVENT_TYPES.event_anniversary), Q.OR
+                )
+            post_query = post_query & query_post
+        elif post_polls_filter == "poll":
+            post_query = post_query & query_poll
+        else:
+            post_query = post_query & (query_post | query_poll)
+
         post_query = posts_shared_with_org_department_query(user, admin_orgs) | post_query
+    elif greeting:
+        post_query = post_query & Q(
+            post_type=POST_TYPE.GREETING_MESSAGE, title="greeting", greeting_id=greeting, user=user,
+            organizations__in=organization, created_on__year=timezone.now().year
+        )
+    elif feeds_api is None and org_reco:
+        query = (Q(post_type=POST_TYPE.USER_CREATED_APPRECIATION) |
+                 Q(nomination__nom_status=NOMINATION_STATUS.approved, organizations__in=organization))
+
+        if user_id and str(user_id).isdigit():
+            query.add(Q(user_id=user_id), query.AND)
+
+        exclude_query = exclude_query | Q(user__hide_appreciation=True)
+        post_query = post_query & query
 
     # Making query here only
     if user.is_staff:
@@ -235,7 +269,21 @@ def accessible_posts_by_user_v2(
         post_query.add(Q(post_type=POST_TYPE.USER_CREATED_APPRECIATION,
                          created_by__organization__in=user.get_affiliated_orgs(), mark_delete=False), Q.OR)
 
-    result = get_related_objects_qs(Post.objects.filter(post_query).exclude(exclude_query or Q(id=None)).distinct())
+    if search:
+        post_query = post_query & Q(
+           Q(user__first_name__icontains=search) |
+           Q(user__last_name__icontains=search) |
+           Q(created_by__first_name__icontains=search) |
+           Q(created_by__last_name__icontains=search) |
+           Q(user__email__icontains=search) |
+           Q(created_by__email__icontains=search) |
+           Q(title__icontains=search) |
+           Q(description__icontains=search)
+        )
+
+    result = get_related_objects_qs(
+        Post.objects.filter(post_query).exclude(exclude_query or Q(id=None)).order_by(order_by).distinct()
+    )
     return result
 
 
