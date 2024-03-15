@@ -178,7 +178,8 @@ def posts_shared_with_org_department_query(user, admin_orgs):
               post_type__in=[POST_TYPE.USER_CREATED_POST, POST_TYPE.USER_CREATED_POLL]))
 
 
-def accessible_posts_by_user_v3(user, organization, allow_feedback=False, appreciations=False, post_id=None, departments=None):
+def accessible_posts_by_user_v3(
+        user, organization, allow_feedback=False, appreciations=False, post_id=None, departments=None):
     if not isinstance(organization, (list, tuple)):
         organization = [organization]
 
@@ -212,11 +213,14 @@ def accessible_posts_by_user_v3(user, organization, allow_feedback=False, apprec
     post_query = post_query & (feedback_query if allow_feedback else ~feedback_query)
 
     if user.is_staff:
-        post_query =  post_query | (Q(organizations=None, shared_with=SHARED_WITH.SELF_DEPARTMENT, mark_delete=False) & ~Q(created_by__departments__in=user_depts) & admin_query)
+        post_query = post_query | (
+                Q(organizations=None, shared_with=SHARED_WITH.SELF_DEPARTMENT, mark_delete=False) &
+                ~Q(created_by__departments__in=user_depts) & admin_query
+        )
         if post_id:
             post_query = post_query | Q(mark_delete=False, id=post_id, created_by__organization_id__in=(
                 admin_orgs if allow_feedback else [user.organization]))
-
+    # Final version
     return post_query, get_exclusion_query(user, admin_orgs, user_depts), admin_orgs
 
 
