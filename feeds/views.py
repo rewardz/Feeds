@@ -1219,17 +1219,11 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         post_polls = request.query_params.get("post_polls", None)
         greeting = request.query_params.get("greeting", None)
         filter_appreciations = Post.objects.none()
-        # feeds = accessible_posts_by_user_v2(
-        #     user=user, organization=user.organization, allow_feedback=False,
-        #     appreciations=False if post_polls else True, post_id=None, departments=user.cached_departments,
-        #     version=request.version, org_reco_api=True, feeds_api=False, post_polls=post_polls,
-        #     post_polls_filter=request.query_params.get("post_polls_filter", None), greeting=greeting,
-        #     user_id=request.query_params.get("user", None), search=self.request.query_params.get("search", None),
-        #     order_by=('-priority', '-created_on')
-        # )
-        feeds = org_reco_api_query(user, user.organization, user.cached_departments, post_polls, request.version,
-                                   request.query_params.get("post_polls_filter", None), greeting,
-                                   request.query_params.get("user", None), self.request.query_params.get("search", None))
+        feeds = org_reco_api_query(
+            user, user.organization, user.cached_departments, post_polls, request.version,
+            request.query_params.get("post_polls_filter", None), greeting, request.query_params.get("user", None),
+            self.request.query_params.get("search", None)
+        )
         feeds = PostFilter(self.request.GET, queryset=feeds).qs
         if post_polls is None and greeting is None:
             if self.request.GET.get("user_strength", 0):

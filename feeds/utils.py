@@ -220,11 +220,12 @@ def accessible_posts_by_user_v3(user, organization, allow_feedback=False, apprec
     return post_query, get_exclusion_query(user, admin_orgs, user_depts), admin_orgs
 
 
-def org_reco_api_query(user, organization, departments, post_polls, version, post_polls_filter, greeting,user_id, search):
-    post_query, exclusion_query, admin_orgs = accessible_posts_by_user_v3(user, organization, False, False if post_polls else True,
-                                                              None, departments)
+def org_reco_api_query(
+        user, organization, departments, post_polls, version, post_polls_filter, greeting,user_id, search
+):
+    post_query, exclusion_query, admin_orgs = accessible_posts_by_user_v3(
+        user, organization, False, False if post_polls else True, None, departments)
 
-    # import pdb;pdb.set_trace()
     if post_polls:
         query_post = Q(post_type=POST_TYPE.USER_CREATED_POST)
         query_poll = Q(post_type=POST_TYPE.USER_CREATED_POLL)
@@ -275,11 +276,9 @@ def org_reco_api_query(user, organization, departments, post_polls, version, pos
         )
 
     return get_related_objects_qs(
-        Post.objects.filter(post_query).exclude(exclusion_query or Q(id=None)).order_by('-priority', '-created_on').distinct()
+        Post.objects.filter(post_query).exclude(
+            exclusion_query or Q(id=None)).order_by('-priority', '-created_on').distinct()
     )
-
-
-
 
 
 def accessible_posts_by_user_v2(
