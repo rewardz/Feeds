@@ -34,7 +34,7 @@ from .utils import (
     notify_new_post_poll_created, notify_flagged_post, push_notification, tag_users_to_comment,
     tag_users_to_post, user_can_delete, user_can_edit, get_date_range, since_last_appreciation,
     get_current_month_end_date, get_absolute_url, posts_not_visible_to_user,
-    get_job_families, get_related_objects_qs, accessible_posts_by_user_v2, org_reco_api_query,
+    get_job_families, get_related_objects_qs, accessible_posts_by_user_v2, org_reco_api_query, post_api_query,
 )
 
 CustomUser = import_string(settings.CUSTOM_USER_MODEL)
@@ -301,31 +301,9 @@ class PostViewSet(viewsets.ModelViewSet):
         post_id = self.kwargs.get("pk", None)
         user = self.request.user
         org = user.organization
-        query = Q(mark_delete=False, post_type=POST_TYPE.USER_CREATED_POST)
-        result = None
-        order_by = ('-priority', '-modified_on', '-created_on')
-        if created_by not in ("user_org", "user_dept"):
-            result = accessible_posts_by_user_v2(
-                user, org, allow_feedback=feedback is not None and feedback == "true",
-                appreciations=is_appreciation_post(post_id) if post_id else False,
-                post_id=None, departments=user.cached_departments, version=int(self.request.version), org_reco_api=False,
-                feeds_api=True, post_polls=True, post_polls_filter=None, greeting=None, user_id=None, search=None,
-                order_by=order_by)
-        else:
-            query = Q(mark_delete=False, post_type=POST_TYPE.USER_CREATED_POST)
-            if created_by == "user_org":
-                query.add(Q(organizations=org, created_by__organization=org), query.connector)
-            elif created_by == "user_dept":
-                departments = user.cached_departments
-                query.add(Q(departments__in=departments, created_by__departments__in=departments), query.connector)
-
-            if user.is_staff:
-                query.add(
-                    Q(mark_delete=False,
-                      post_type=POST_TYPE.USER_CREATED_POST, created_by__organization__in=user.child_organizations),
-                    Q.OR)
-                result = get_related_objects_qs(Post.objects.filter(query)).order_by(*order_by)
-
+        result = post_api_query(
+            self.request.version, feedback is not None and feedback == "true", created_by, user, org,
+            post_id, is_appreciation_post(post_id) if post_id else False, user.cached_departments)
         result = PostFilter(self.request.GET, queryset=result).qs
         return result
 

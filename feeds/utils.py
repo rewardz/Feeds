@@ -223,6 +223,49 @@ def accessible_posts_by_user_v3(
     # Final version
     return post_query, get_exclusion_query(user, admin_orgs, user_depts), admin_orgs
 
+def post_api_query(version, allow_feedback, created_by, user, org, post_id, appreciations, departments):
+    exclusion_query = Q(id=None)
+    admin_orgs = None
+
+    query = Q(mark_delete=False, post_type=POST_TYPE.USER_CREATED_POST)
+    if created_by == "user_org":
+        query.add(Q(organizations=org, created_by__organization=org), query.connector)
+    elif created_by == "user_dept":
+        departments = user.departments.all()
+        query.add(Q(departments__in=departments, created_by__departments__in=departments), query.connector)
+    else:
+        if allow_feedback and user.is_staff:
+            org = list(user.child_organizations.values_list("id", flat=True))
+        post_query, exclusion_query, admin_orgs = accessible_posts_by_user_v3(
+            user, org, allow_feedback, appreciations, None, departments)
+
+    if created_by in ("user_org", "user_dept"):
+        if user.is_staff:
+            query.add(Q(
+                mark_delete=False,
+                post_type=POST_TYPE.USER_CREATED_POST, created_by__organization__in=user.child_organizations), Q.OR
+            )
+            post_query = query
+
+    if not post_id:
+        # For list api excluded personal greeting message (events.api.EventViewSet.message)
+        exclusion_query = exclusion_query | Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting")
+
+    if int(version) < 12 and not post_id:
+        # For list api below version 12 we are excluding system created greeting post
+        exclusion_query = exclusion_query | Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post")
+
+    post_query = post_query | posts_shared_with_org_department_query(user, admin_orgs)
+    print(post_query, "@@@@@@")
+
+
+    print(exclusion_query, "###")
+
+    return get_related_objects_qs(
+        Post.objects.filter(post_query).exclude(
+            exclusion_query or Q(id=None)).order_by('-priority', '-modified_on', '-created_on').distinct()
+    )
+
 
 def org_reco_api_query(
         user, organization, departments, post_polls, version, post_polls_filter, greeting,user_id, search
