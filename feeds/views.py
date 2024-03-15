@@ -321,7 +321,7 @@ class PostViewSet(viewsets.ModelViewSet):
             if user.is_staff:
                 query.add(
                     Q(mark_delete=False,
-                      post_type=POST_TYPE.USER_CREATED_POST, created_by__organizations__in=user.child_organizations),
+                      post_type=POST_TYPE.USER_CREATED_POST, created_by__organization__in=user.child_organizations),
                     Q.OR)
                 result = get_related_objects_qs(Post.objects.filter(query)).order_by(order_by)
 
