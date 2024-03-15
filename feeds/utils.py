@@ -225,7 +225,7 @@ def accessible_posts_by_user_v3(
 
 def post_api_query(version, allow_feedback, created_by, user, org, post_id, appreciations, departments):
     exclusion_query = Q(id=None)
-    admin_orgs = None
+    admin_orgs = user.child_organizations if user.is_staff else None
 
     query = Q(mark_delete=False, post_type=POST_TYPE.USER_CREATED_POST)
     if created_by == "user_org":
@@ -238,6 +238,7 @@ def post_api_query(version, allow_feedback, created_by, user, org, post_id, appr
             org = list(user.child_organizations.values_list("id", flat=True))
         post_query, exclusion_query, admin_orgs = accessible_posts_by_user_v3(
             user, org, allow_feedback, appreciations, None, departments)
+        print(admin_orgs, "admin_orgs")
 
     if created_by in ("user_org", "user_dept"):
         if user.is_staff:
