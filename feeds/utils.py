@@ -106,20 +106,16 @@ def accessible_posts_by_user(user, organization, allow_feedback=False, appreciat
     return Post.objects.filter(id__in=post_ids, mark_delete=False)
 
 
-
-
 def shared_with_all_departments_but_not_belongs_to_user_org_query(user, exclude_query):
-    if exclude_query is None:
-        return
+    if user.is_staff:
+        return exclude_query
     query = Q(shared_with=SHARED_WITH.ALL_DEPARTMENTS)
     query.add(~Q(created_by__organization=user.organization) &
               ~Q(created_by=user) & ~Q(user=user) & ~Q(cc_users__in=[user.id]), query.connector)
-    return query | exclude_query
+    return query | exclude_query if exclude_query else query
 
 
 def posts_not_shared_with_org_department_query(user, admin_orgs, departments, exclude_query):
-    if exclude_query is None:
-        return
     if user.is_staff:
         query = (
                 Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS) &
@@ -132,11 +128,11 @@ def posts_not_shared_with_org_department_query(user, admin_orgs, departments, ex
                 ~Q(organizations__in=[user.organization]) & ~Q(created_by=user)
         )
 
-    return exclude_query | query
+    return exclude_query | query if exclude_query else query
 
 
 def admin_feeds_to_exclude_query(user, exclude_query):
-    if exclude_query is None:
+    if user.is_staff:
         return
     return exclude_query | (Q(shared_with=SHARED_WITH.ADMIN_ONLY) & (~Q(created_by=user) & ~Q(cc_users__in=[user.id]) & ~Q(user=user)))
 
@@ -151,7 +147,7 @@ def posts_not_shared_with_self_department_query(user):
 
 
 def posts_not_shared_with_job_family_query(user, exclude_query):
-    if exclude_query is None:
+    if user.is_staff:
         return
     return exclude_query | ((
                 Q(shared_with=SHARED_WITH.SELF_JOB_FAMILY) &
@@ -159,7 +155,7 @@ def posts_not_shared_with_job_family_query(user, exclude_query):
         ) if user.job_family else Q(shared_with=SHARED_WITH.SELF_JOB_FAMILY))
 
 
-def get_exclusion_query(user, post_polls, admin_orgs, departments):
+def get_exclusion_query(user, admin_orgs, departments):
     exclude_query = posts_not_shared_with_self_department_query(user)
     exclude_query = posts_not_shared_with_job_family_query(user, exclude_query)
     exclude_query = admin_feeds_to_exclude_query(user, exclude_query)
@@ -220,7 +216,7 @@ def accessible_posts_by_user_v2(
             # For list api below version 12 we are excluding system created greeting post
             post_query = post_query & ~Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post")
 
-    exclude_query = get_exclusion_query(user, post_polls, admin_orgs, departments)
+    exclude_query = get_exclusion_query(user, admin_orgs, departments)
     post_query = post_query | get_nomination_query(user)
     if post_polls:
         if org_reco_api:
@@ -248,7 +244,7 @@ def accessible_posts_by_user_v2(
             post_type=POST_TYPE.GREETING_MESSAGE, title="greeting", greeting_id=greeting, user=user,
             organizations__in=organization, created_on__year=timezone.now().year
         )
-    elif feeds_api is None and org_reco_api:
+    elif feeds_api is False and org_reco_api:
         query = (Q(post_type=POST_TYPE.USER_CREATED_APPRECIATION) |
                  Q(nomination__nom_status=NOMINATION_STATUS.approved, organizations__in=organization))
 
