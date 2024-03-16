@@ -231,8 +231,8 @@ def accessible_posts_by_user_v3(
 
 
 def post_api_query(version, allow_feedback, created_by, user, org, post_id, appreciations, departments):
-    exclusion_query = Q(id=None)
     admin_orgs = user.child_organizations if user.is_staff else None
+    exclusion_query = get_exclusion_query(user, admin_orgs, departments, False)
 
     query = Q(mark_delete=False, post_type=POST_TYPE.USER_CREATED_POST)
     if created_by == "user_org":
