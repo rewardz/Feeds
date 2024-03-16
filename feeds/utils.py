@@ -251,7 +251,7 @@ def post_api_query(version, allow_feedback, created_by, user, org, post_id, appr
                 mark_delete=False,
                 post_type=POST_TYPE.USER_CREATED_POST, created_by__organization__in=admin_orgs), Q.OR
             )
-            post_query = query
+        post_query = query
 
     if not post_id:
         # For list api excluded personal greeting message (events.api.EventViewSet.message)
