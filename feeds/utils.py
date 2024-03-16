@@ -233,7 +233,6 @@ def post_api_query(version, allow_feedback, created_by, user, org, post_id, appr
     if created_by == "user_org":
         query.add(Q(organizations=org, created_by__organization=org), query.connector)
     elif created_by == "user_dept":
-        departments = user.departments.all()
         query.add(Q(departments__in=departments, created_by__departments__in=departments), query.connector)
     else:
         if allow_feedback and user.is_staff:
