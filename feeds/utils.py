@@ -273,7 +273,7 @@ def org_reco_api_query(
         user, organization, departments, post_polls, version, post_polls_filter, greeting,user_id, search
 ):
     post_query, exclusion_query, admin_orgs = accessible_posts_by_user_v3(
-        user, organization, False, False if post_polls else True, None, departments)
+        user, organization, False, False if post_polls else True, None, departments, True)
 
     if post_polls:
         query_post = Q(post_type=POST_TYPE.USER_CREATED_POST)
