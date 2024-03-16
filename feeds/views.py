@@ -34,7 +34,7 @@ from .utils import (
     notify_new_post_poll_created, notify_flagged_post, push_notification, tag_users_to_comment,
     tag_users_to_post, user_can_delete, user_can_edit, get_date_range, since_last_appreciation,
     get_current_month_end_date, get_absolute_url, posts_not_visible_to_user,
-    get_job_families, get_related_objects_qs, accessible_posts_by_user_v2, org_reco_api_query, post_api_query,
+    get_job_families, get_related_objects_qs, org_reco_api_query, post_api_query,
 )
 
 CustomUser = import_string(settings.CUSTOM_USER_MODEL)
