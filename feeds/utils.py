@@ -107,6 +107,13 @@ def accessible_posts_by_user(user, organization, allow_feedback=False, appreciat
 
 
 def shared_with_all_departments_but_not_belongs_to_user_org_query(user, exclude_query):
+    """
+    Returns exclude_query (posts which are shared with all departments but created by user's org
+    user is superuser then empty QS (no need to exclude anything)
+    does not match with user's org ) queryset to exclude
+    user: CustomUser
+    exclude_query: Q()
+    """
     if user.is_staff:
         return exclude_query
     query = Q(shared_with=SHARED_WITH.ALL_DEPARTMENTS)
@@ -116,6 +123,13 @@ def shared_with_all_departments_but_not_belongs_to_user_org_query(user, exclude_
 
 
 def posts_not_shared_with_org_department_query(user, admin_orgs, departments, exclude_query):
+    """
+    Returns exclude_query (posts which are not shared with organization department i.e. Custom) queryset of Post
+    exclude_query: Q()
+    departments: QuerySet(Department)
+    admin_orgs: QuerySet(Organization)
+    user: CustomUser
+    """
     if user.is_staff:
         query = (
                 Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS) &
@@ -132,12 +146,24 @@ def posts_not_shared_with_org_department_query(user, admin_orgs, departments, ex
 
 
 def admin_feeds_to_exclude_query(user, exclude_query):
+    """
+    Returns exclude_query (posts which are shared with admin) queryset to exclude
+    if user is superuser then empty QS (no need to exclude anything)
+    if user is neither creator of post nor in cc posts to exclude
+    exclude_query: Q()
+    user: CustomUser
+    """
     if user.is_staff:
         return
     return exclude_query | (Q(shared_with=SHARED_WITH.ADMIN_ONLY) & (~Q(created_by=user) & ~Q(cc_users__in=[user.id]) & ~Q(user=user)))
 
 
 def posts_not_shared_with_self_department_query(user):
+    """
+    Returns filtered (posts which are not shared with requested users department) queryset of Post
+    if user is superuser then empty QS (no need to exclude anything)
+    user: CustomUser
+    """
     if user.is_staff:
         return None
     return (
@@ -147,6 +173,12 @@ def posts_not_shared_with_self_department_query(user):
 
 
 def posts_not_shared_with_job_family_query(user, exclude_query):
+    """
+    Returns the exclude_query to exclude which is shared with my job family
+    Case if I am admin then i can see the post
+    exclude_query: Q()
+    user: CustomUser
+    """
     if user.is_staff:
         return
     return exclude_query | ((
@@ -156,6 +188,7 @@ def posts_not_shared_with_job_family_query(user, exclude_query):
 
 
 def get_exclusion_query(user, admin_orgs, departments, org_reco_api):
+    """Returns the combined query to exclude the post based on shared_with flag and user type"""
     exclude_query = posts_not_shared_with_self_department_query(user)
     exclude_query = posts_not_shared_with_job_family_query(user, exclude_query)
     if org_reco_api:
@@ -167,11 +200,18 @@ def get_exclusion_query(user, admin_orgs, departments, org_reco_api):
 
 
 def get_nomination_query(user):
+    """Returns the query to filter nomination posts"""
     return (Q(nomination__assigned_reviewer=user) | Q(nomination__alternate_reviewer=user) |
             Q(nomination__histories__reviewer=user)) & Q(post_type=POST_TYPE.USER_CREATED_NOMINATION, mark_delete=False)
 
 
 def posts_shared_with_org_department_query(user, admin_orgs):
+    """
+    Return all query which is shared with ORG departments
+    and belongs to user's department or created by user
+    params: user: CustomUser
+    params: admin_orgs: QuerySet[Organization]
+    """
     if user.is_staff:
         return Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS, created_by__organization__in=admin_orgs)
     return ((Q(created_by=user) | Q(departments__in=[user.department]) | Q(job_families__in=user.job_families)) &
@@ -183,6 +223,7 @@ def accessible_posts_by_user_v3(
         user, organization, allow_feedback=False, appreciations=False, post_id=None, departments=None,
         org_reco_api=False
 ):
+    """Function is responsible to return the Posts which is accessible by the user based on the privacy of the post"""
     if not isinstance(organization, (list, tuple, django_query.QuerySet)):
         organization = [organization]
 
@@ -231,6 +272,7 @@ def accessible_posts_by_user_v3(
 
 
 def post_api_query(version, allow_feedback, created_by, user, org, post_id, appreciations, departments):
+    """Used to return the list API query for the PostViewSet"""
     admin_orgs = user.child_organizations if user.is_staff else None
     exclusion_query = get_exclusion_query(user, admin_orgs, departments, False)
 
@@ -272,6 +314,7 @@ def post_api_query(version, allow_feedback, created_by, user, org, post_id, appr
 def org_reco_api_query(
         user, organization, departments, post_polls, version, post_polls_filter, greeting,user_id, search
 ):
+    """Used to return the list API query for the org_reco API"""
     post_query, exclusion_query, admin_orgs = accessible_posts_by_user_v3(
         user, organization, False, False if post_polls else True, None, departments, True)
 

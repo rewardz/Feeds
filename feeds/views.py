@@ -34,7 +34,8 @@ from .utils import (
     notify_new_post_poll_created, notify_flagged_post, push_notification, tag_users_to_comment,
     tag_users_to_post, user_can_delete, user_can_edit, get_date_range, since_last_appreciation,
     get_current_month_end_date, get_absolute_url, posts_not_visible_to_user,
-    get_job_families, get_related_objects_qs, org_reco_api_query, post_api_query,
+    get_job_families, get_related_objects_qs, org_reco_api_query, post_api_query, posts_not_shared_with_self_department,
+    posts_not_shared_with_job_family, assigned_nomination_post_ids, posts_shared_with_org_department,
 )
 
 CustomUser = import_string(settings.CUSTOM_USER_MODEL)
@@ -71,6 +72,23 @@ class PostViewSet(viewsets.ModelViewSet):
     permission_classes = (IsOptionsOrAuthenticated,)
     pagination_class = FeedsResultsSetPagination
     filter_backends = (filters.DjangoFilterBackend,)
+
+    def optimized_queryset(self):
+        feedback = self.request.query_params.get('feedback', None)
+        created_by = self.request.query_params.get('created_by', None)
+        post_id = self.kwargs.get("pk", None)
+        user = self.request.user
+        org = user.organization
+        result = post_api_query(
+            self.request.version, feedback is not None and feedback == "true", created_by, user, org,
+            post_id, is_appreciation_post(post_id) if post_id else False, user.cached_departments)
+        result = PostFilter(self.request.GET, queryset=result).qs
+        return result
+
+    def list(self, request, *args, **kwargs):
+        page = self.paginate_queryset(self.optimized_queryset())
+        serializer = self.get_serializer(page, many=True)
+        return self.get_paginated_response(serializer.data)
 
     def _create_or_update(self, request, create=False):
         payload = request.data
@@ -298,13 +316,54 @@ class PostViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         feedback = self.request.query_params.get('feedback', None)
         created_by = self.request.query_params.get('created_by', None)
-        post_id = self.kwargs.get("pk", None)
+        if feedback and feedback == "true":
+            allow_feedback = True
+        else:
+            allow_feedback = False
         user = self.request.user
-        org = user.organization
-        result = post_api_query(
-            self.request.version, feedback is not None and feedback == "true", created_by, user, org,
-            post_id, is_appreciation_post(post_id) if post_id else False, user.cached_departments)
+        org = self.request.user.organization
+        post_id = self.kwargs.get("pk", None)
+        query = Q(mark_delete=False, post_type=POST_TYPE.USER_CREATED_POST)
+        if created_by == "user_org":
+            query.add(Q(organizations=org, created_by__organization=org), query.connector)
+        elif created_by == "user_dept":
+            departments = user.departments.all()
+            query.add(Q(departments__in=departments, created_by__departments__in=departments), query.connector)
+        else:
+            if allow_feedback and user.is_staff:
+                org = list(user.child_organizations.values_list("id", flat=True))
+            result = accessible_posts_by_user(user, org, allow_feedback=allow_feedback,
+                                              appreciations=is_appreciation_post(post_id) if post_id else False)
+
+        if created_by in ("user_org", "user_dept"):
+            if user.is_staff:
+                query.add(Q(
+                    mark_delete=False,
+                    post_type=POST_TYPE.USER_CREATED_POST, created_by__organizations__in=user.child_organizations), Q.OR
+                )
+            result = Post.objects.filter(query)
+
+        if not post_id:
+            # For list api excluded personal greeting message (events.api.EventViewSet.message)
+            result = result.exclude(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting")
+
+        if int(self.request.version) < 12 and not post_id:
+            # For list api below version 12 we are excluding system created greeting post
+            result = result.exclude(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post")
+
+        posts_ids_to_exclude = list(posts_not_shared_with_self_department(result, user).values_list("id", flat=True))
+        posts_ids_to_exclude.extend(list(posts_not_shared_with_job_family(result, user).values_list("id", flat=True)))
+        posts_ids_not_to_exclude = assigned_nomination_post_ids(user)
+        posts_ids_to_exclude = list(set(posts_ids_to_exclude) - set(posts_ids_not_to_exclude))
+
+        result = result.exclude(id__in=posts_ids_to_exclude)
+
+        result = (result | posts_shared_with_org_department(
+            user, [POST_TYPE.USER_CREATED_POST, POST_TYPE.USER_CREATED_POLL],
+            result.values_list("id", flat=True))).distinct()
+
         result = PostFilter(self.request.GET, queryset=result).qs
+        result = result.order_by('-priority', '-modified_on', '-created_on')
         return result
 
     @list_route(methods=["POST"], permission_classes=(IsOptionsOrAuthenticated,))

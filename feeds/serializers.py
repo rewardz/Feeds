@@ -160,7 +160,8 @@ class UserInfoSerializer(DynamicFieldsModelSerializer):
             "pk", "email", "first_name", "last_name", "departments", "profile_img", "full_name"
         )
 
-    def get_departments(self, instance):
+    @staticmethod
+    def get_departments(instance):
         return list(get_departments(instance).values("name"))
 
     def get_profile_img(self, instance):
