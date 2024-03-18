@@ -219,7 +219,7 @@ def posts_shared_with_org_department_query(user, admin_orgs):
               post_type__in=[POST_TYPE.USER_CREATED_POST, POST_TYPE.USER_CREATED_POLL]))
 
 
-def accessible_posts_by_user_v3(
+def accessible_posts_by_user_v2(
         user, organization, allow_feedback=False, appreciations=False, post_id=None, departments=None,
         org_reco_api=False
 ):
@@ -284,7 +284,7 @@ def post_api_query(version, allow_feedback, created_by, user, org, post_id, appr
     else:
         if allow_feedback and user.is_staff:
             org = admin_orgs
-        post_query, exclusion_query, admin_orgs = accessible_posts_by_user_v3(
+        post_query, exclusion_query, admin_orgs = accessible_posts_by_user_v2(
             user, org, allow_feedback, appreciations, None, departments, False)
 
     if created_by in ("user_org", "user_dept"):
@@ -315,7 +315,7 @@ def org_reco_api_query(
         user, organization, departments, post_polls, version, post_polls_filter, greeting,user_id, search
 ):
     """Used to return the list API query for the org_reco API"""
-    post_query, exclusion_query, admin_orgs = accessible_posts_by_user_v3(
+    post_query, exclusion_query, admin_orgs = accessible_posts_by_user_v2(
         user, organization, False, False if post_polls else True, None, departments, True)
 
     if post_polls:
