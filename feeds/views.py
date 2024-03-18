@@ -358,9 +358,9 @@ class PostViewSet(viewsets.ModelViewSet):
 
         result = result.exclude(id__in=posts_ids_to_exclude)
 
-        result = (result | posts_shared_with_org_department(
+        result = get_related_objects_qs((result | posts_shared_with_org_department(
             user, [POST_TYPE.USER_CREATED_POST, POST_TYPE.USER_CREATED_POLL],
-            result.values_list("id", flat=True))).distinct()
+            result.values_list("id", flat=True)))).distinct()
 
         result = PostFilter(self.request.GET, queryset=result).qs
         result = result.order_by('-priority', '-modified_on', '-created_on')
