@@ -118,7 +118,7 @@ def shared_with_all_departments_but_not_belongs_to_user_org_query(user, exclude_
         return exclude_query
     query = Q(shared_with=SHARED_WITH.ALL_DEPARTMENTS)
     query.add(~Q(created_by__organization=user.organization) &
-              ~Q(created_by=user) & ~Q(user=user) & ~Q(cc_users__in=[user.id]), query.connector)
+              ~Q(created_by=user) & ~Q(user=user) & ~Q(cc_users__in=[user]), query.connector)
     return query | exclude_query if exclude_query else query
 
 
@@ -155,42 +155,44 @@ def admin_feeds_to_exclude_query(user, exclude_query):
     """
     if user.is_staff:
         return
-    return exclude_query | (Q(shared_with=SHARED_WITH.ADMIN_ONLY) & (~Q(created_by=user) & ~Q(cc_users__in=[user.id]) & ~Q(user=user)))
+    return exclude_query | (Q(shared_with=SHARED_WITH.ADMIN_ONLY) & (~Q(created_by=user) & ~Q(cc_users__in=[user]) & ~Q(user=user)))
 
 
-def posts_not_shared_with_self_department_query(user):
+def posts_not_shared_with_self_department_query(user, departments):
     """
     Returns filtered (posts which are not shared with requested users department) queryset of Post
     if user is superuser then empty QS (no need to exclude anything)
     user: CustomUser
+    departments: QuerySet[Department]
     """
     if user.is_staff:
         return None
     return (
-        Q(shared_with=SHARED_WITH.SELF_DEPARTMENT) & ~Q(created_by__departments__in=user.departments.all()) &
+        Q(shared_with=SHARED_WITH.SELF_DEPARTMENT) & ~Q(created_by__departments__in=departments) &
         ~Q(user=user) & ~Q(cc_users__in=[user])
     )
 
 
-def posts_not_shared_with_job_family_query(user, exclude_query):
+def posts_not_shared_with_job_family_query(user, exclude_query, job_family):
     """
     Returns the exclude_query to exclude which is shared with my job family
     Case if I am admin then i can see the post
     exclude_query: Q()
     user: CustomUser
+    job_family: JobFamily
     """
     if user.is_staff:
         return
     return exclude_query | ((
                 Q(shared_with=SHARED_WITH.SELF_JOB_FAMILY) &
-                ~Q(created_by__employee_id_store__job_family=user.employee_id_store.job_family)
-        ) if user.job_family else Q(shared_with=SHARED_WITH.SELF_JOB_FAMILY))
+                ~Q(created_by__employee_id_store__job_family=job_family)
+        ) if job_family else Q(shared_with=SHARED_WITH.SELF_JOB_FAMILY))
 
 
-def get_exclusion_query(user, admin_orgs, departments, org_reco_api):
+def get_exclusion_query(user, admin_orgs, departments, org_reco_api, job_family):
     """Returns the combined query to exclude the post based on shared_with flag and user type"""
-    exclude_query = posts_not_shared_with_self_department_query(user)
-    exclude_query = posts_not_shared_with_job_family_query(user, exclude_query)
+    exclude_query = posts_not_shared_with_self_department_query(user, departments)
+    exclude_query = posts_not_shared_with_job_family_query(user, exclude_query, job_family)
     if org_reco_api:
         exclude_query = admin_feeds_to_exclude_query(user, exclude_query)
         exclude_query = posts_not_shared_with_org_department_query(user, admin_orgs, departments, exclude_query)
@@ -268,13 +270,13 @@ def accessible_posts_by_user_v2(
             post_query = post_query | Q(mark_delete=False, id=post_id, created_by__organization_id__in=(
                 admin_orgs if allow_feedback else [user.organization]))
     # Final version
-    return post_query, get_exclusion_query(user, admin_orgs, user_depts, org_reco_api), admin_orgs
+    return post_query, get_exclusion_query(user, admin_orgs, user_depts, org_reco_api, job_family), admin_orgs
 
 
 def post_api_query(version, allow_feedback, created_by, user, org, post_id, appreciations, departments):
     """Used to return the list API query for the PostViewSet"""
     admin_orgs = user.child_organizations if user.is_staff else None
-    exclusion_query = get_exclusion_query(user, admin_orgs, departments, False)
+    exclusion_query = get_exclusion_query(user, admin_orgs, departments, False, user.job_family)
 
     query = Q(mark_delete=False, post_type=POST_TYPE.USER_CREATED_POST)
     if created_by == "user_org":
