@@ -1246,7 +1246,11 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         post_polls = request.query_params.get("post_polls", None)
         greeting = request.query_params.get("greeting", None)
         filter_appreciations = Post.objects.none()
-        feeds = org_reco_api_query(user, user.organization, user.cached_departments, post_polls, 12,None, greeting, None,None)
+        feeds = org_reco_api_query(
+            user, user.organization, user.cached_departments, post_polls, request.version,
+            request.query_params.get("post_polls_filter", None), greeting, request.query_params.get("user", None),
+            self.request.query_params.get("search", None)
+        )
         feeds = PostFilter(self.request.GET, queryset=feeds).qs
         if post_polls is None and greeting is None:
             if self.request.GET.get("user_strength", 0):
