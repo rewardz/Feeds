@@ -141,6 +141,10 @@ def posts_not_shared_with_org_department_query(user, admin_orgs, departments, ex
                 ~Q(departments__in=departments) &
                 ~Q(organizations__in=[user.organization]) & ~Q(created_by=user)
         )
+        try:
+            query = query & ~Q(job_families__in=[user.job_family])
+        except Exception:
+            pass
 
     return exclude_query | query if exclude_query else query
 
