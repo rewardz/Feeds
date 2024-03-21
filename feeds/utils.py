@@ -3,7 +3,7 @@ from __future__ import division, print_function, unicode_literals
 import json
 import re
 from django.conf import settings
-from django.db.models import Q
+from django.db.models import Q, query as django_query
 from django.utils.translation import ugettext as _
 from django.utils.module_loading import import_string
 from django.utils import timezone
@@ -32,6 +32,7 @@ ORGANIZATION_SETTINGS_MODEL = import_string(settings.ORGANIZATION_SETTINGS_MODEL
 NOMINATION_STATUS = import_string(settings.NOMINATION_STATUS)
 UserJobFamily = import_string(settings.USER_JOB_FAMILY)
 EmployeeIDStore = import_string(settings.EMPLOYEE_ID_STORE)
+REPEATED_EVENT_TYPES = import_string(settings.REPEATED_EVENT_TYPES_CHOICE)
 
 
 def accessible_posts_by_user(user, organization, allow_feedback=False, appreciations=False, post_id=None):
@@ -103,6 +104,279 @@ def accessible_posts_by_user(user, organization, allow_feedback=False, appreciat
             post_ids.append(post_id)
 
     return Post.objects.filter(id__in=post_ids, mark_delete=False)
+
+
+def shared_with_all_departments_but_not_belongs_to_user_org_query(user, exclude_query):
+    """
+    Returns exclude_query (posts which are shared with all departments but created by user's org
+    user is superuser then empty QS (no need to exclude anything)
+    does not match with user's org ) queryset to exclude
+    user: CustomUser
+    exclude_query: Q()
+    """
+    if user.is_staff:
+        return exclude_query
+    query = Q(shared_with=SHARED_WITH.ALL_DEPARTMENTS)
+    query.add(~Q(created_by__organization=user.organization) &
+              ~Q(created_by=user) & ~Q(user=user) & ~Q(cc_users__in=[user]), query.connector)
+    return query | exclude_query if exclude_query else query
+
+
+def posts_not_shared_with_org_department_query(user, admin_orgs, departments, exclude_query):
+    """
+    Returns exclude_query (posts which are not shared with organization department i.e. Custom) queryset of Post
+    exclude_query: Q()
+    departments: QuerySet(Department)
+    admin_orgs: QuerySet(Organization)
+    user: CustomUser
+    """
+    if user.is_staff:
+        query = (
+                Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS) &
+                ~Q(created_by__organization__in=admin_orgs)
+        )
+    else:
+        query = (
+                Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS) &
+                ~Q(departments__in=departments) &
+                ~Q(organizations__in=[user.organization]) & ~Q(created_by=user)
+        )
+        try:
+            query = query & ~Q(job_families__in=[user.job_family])
+        except Exception:
+            pass
+
+    return exclude_query | query if exclude_query else query
+
+
+def admin_feeds_to_exclude_query(user, exclude_query):
+    """
+    Returns exclude_query (posts which are shared with admin) queryset to exclude
+    if user is superuser then empty QS (no need to exclude anything)
+    if user is neither creator of post nor in cc posts to exclude
+    exclude_query: Q()
+    user: CustomUser
+    """
+    if user.is_staff:
+        return
+    return exclude_query | (Q(shared_with=SHARED_WITH.ADMIN_ONLY) & (~Q(created_by=user) & ~Q(cc_users__in=[user]) & ~Q(user=user)))
+
+
+def posts_not_shared_with_self_department_query(user, departments):
+    """
+    Returns filtered (posts which are not shared with requested users department) queryset of Post
+    if user is superuser then empty QS (no need to exclude anything)
+    user: CustomUser
+    departments: QuerySet[Department]
+    """
+    if user.is_staff:
+        return None
+    return (
+        Q(shared_with=SHARED_WITH.SELF_DEPARTMENT) & ~Q(created_by__departments__in=departments) &
+        ~Q(user=user) & ~Q(cc_users__in=[user])
+    )
+
+
+def posts_not_shared_with_job_family_query(user, exclude_query, job_family):
+    """
+    Returns the exclude_query to exclude which is shared with my job family
+    Case if I am admin then i can see the post
+    exclude_query: Q()
+    user: CustomUser
+    job_family: JobFamily
+    """
+    if user.is_staff:
+        return
+    return exclude_query | ((
+                Q(shared_with=SHARED_WITH.SELF_JOB_FAMILY) &
+                ~Q(created_by__employee_id_store__job_family=job_family)
+        ) if job_family else Q(shared_with=SHARED_WITH.SELF_JOB_FAMILY))
+
+
+def get_exclusion_query(user, admin_orgs, departments, org_reco_api, job_family):
+    """Returns the combined query to exclude the post based on shared_with flag and user type"""
+    exclude_query = posts_not_shared_with_self_department_query(user, departments)
+    exclude_query = posts_not_shared_with_job_family_query(user, exclude_query, job_family)
+    if org_reco_api:
+        exclude_query = admin_feeds_to_exclude_query(user, exclude_query)
+        exclude_query = posts_not_shared_with_org_department_query(user, admin_orgs, departments, exclude_query)
+        exclude_query = shared_with_all_departments_but_not_belongs_to_user_org_query(user, exclude_query)
+
+    return exclude_query or Q(id=None)
+
+
+def get_nomination_query(user):
+    """Returns the query to filter nomination posts"""
+    return (Q(nomination__assigned_reviewer=user) | Q(nomination__alternate_reviewer=user) |
+            Q(nomination__histories__reviewer=user)) & Q(post_type=POST_TYPE.USER_CREATED_NOMINATION, mark_delete=False)
+
+
+def posts_shared_with_org_department_query(user, admin_orgs):
+    """
+    Return all query which is shared with ORG departments
+    and belongs to user's department or created by user
+    params: user: CustomUser
+    params: admin_orgs: QuerySet[Organization]
+    """
+    if user.is_staff:
+        return Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS, created_by__organization__in=admin_orgs)
+    return ((Q(created_by=user) | Q(departments__in=[user.department]) | Q(job_families__in=user.job_families)) &
+            Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS,
+              post_type__in=[POST_TYPE.USER_CREATED_POST, POST_TYPE.USER_CREATED_POLL]))
+
+
+def accessible_posts_by_user_v2(
+        user, organization, allow_feedback=False, appreciations=False, post_id=None, departments=None,
+        org_reco_api=False
+):
+    """Function is responsible to return the Posts which is accessible by the user based on the privacy of the post"""
+    if not isinstance(organization, (list, tuple, django_query.QuerySet)):
+        organization = [organization]
+
+    # get the departments to which this user belongs
+    user_depts = departments or getattr(user, USER_DEPARTMENT_RELATED_NAME).all()
+    job_family = user.job_family
+    post_query = (
+            Q(organizations__in=organization) |
+            Q(departments__in=user_depts) |
+            Q(shared_with=SHARED_WITH.ALL_DEPARTMENTS, created_by__organization__in=organization) |
+            Q(shared_with=SHARED_WITH.SELF_DEPARTMENT, created_by__departments__in=user_depts) |
+            Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS, job_families__in=[job_family])
+    )
+    admin_orgs = None
+
+    if user.is_staff:
+        admin_orgs = user.child_organizations
+        admin_query = (
+            Q(created_by__organization__in=admin_orgs,
+              post_type__in=[POST_TYPE.USER_CREATED_POST, POST_TYPE.USER_CREATED_POLL, POST_TYPE.FEEDBACK_POST])
+        )
+        post_query = post_query | admin_query
+
+    post_query = Q(mark_delete=False) & post_query | Q(mark_delete=False, created_by=user)
+
+    if appreciations:
+        post_query.add(Q(post_type=POST_TYPE.USER_CREATED_APPRECIATION,
+                         created_by__organization__in=user.get_affiliated_orgs(), mark_delete=False), Q.OR)
+
+    feedback_query = Q(post_type=POST_TYPE.FEEDBACK_POST)
+    post_query = post_query & (feedback_query if allow_feedback else ~feedback_query)
+
+    if user.is_staff:
+        query = (
+                Q(organizations=None, shared_with=SHARED_WITH.SELF_DEPARTMENT, mark_delete=False) &
+                 admin_query
+        )
+        if not allow_feedback:
+            query = query & ~Q(created_by__departments__in=user_depts)
+        post_query = post_query | query
+        if post_id:
+            post_query = post_query | Q(mark_delete=False, id=post_id, created_by__organization_id__in=(
+                admin_orgs if allow_feedback else [user.organization]))
+    # Final version
+    return post_query, get_exclusion_query(user, admin_orgs, user_depts, org_reco_api, job_family), admin_orgs
+
+
+def post_api_query(version, allow_feedback, created_by, user, org, post_id, appreciations, departments):
+    """Used to return the list API query for the PostViewSet"""
+    admin_orgs = user.child_organizations if user.is_staff else None
+    exclusion_query = get_exclusion_query(user, admin_orgs, departments, False, user.job_family)
+
+    query = Q(mark_delete=False, post_type=POST_TYPE.USER_CREATED_POST)
+    if created_by == "user_org":
+        query.add(Q(organizations=org, created_by__organization=org), query.connector)
+    elif created_by == "user_dept":
+        query.add(Q(departments__in=departments, created_by__departments__in=departments), query.connector)
+    else:
+        if allow_feedback and user.is_staff:
+            org = admin_orgs
+        post_query, exclusion_query, admin_orgs = accessible_posts_by_user_v2(
+            user, org, allow_feedback, appreciations, None, departments, False)
+
+    if created_by in ("user_org", "user_dept"):
+        if user.is_staff:
+            query.add(Q(
+                mark_delete=False,
+                post_type=POST_TYPE.USER_CREATED_POST, created_by__organization__in=admin_orgs), Q.OR
+            )
+        post_query = query
+
+    if not post_id:
+        # For list api excluded personal greeting message (events.api.EventViewSet.message)
+        exclusion_query = exclusion_query | Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting")
+
+    if int(version) < 12 and not post_id:
+        # For list api below version 12 we are excluding system created greeting post
+        exclusion_query = exclusion_query | Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post")
+
+    post_query = post_query | posts_shared_with_org_department_query(user, admin_orgs) | get_nomination_query(user)
+
+    return get_related_objects_qs(
+        Post.objects.filter(post_query).exclude(
+            exclusion_query or Q(id=None)).order_by('-priority', '-modified_on', '-created_on').distinct()
+    )
+
+
+def org_reco_api_query(
+        user, organization, departments, post_polls, version, post_polls_filter, greeting,user_id, search
+):
+    """Used to return the list API query for the org_reco API"""
+    post_query, exclusion_query, admin_orgs = accessible_posts_by_user_v2(
+        user, organization, False, False if post_polls else True, None, departments, True)
+
+    if post_polls:
+        query_post = Q(post_type=POST_TYPE.USER_CREATED_POST)
+        query_poll = Q(post_type=POST_TYPE.USER_CREATED_POLL)
+        if int(version) >= 12:
+            query_post.add(
+                Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post", user__is_dob_public=True,
+                  greeting__event_type=REPEATED_EVENT_TYPES.event_birthday), Q.OR
+            )
+            query_post.add(
+                Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post", user__is_anniversary_public=True,
+                  greeting__event_type=REPEATED_EVENT_TYPES.event_anniversary), Q.OR
+            )
+
+        if post_polls_filter == "post":
+            query = query_post
+        elif post_polls_filter == "poll":
+            query = query_poll
+        else:
+            query = query_post | query_poll
+        post_query = post_query & query
+    elif greeting:
+        post_query = post_query & Q(
+            post_type=POST_TYPE.GREETING_MESSAGE, title="greeting", greeting_id=greeting, user=user,
+            organizations__in=[organization], created_on__year=timezone.now().year
+        )
+    else:
+        query = (Q(post_type=POST_TYPE.USER_CREATED_APPRECIATION) |
+                 Q(nomination__nom_status=NOMINATION_STATUS.approved, organizations__in=[organization]))
+
+        if user_id and str(user_id).isdigit():
+            query.add(Q(user_id=user_id), query.AND)
+
+        post_query =  post_query & query
+        exclusion_query = exclusion_query | Q(user__hide_appreciation=True)
+
+    if post_polls:
+        post_query = post_query | posts_shared_with_org_department_query(user, admin_orgs)
+    if search:
+        post_query = post_query & (
+            Q(user__first_name__icontains=search) |
+            Q(user__last_name__icontains=search) |
+            Q(created_by__first_name__icontains=search) |
+            Q(created_by__last_name__icontains=search) |
+            Q(user__email__icontains=search) |
+            Q(created_by__email__icontains=search) |
+            Q(title__icontains=search) |
+            Q(description__icontains=search)
+        )
+
+    return get_related_objects_qs(
+        Post.objects.filter(post_query).exclude(
+            exclusion_query or Q(id=None)).order_by('-priority', '-created_on').distinct()
+    )
 
 
 def validate_priority(data):
@@ -554,3 +828,39 @@ def get_job_families(user, shared_with, data):
         job_families = json.loads(job_families)
 
     return validate_job_families(job_families, user.get_affiliated_orgs())
+
+
+def get_feed_type(post):
+    """
+    Returns the feed type as per FE
+    :params: post: Post
+    :returns: str
+    """
+    if post.post_type == POST_TYPE.USER_CREATED_NOMINATION:
+        return "nomination"
+    elif post.post_type == POST_TYPE.USER_CREATED_APPRECIATION:
+        return "appreciation"
+    return post.post_type
+
+
+def get_user_reaction_type(user, post):
+    """
+    Returns if the user reacted on the post
+    :params: post: Post
+    :params: user: CustomUser
+    :returns: int/None
+    """
+    post_like = post.postliked_set.filter(created_by=user).first()
+    if post_like:
+        return post_like.reaction_type
+    return None
+
+
+def get_related_objects_qs(feeds):
+    """Returns the all related objects in same QS to enhance the performance"""
+    return feeds.select_related(
+            "user", "transaction", "nomination", "greeting", "ecard", "modified_by", "created_by"
+        ).prefetch_related(
+            "organizations", "transactions", "cc_users", "departments", "job_families", "tagged_users", "tags",
+            "images_set", "documents_set", "postliked_set", "comment_set")
+

@@ -1,6 +1,5 @@
 from __future__ import division, print_function, unicode_literals
 
-import datetime
 from json import loads
 from django.conf import settings
 from django.db import transaction
@@ -34,9 +33,9 @@ from .utils import (
     accessible_posts_by_user, extract_tagged_users, get_user_name, notify_new_comment,
     notify_new_post_poll_created, notify_flagged_post, push_notification, tag_users_to_comment,
     tag_users_to_post, user_can_delete, user_can_edit, get_date_range, since_last_appreciation,
-    get_current_month_end_date, get_absolute_url, posts_not_visible_to_user, assigned_nomination_post_ids,
-    posts_not_shared_with_self_department, posts_shared_with_org_department, posts_not_shared_with_job_family,
-    get_job_families,
+    get_current_month_end_date, get_absolute_url, posts_not_visible_to_user,
+    get_job_families, get_related_objects_qs, org_reco_api_query, post_api_query, posts_not_shared_with_self_department,
+    posts_not_shared_with_job_family, assigned_nomination_post_ids, posts_shared_with_org_department,
 )
 
 CustomUser = import_string(settings.CUSTOM_USER_MODEL)
@@ -61,7 +60,11 @@ def is_appreciation_post(post_id):
     """
     Returns True if post is user created appreciation
     """
-    return Post.objects.filter(post_type=POST_TYPE.USER_CREATED_APPRECIATION, id=post_id).exists()
+    try:
+        Post.objects.get(post_type=POST_TYPE.USER_CREATED_APPRECIATION, id=post_id)
+        return True
+    except Post.DoesNotExist:
+        return False
 
 
 class PostViewSet(viewsets.ModelViewSet):
@@ -69,6 +72,23 @@ class PostViewSet(viewsets.ModelViewSet):
     permission_classes = (IsOptionsOrAuthenticated,)
     pagination_class = FeedsResultsSetPagination
     filter_backends = (filters.DjangoFilterBackend,)
+
+    def optimized_queryset(self):
+        feedback = self.request.query_params.get('feedback', None)
+        created_by = self.request.query_params.get('created_by', None)
+        post_id = self.kwargs.get("pk", None)
+        user = self.request.user
+        org = user.organization
+        result = post_api_query(
+            self.request.version, feedback is not None and feedback == "true", created_by, user, org,
+            post_id, is_appreciation_post(post_id) if post_id else False, user.cached_departments)
+        result = PostFilter(self.request.GET, queryset=result).qs
+        return result
+
+    def list(self, request, *args, **kwargs):
+        page = self.paginate_queryset(self.optimized_queryset())
+        serializer = self.get_serializer(page, many=True)
+        return self.get_paginated_response(serializer.data)
 
     def _create_or_update(self, request, create=False):
         payload = request.data
@@ -338,9 +358,9 @@ class PostViewSet(viewsets.ModelViewSet):
 
         result = result.exclude(id__in=posts_ids_to_exclude)
 
-        result = (result | posts_shared_with_org_department(
+        result = get_related_objects_qs((result | posts_shared_with_org_department(
             user, [POST_TYPE.USER_CREATED_POST, POST_TYPE.USER_CREATED_POLL],
-            result.values_list("id", flat=True))).distinct()
+            result.values_list("id", flat=True)))).distinct()
 
         result = PostFilter(self.request.GET, queryset=result).qs
         result = result.order_by('-priority', '-modified_on', '-created_on')
@@ -1009,7 +1029,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         filter_appreciations = self.filter_appreciations(feeds)
         feeds = PostFilter(self.request.GET, queryset=feeds, user=user).qs
         feeds = (feeds | filter_appreciations).distinct()
-
+        feeds = get_related_objects_qs(feeds)
         if feed_flag == "received":
             # returning only approved nominations with all the received appreciations
             feeds = feeds.filter(user=user).filter(Q(nomination__nom_status=NOMINATION_STATUS.approved) | Q(
@@ -1170,11 +1190,12 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         # returns latest 5 appreciations from last 30 days
         start_date, end_date = get_date_range(30)
         feeds = feeds.filter(created_on__gte=start_date, created_on__lte=end_date)[:5]
+        feeds = get_related_objects_qs(feeds)
         page = self.paginate_queryset(feeds)
         serializer = PostFeedSerializer(page, context={"request": request}, many=True)
         feeds = self.get_paginated_response(serializer.data)
         user_appreciation = posts.filter(post_type=POST_TYPE.USER_CREATED_APPRECIATION,
-                                                created_by=request.user).first()
+                                         created_by=request.user).first()
         if user_appreciation:
             days_passed = since_last_appreciation(user_appreciation.created_on)
             if 3 <= days_passed <= 120:
@@ -1219,78 +1240,25 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             if loads(feed.get("transactions__context") or '{}').get("strength_id") == strength_id
         ])).qs
 
-    def merge_querset(self, feeds, filter_appreciations):
-        post_ids = list(feeds.values_list("id", flat=True))
-        post_ids.extend(list(filter_appreciations.values_list("id", flat=True)))
-        return Post.objects.filter(id__in=post_ids)
-
     @list_route(methods=["GET"], permission_classes=(IsOptionsOrAuthenticated,))
     def organization_recognitions(self, request, *args, **kwargs):
         user = self.request.user
         post_polls = request.query_params.get("post_polls", None)
-        post_polls_filter = request.query_params.get("post_polls_filter", None)
         greeting = request.query_params.get("greeting", None)
-        user_id = request.query_params.get("user", None)
-        organizations = user.organization
         filter_appreciations = Post.objects.none()
-        posts = accessible_posts_by_user(user, organizations, False, False if post_polls else True)
-        if post_polls:
-            query_post = Q(post_type=POST_TYPE.USER_CREATED_POST)
-            query_poll = Q(post_type=POST_TYPE.USER_CREATED_POLL)
-            if int(request.version) >= 12:
-                query_post.add(
-                    Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post", user__is_dob_public=True,
-                      greeting__event_type=REPEATED_EVENT_TYPES.event_birthday), Q.OR
-                )
-                query_post.add(
-                    Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post", user__is_anniversary_public=True,
-                      greeting__event_type=REPEATED_EVENT_TYPES.event_anniversary), Q.OR
-                )
-
-            if post_polls_filter == "post":
-                query = query_post
-            elif post_polls_filter == "poll":
-                query = query_poll
-            else:
-                query = query_post | query_poll
-            feeds = posts.filter(query)
-        elif greeting:
-            feeds = posts.filter(
-                post_type=POST_TYPE.GREETING_MESSAGE, title="greeting", greeting_id=greeting, user=user,
-                organizations__in=[organizations], created_on__year=datetime.datetime.now().year
-            )
-        else:
-            query = (Q(post_type=POST_TYPE.USER_CREATED_APPRECIATION) |
-                     Q(nomination__nom_status=NOMINATION_STATUS.approved, organizations__in=[organizations]))
-
-            if user_id and str(user_id).isdigit():
-                query.add(Q(user_id=user_id), query.AND)
-
-            feeds = posts.filter(query).exclude(user__hide_appreciation=True)
+        feeds = org_reco_api_query(
+            user, user.organization, user.cached_departments, post_polls, request.version,
+            request.query_params.get("post_polls_filter", None), greeting, request.query_params.get("user", None),
+            self.request.query_params.get("search", None)
+        )
+        feeds = PostFilter(self.request.GET, queryset=feeds).qs
+        if post_polls is None and greeting is None:
             if self.request.GET.get("user_strength", 0):
                 filter_appreciations = self.filter_appreciations(feeds)
-        feeds = PostFilter(self.request.GET, queryset=feeds).qs
-        search = self.request.query_params.get("search", None)
+
         if filter_appreciations.exists():
             feeds = (feeds | filter_appreciations).distinct()
-        feeds = self.get_filtered_feeds_according_to_shared_with(
-            feeds=feeds, user=user, post_polls=post_polls).order_by('-priority', '-created_on')
-        if post_polls:
-            feeds = (feeds | posts_shared_with_org_department(
-                user, [POST_TYPE.USER_CREATED_POST, POST_TYPE.USER_CREATED_POLL],
-                feeds.values_list("id", flat=True))).distinct()
-        if search:
-            feeds = feeds.filter(
-                Q(user__first_name__icontains=search) |
-                Q(user__last_name__icontains=search) |
-                Q(created_by__first_name__icontains=search) |
-                Q(created_by__last_name__icontains=search) |
-                Q(user__email__icontains=search) |
-                Q(created_by__email__icontains=search) |
-                Q(title__icontains=search) |
-                Q(description__icontains=search)
-            )
-        page = self.paginate_queryset(feeds.distinct())
+        page = self.paginate_queryset(feeds)
         serializer = GreetingSerializer if greeting else OrganizationRecognitionSerializer
         serializer = serializer(page, context={"request": request}, many=True)
         return self.get_paginated_response(serializer.data)

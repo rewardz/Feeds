@@ -1,5 +1,4 @@
 from __future__ import division, print_function, unicode_literals
-import json
 
 from django.conf import settings
 from django.utils.module_loading import import_string
@@ -14,7 +13,8 @@ from .models import (
 )
 from .utils import (
     extract_tagged_users, get_departments, get_profile_image, tag_users_to_comment,
-    validate_priority, user_can_delete, user_can_edit, get_absolute_url, get_job_families
+    validate_priority, user_can_delete, user_can_edit, get_absolute_url, get_job_families,
+    get_feed_type, get_user_reaction_type
 )
 
 DEPARTMENT_MODEL = import_string(settings.DEPARTMENT_MODEL)
@@ -34,7 +34,10 @@ RepeatedEventSerializer = import_string(settings.REPEATED_EVENT_SERIALIZER)
 
 
 def get_user_detail(user_id):
-    return getattr(UserModel, settings.ALL_USER_OBJECT).filter(pk=user_id).first()
+    try:
+        return getattr(UserModel, settings.ALL_USER_OBJECT).get(pk=user_id)
+    except UserModel.DoesNotExist:
+        return
 
 
 def get_user_detail_with_org(post, context):
@@ -61,6 +64,54 @@ def get_info_for_greeting_post(post):
         context.update(
             {"show_greeting_department": post.user.organization.has_setting_to_show_greeting_department})
     return RepeatedEventSerializer(post.greeting, context=context).data
+
+
+def get_images_with_ecard(post):
+    """
+    Returns the serialized images
+    :params: post: Post
+    :returns: [ImagesSerializer]
+    """
+    all_images = list()
+    if not post.post_type == POST_TYPE.USER_CREATED_POLL:
+        all_images = ImagesSerializer(post.images_set, many=True, read_only=True).data
+    if post.ecard:
+        all_images.insert(0, ECardSerializer(post.ecard).data)
+    return all_images
+
+
+def get_user_strength(instance):
+    """
+    Returns the serialized user strength data
+    :params: instance: Post
+    :returns: UserStrengthSerializer/None
+    """
+    transaction = instance.transactions.first()
+    if transaction:
+        strength_id = transaction.context.get('strength_id')
+        if strength_id:
+            try:
+                return UserStrengthSerializer(instance=UserStrength.objects.get(id=strength_id)).data
+            except UserStrength.DoesNotExist:
+                return
+    elif instance.nomination and instance.nomination.user_strength:
+        return UserStrengthSerializer(instance=instance.nomination.user_strength).data
+    return None
+
+
+def get_poll_info(instance, request):
+    """
+    Returns the serialized user Poll data
+    :params: instance: Post
+    :params: request: HttpRequestObj
+    :returns: PollSerializer/None
+    """
+    if not instance.post_type == POST_TYPE.USER_CREATED_POLL:
+        return None
+    serializer_context = {'request': request}
+    return PollSerializer(
+        instance, read_only=True, context=serializer_context
+    ).data
 
 
 class DynamicFieldsModelSerializer(serializers.ModelSerializer):
@@ -109,9 +160,9 @@ class UserInfoSerializer(DynamicFieldsModelSerializer):
             "pk", "email", "first_name", "last_name", "departments", "profile_img", "full_name"
         )
 
-    def get_departments(self, instance):
-        departments = get_departments(instance)
-        return DepartmentDetailSerializer(departments, many=True, read_only=True).data
+    @staticmethod
+    def get_departments(instance):
+        return list(get_departments(instance).values("name"))
 
     def get_profile_img(self, instance):
         request = self.context.get('request')
@@ -412,6 +463,8 @@ class PostSerializer(DynamicFieldsModelSerializer):
     organization = serializers.SerializerMethodField()
     department = serializers.SerializerMethodField()
     job_families = serializers.SerializerMethodField()
+    created_on = serializers.SerializerMethodField()
+    modified_on = serializers.SerializerMethodField()
 
     class Meta:
         model = Post
@@ -439,75 +492,67 @@ class PostSerializer(DynamicFieldsModelSerializer):
         return list(obj.tags.values_list("name", flat=True))
 
     def get_is_admin(self, instance):
-        request = self.context['request']
-        user = request.user
-        return user.is_staff
+        return self.context['request'].user.is_staff
 
     def get_job_families(self, instance):
         return instance.job_families.values_list("id", flat=True)
 
     def get_poll_info(self, instance):
-        if not instance.post_type == POST_TYPE.USER_CREATED_POLL:
-            return None
-        request = self.context.get('request')
-        serializer_context = {'request': request}
-        return PollSerializer(
-            instance, read_only=True, context=serializer_context
-        ).data
+        return get_poll_info(instance, self.context.get('request'))
 
-    def get_images(self, instance):
+    @staticmethod
+    def get_images(instance):
         if instance.post_type == POST_TYPE.USER_CREATED_POLL:
             return None
-        post_id = instance.id
-        images = Images.objects.filter(post=post_id)
-        return ImagesSerializer(images, many=True, read_only=True).data
+        return ImagesSerializer(instance.images_set, many=True).data
 
-    def get_documents(self, instance):
+    @staticmethod
+    def get_documents(instance):
         if instance.post_type == POST_TYPE.USER_CREATED_POLL:
             return None
-        post_id = instance.id
-        documents = Documents.objects.filter(post=post_id)
-        return DocumentsSerializer(documents, many=True, read_only=True).data
+        return DocumentsSerializer(instance.documents_set, many=True).data
 
-    def get_videos(self, instance):
+    @staticmethod
+    def get_videos(instance):
         if instance.post_type == POST_TYPE.USER_CREATED_POLL:
             return None
-        post_id = instance.id
-        videos = Videos.objects.filter(post=post_id)
-        return VideosSerializer(videos, many=True, read_only=True).data
+        return VideosSerializer(instance.videos_set, many=True).data
 
     def get_created_by_user_info(self, instance):
-        request = self.context.get('request')
-        created_by = instance.created_by
-        user_detail = get_user_detail(created_by.id)
-        return UserInfoSerializer(user_detail, context={'request': request}).data
+        return UserInfoSerializer(instance.created_by, context={'request': self.context.get('request')}).data
 
     def get_is_owner(self, instance):
-        request = self.context['request']
-        return instance.created_by.pk == request.user.pk
+        return instance.created_by == self.context['request'].user
 
     def get_has_appreciated(self, instance):
-        request = self.context['request']
-        user = request.user
-        return PostLiked.objects.filter(post=instance, created_by=user).exists()
+        return instance.postliked_set.filter(created_by=self.context['request'].user).exists()
 
-    def get_appreciation_count(self, instance):
-        return PostLiked.objects.filter(post=instance).count()
+    @staticmethod
+    def get_appreciation_count(instance):
+        return instance.postliked_set.count()
 
-    def get_comments_count(self, instance):
-        return Comment.objects.filter(post=instance, mark_delete=False).count()
+    @staticmethod
+    def get_comments_count(instance):
+        return instance.comment_set.filter(mark_delete=False).count()
 
     def get_can_edit(self, instance):
-        request = self.context['request']
-        return user_can_edit(request.user, instance)
+        return user_can_edit(self.context['request'].user, instance)
 
     def get_can_delete(self, instance):
-        request = self.context['request']
-        return user_can_delete(request.user, instance)
+        return user_can_delete(self.context['request'].user, instance)
 
-    def get_tagged_users(self, instance):
-        result = instance.tagged_users.all()
-        return UserInfoSerializer(result, many=True, read_only=True).data
+    @staticmethod
+    def get_tagged_users(instance):
+        return UserInfoSerializer(instance.tagged_users, many=True).data
+
+    @staticmethod
+    def get_modified_on(instance):
+        if instance.modified_on:
+            return instance.modified_on.strftime("%Y-%m-%d")
+
+    @staticmethod
+    def get_created_on(instance):
+        return instance.created_on.strftime("%Y-%m-%d")
 
     def create(self, validated_data):
         request = self.context.get('request', None)
@@ -544,44 +589,24 @@ class PostSerializer(DynamicFieldsModelSerializer):
 
         return post
 
-    def to_representation(self, instance):
-        representation = super(PostSerializer, self).to_representation(instance)
-        representation["created_on"] = instance.created_on.strftime("%Y-%m-%d")
-        representation["modified_on"] = instance.modified_on. \
-            strftime("%Y-%m-%d") if instance.modified_on else None
-        return representation
+    @staticmethod
+    def get_feed_type(instance):
+        return get_feed_type(instance)
 
-    def get_feed_type(self, instance):
-        if instance.post_type == POST_TYPE.USER_CREATED_NOMINATION:
-            return "nomination"
-        elif instance.post_type == POST_TYPE.USER_CREATED_APPRECIATION:
-            return "appreciation"
-        return instance.post_type
+    @staticmethod
+    def get_user_strength(instance):
+        return get_user_strength(instance)
 
-    def get_user_strength(self, instance):
-        transaction = instance.transactions.first()
-        if transaction:
-            strength_id = transaction.context.get('strength_id')
-            if strength_id:
-                return UserStrengthSerializer(instance=UserStrength.objects.filter(id=strength_id).first()).data
-        elif instance.nomination and instance.nomination.user_strength:
-            return UserStrengthSerializer(instance=instance.nomination.user_strength).data
-        return None
-
-    def get_reaction_type(self, instance):
-        post_likes = PostLiked.objects.filter(post=instance)
+    @staticmethod
+    def get_reaction_type(instance):
+        post_likes = instance.postliked_set
         if post_likes.exists():
             return post_likes.values('reaction_type').annotate(
                 reaction_count=Count('reaction_type')).order_by('-reaction_count')[:2]
         return list()
 
     def get_user_reaction_type(self, instance):
-        request = self.context['request']
-        user = request.user
-        post_likes = PostLiked.objects.filter(post=instance, created_by=user)
-        if post_likes.exists():
-            return post_likes.first().reaction_type
-        return None
+        return get_user_reaction_type(self.context['request'].user, instance)
 
     def get_nomination(self, instance):
         return NominationsSerializer(instance=instance.nomination,
@@ -605,13 +630,7 @@ class PostSerializer(DynamicFieldsModelSerializer):
 
     @staticmethod
     def get_images_with_ecard(instance):
-        all_images = list()
-        if not instance.post_type == POST_TYPE.USER_CREATED_POLL:
-            images = Images.objects.filter(post=instance.id)
-            all_images = ImagesSerializer(images, many=True, read_only=True).data
-        if instance.ecard:
-            all_images.insert(0, ECardSerializer(instance.ecard).data)
-        return all_images
+        return get_images_with_ecard(instance)
 
 
 class CommentsLikedSerializer(serializers.ModelSerializer):
@@ -708,27 +727,26 @@ class PostDetailSerializer(PostSerializer):
     def get_greeting_info(post):
         return get_info_for_greeting_post(post)
 
-    def get_organization_name(self, instance):
+    @staticmethod
+    def get_organization_name(instance):
         return instance.feedback.organization_name if instance.feedback else ""
 
-    def get_display_status(self, instance):
+    @staticmethod
+    def get_display_status(instance):
         return instance.feedback.display_status if instance.feedback else ""
 
-    def get_department_name(self, instance):
+    @staticmethod
+    def get_department_name(instance):
         return instance.feedback.department_name if instance.feedback else ""
 
     def get_comments(self, instance):
-        request = self.context.get('request')
-        serializer_context = {'request': request}
-        post_id = instance.id
-        comments = Comment.objects.filter(post=post_id).order_by('-created_on')[:20]
         return CommentSerializer(
-            comments, many=True, read_only=True, context=serializer_context).data
+            instance.comment_set.filter(mark_delete=False).order_by('-created_on')[:20],
+            many=True, context={'request': self.context.get('request')}).data
 
-    def get_appreciated_by(self, instance):
-        post_id = instance.id
-        posts_liked = PostLiked.objects.filter(post_id=post_id).order_by('-created_on')
-        return PostLikedSerializer(posts_liked, many=True, read_only=True).data
+    @staticmethod
+    def get_appreciated_by(instance):
+        return PostLikedSerializer(instance.postliked_set.order_by('-created_on'), many=True).data
 
     def update(self, instance, validated_data):
         validate_priority(validated_data)
@@ -768,34 +786,6 @@ class PostFeedSerializer(PostSerializer):
             "appreciation_count", "comments_count", "tagged_users", "is_admin", "tags", "reaction_type", "nomination",
             "feed_type", "user_strength", "user", "user_reaction_type", "gif", "ecard", "points", "time_left",
             "images_with_ecard", "greeting_info",  "departments", "job_families"
-        )
-
-
-class OrganizationRecognitionSerializer(PostFeedSerializer):
-
-    class Meta:
-        model = Post
-        fields = (
-            "id", "created_by", "created_on", "modified_by", "modified_on",
-            "organizations", "created_by_user_info",
-            "title", "description", "post_type", "poll_info", "active_days",
-            "priority", "prior_till",
-            "shared_with",
-            "is_owner", "can_edit", "can_delete", "has_appreciated",
-            "appreciation_count", "comments_count", "is_admin", "reaction_type", "nomination",
-            "feed_type", "user_strength", "user", "user_reaction_type", "gif", "ecard", "points",
-            "images_with_ecard", "greeting_info",  "departments", "job_families"
-        )
-
-
-class GreetingSerializer(PostFeedSerializer):
-
-    class Meta:
-        model = Post
-        fields = (
-            "id", "created_by", "created_on", "organizations", "created_by_user_info", "title", "description",
-            "post_type", "priority", "shared_with", "is_owner", "tagged_users", "is_admin", "tags", "feed_type",
-            "gif", "ecard", "images_with_ecard", "greeting_info"
         )
 
 
@@ -970,3 +960,144 @@ class ECardCategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = ECardCategory
         fields = ('pk', 'name', 'organization')
+
+
+class GreetingSerializerBase(serializers.ModelSerializer):
+    created_on = serializers.SerializerMethodField()
+    created_by_user_info = serializers.SerializerMethodField()
+    is_owner = serializers.SerializerMethodField()
+    is_admin = serializers.SerializerMethodField()
+    feed_type = serializers.SerializerMethodField()
+    ecard = ECardSerializer(read_only=True)
+    images_with_ecard = serializers.SerializerMethodField()
+    greeting_info = serializers.SerializerMethodField()
+
+    def __init__(self, *args, **kwargs):
+        super(GreetingSerializerBase, self).__init__(*args, **kwargs)
+        self.request = self.context.get("request")
+        self.user = self.request.user
+
+    @staticmethod
+    def get_created_on(instance):
+        return instance.created_on.strftime("%Y-%m-%d")
+
+    def get_created_by_user_info(self, instance):
+        return UserInfoSerializer(instance.created_by, context={'request': self.request}).data
+
+    def get_is_owner(self, instance):
+        return instance.created_by == self.user
+
+    def get_is_admin(self, instance):
+        return self.user.is_staff
+
+    @staticmethod
+    def get_feed_type(instance):
+        return get_feed_type(instance)
+
+    @staticmethod
+    def get_greeting_info(post):
+        return get_info_for_greeting_post(post)
+
+    @staticmethod
+    def get_images_with_ecard(instance):
+        return get_images_with_ecard(instance)
+
+    class Meta:
+        model = Post
+        fields = (
+            "id", "created_by", "created_on", "organizations", "created_by_user_info", "title", "description",
+            "post_type", "priority", "shared_with", "is_owner", "is_admin", "feed_type",
+            "gif", "ecard", "images_with_ecard", "greeting_info"
+        )
+
+
+class OrganizationRecognitionSerializer(GreetingSerializerBase):
+    modified_on = serializers.SerializerMethodField()
+    appreciation_count = serializers.SerializerMethodField()
+    poll_info = serializers.SerializerMethodField()
+    can_edit = serializers.SerializerMethodField()
+    can_delete = serializers.SerializerMethodField()
+    comments_count = serializers.SerializerMethodField()
+    has_appreciated = serializers.SerializerMethodField()
+    reaction_type = serializers.SerializerMethodField()
+    user_strength = serializers.SerializerMethodField()
+    user_reaction_type = serializers.SerializerMethodField()
+    points = serializers.SerializerMethodField()
+    nomination = serializers.SerializerMethodField()
+    user = serializers.SerializerMethodField()
+
+    @staticmethod
+    def get_modified_on(instance):
+        if instance.modified_on:
+            return instance.modified_on.strftime("%Y-%m-%d")
+
+    @staticmethod
+    def get_appreciation_count(instance):
+        return instance.postliked_set.count()
+
+    def get_poll_info(self, instance):
+        return get_poll_info(instance, self.context.get('request'))
+
+    @staticmethod
+    def get_comments_count(instance):
+        return instance.comment_set.filter(mark_delete=False).count()
+
+    def get_can_edit(self, instance):
+        return user_can_edit(self.user, instance)
+
+    def get_can_delete(self, instance):
+        return user_can_delete(self.user, instance)
+
+    def get_has_appreciated(self, instance):
+        return instance.postliked_set.filter(created_by=self.user).exists()
+
+    @staticmethod
+    def get_reaction_type(instance):
+        if instance.postliked_set.count() > 0:
+            return instance.postliked_set.values('reaction_type').annotate(
+                reaction_count=Count('reaction_type')).order_by('-reaction_count')[:2]
+        return list()
+
+    @staticmethod
+    def get_user_strength(instance):
+        return get_user_strength(instance)
+
+    def get_user_reaction_type(self, instance):
+        return get_user_reaction_type(self.user, instance)
+
+    def get_points(self, instance):
+        return str(instance.points(self.user))
+
+    def get_nomination(self, instance):
+        return NominationsSerializer(
+            instance=instance.nomination, context={"user": self.user}, fields=self.context.get('nomination_fields')
+        ).data
+
+    def get_user(self, post):
+        return get_user_detail_with_org(post, {"request": self.request})
+
+    class Meta:
+        model = Post
+        fields = GreetingSerializerBase.Meta.fields + (
+            "modified_by", "modified_on", "poll_info", "active_days", "priority", "prior_till", "can_edit",
+            "can_delete", "has_appreciated", "appreciation_count", "comments_count", "reaction_type", "nomination",
+            "user_strength", "user", "user_reaction_type", "points", "departments", "job_families"
+        )
+
+
+class GreetingSerializer(GreetingSerializerBase):
+    tagged_users = serializers.SerializerMethodField()
+    tags = serializers.SerializerMethodField()
+
+    @staticmethod
+    def get_tagged_users(instance):
+        result = instance.tagged_users.all()
+        return UserInfoSerializer(result, many=True).data
+
+    @staticmethod
+    def get_tags(obj):
+        return list(obj.tags.values_list("name", flat=True))
+
+    class Meta:
+        model = Post
+        fields = GreetingSerializerBase.Meta.fields + ("tagged_users", "tags")
