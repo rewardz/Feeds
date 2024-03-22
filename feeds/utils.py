@@ -834,7 +834,6 @@ def get_user_localtime(date, org_timezone, date_format="%Y-%m-%d"):
     return timezone.localtime(date, pytz.timezone(org_timezone)).strftime(date_format)
 
 
-
 def get_feed_type(post):
     """
     Returns the feed type as per FE

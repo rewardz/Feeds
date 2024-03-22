@@ -350,6 +350,7 @@ class NominationsSerializer(DynamicFieldsModelSerializer):
     nom_status = serializers.SerializerMethodField()
     nom_status_color = serializers.SerializerMethodField()
     nom_status_approvals = serializers.SerializerMethodField()
+    created = serializers.SerializerMethodField()
 
     class Meta:
         model = Nominations
@@ -414,6 +415,17 @@ class NominationsSerializer(DynamicFieldsModelSerializer):
     @staticmethod
     def get_nom_status_color(instance):
         return NOMINATION_STATUS_COLOR_CODE.get(instance.nom_status)
+
+    def get_created(self, instance):
+        user = self.context.get("user", None)
+        organization = None
+        if user:
+            organization = user.organization
+        elif instance.nominator:
+            organization = instance.nominator.organization
+        if organization:
+            get_user_localtime(instance.created, instance.nominator.organization.timezone)
+        return instance.created
 
     def get_nom_status_approvals(self, instance):
         user = self.context.get("user", None)
@@ -545,14 +557,16 @@ class PostSerializer(DynamicFieldsModelSerializer):
     def get_tagged_users(instance):
         return UserInfoSerializer(instance.tagged_users, many=True).data
 
-    @staticmethod
-    def get_modified_on(instance):
+    def get_modified_on(self, instance):
         if instance.modified_on:
-            return instance.modified_on.strftime("%Y-%m-%d")
+            request = self.context.get('request', None)
+            user = request.user
+            return get_user_localtime(instance.modified_on, user.organization.timezone)
 
-    @staticmethod
-    def get_created_on(instance):
-        return instance.created_on.strftime("%Y-%m-%d")
+    def get_created_on(self, instance):
+        request = self.context.get('request', None)
+        user = request.user
+        return get_user_localtime(instance.created_on, user.organization.timezone)
 
     def create(self, validated_data):
         request = self.context.get('request', None)
@@ -911,7 +925,8 @@ class PostLikedSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         representation = super(PostLikedSerializer, self).to_representation(instance)
-        representation["created_on"] = instance.created_on.strftime("%Y-%m-%d")
+        representation["created_on"] = get_user_localtime(instance.created_on,
+                                                          instance.created_by.organization.timezone)
         return representation
 
 
