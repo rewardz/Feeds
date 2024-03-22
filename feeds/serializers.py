@@ -561,11 +561,15 @@ class PostSerializer(DynamicFieldsModelSerializer):
         if instance.modified_on:
             request = self.context.get('request', None)
             user = request.user
+            if not user:
+                return instance.modified_on
             return get_user_localtime(instance.modified_on, user.organization.timezone)
 
     def get_created_on(self, instance):
         request = self.context.get('request', None)
         user = request.user
+        if not user:
+            return instance.created_on
         return get_user_localtime(instance.created_on, user.organization.timezone)
 
     def create(self, validated_data):
