@@ -9,7 +9,7 @@ class FeedsResultsSetPagination(PageNumberPagination):
     try:
         page_size = settings.FEEDS_PAGE_SIZE
     except AttributeError as ae:
-        page_size = 20
+        page_size = 10
     page_size = page_size
     page_size_query_param = 'page'
     max_page_size = 500
@@ -20,7 +20,7 @@ class FeedsResultsSetPagination(PageNumberPagination):
             if not page_size:
                 page_size = settings.FEEDS_PAGE_SIZE
         except AttributeError as ae:
-            page_size = 20
+            page_size = 10
         return page_size
 
 
