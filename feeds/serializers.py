@@ -424,7 +424,7 @@ class NominationsSerializer(DynamicFieldsModelSerializer):
         elif instance.nominator:
             organization = instance.nominator.organization
         if organization:
-            get_user_localtime(instance.created, instance.nominator.organization.timezone)
+            return get_user_localtime(instance.created, organization.timezone)
         return instance.created
 
     def get_nom_status_approvals(self, instance):
@@ -667,8 +667,12 @@ class CommentsLikedSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         representation = super(CommentsLikedSerializer, self).to_representation(instance)
-        representation["created_on"] = get_user_localtime(instance.created_on,
-                                                          instance.created_by.organization.timezone)
+        request = self.context.get('request')
+        if request and request.user:
+            user = request.user
+        else:
+            user = instance.created_by
+        representation["created_on"] = get_user_localtime(instance.created_on, user.organization.timezone)
         return representation
 
 
@@ -763,9 +767,9 @@ class PostDetailSerializer(PostSerializer):
             instance.comment_set.filter(mark_delete=False).order_by('-created_on')[:20],
             many=True, context={'request': self.context.get('request')}).data
 
-    @staticmethod
-    def get_appreciated_by(instance):
-        return PostLikedSerializer(instance.postliked_set.order_by('-created_on'), many=True).data
+    def get_appreciated_by(self, instance):
+        return PostLikedSerializer(instance.postliked_set.order_by('-created_on'), many=True,
+                                   context={'request': self.context.get('request')}).data
 
     def update(self, instance, validated_data):
         validate_priority(validated_data)
@@ -848,7 +852,8 @@ class CommentSerializer(serializers.ModelSerializer):
 
     def get_liked_by(self, instance):
         result = CommentLiked.objects.filter(comment=instance).order_by('-created_on')
-        return CommentsLikedSerializer(result, many=True, read_only=True).data
+        return CommentsLikedSerializer(result, many=True, read_only=True,
+                                       context={"request": self.context.get('request')}).data
 
     def get_tagged_users(self, instance):
         result = instance.tagged_users.all()
@@ -929,8 +934,12 @@ class PostLikedSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         representation = super(PostLikedSerializer, self).to_representation(instance)
-        representation["created_on"] = get_user_localtime(instance.created_on,
-                                                          instance.created_by.organization.timezone)
+        request = self.context.get('request')
+        if request and request.user:
+            user = request.user
+        else:
+            user = instance.created_by
+        representation["created_on"] = get_user_localtime(instance.created_on, user.organization.timezone)
         return representation
 
 
@@ -1012,9 +1021,10 @@ class GreetingSerializerBase(serializers.ModelSerializer):
         self.request = self.context.get("request")
         self.user = self.request.user
 
-    @staticmethod
-    def get_created_on(instance):
-        return instance.created_on.strftime("%Y-%m-%d")
+    def get_created_on(self, instance):
+        if not self.user:
+            return instance.created_on
+        return get_user_localtime(instance.created_on, self.user.organization.timezone)
 
     def get_created_by_user_info(self, instance):
         return UserInfoSerializer(instance.created_by, context={'request': self.request}).data
@@ -1061,10 +1071,11 @@ class OrganizationRecognitionSerializer(GreetingSerializerBase):
     nomination = serializers.SerializerMethodField()
     user = serializers.SerializerMethodField()
 
-    @staticmethod
-    def get_modified_on(instance):
+    def get_modified_on(self, instance):
         if instance.modified_on:
-            return instance.modified_on.strftime("%Y-%m-%d")
+            if not self.user:
+                return instance.modified_on
+            return get_user_localtime(instance.modified_on, self.user.organization.timezone)
 
     @staticmethod
     def get_appreciation_count(instance):
