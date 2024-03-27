@@ -311,12 +311,11 @@ def post_api_query(version, allow_feedback, created_by, user, org, post_id, appr
         exclusion_query = exclusion_query | Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post")
 
     post_query = post_query | posts_shared_with_org_department_query(user, admin_orgs) | get_nomination_query(user)
-
+    post_ids = Post.objects.filter(post_query).exclude(
+            exclusion_query or Q(id=None)).distinct("id").values_list("id", flat=True)
     return get_related_objects_qs(
-        Post.objects.filter(post_query).exclude(
-            exclusion_query or Q(id=None)).order_by('-priority', '-modified_on', '-created_on').distinct()
+        Post.objects.filter(id__in=post_ids).order_by('-priority', '-modified_on', '-created_on')
     )
-
 
 def org_reco_api_query(
         user, organization, departments, post_polls, version, post_polls_filter, greeting,user_id, search
@@ -373,10 +372,9 @@ def org_reco_api_query(
             Q(title__icontains=search) |
             Q(description__icontains=search)
         )
-
+    post_ids = Post.objects.filter(post_query).exclude(exclusion_query or Q(id=None)).distinct("id").values_list("id", flat=True)
     return get_related_objects_qs(
-        Post.objects.filter(post_query).exclude(
-            exclusion_query or Q(id=None)).order_by('-priority', '-created_on').distinct()
+        Post.objects.filter(id__in=post_ids).order_by('-priority', '-created_on')
     )
 
 
@@ -830,10 +828,8 @@ def get_job_families(user, shared_with, data):
 
     return validate_job_families(job_families, user.get_affiliated_orgs())
 
-
 def get_user_localtime(date, org_timezone, date_format="%Y-%m-%d"):
     return timezone.localtime(date, pytz.timezone(org_timezone)).strftime(date_format)
-
 
 def get_feed_type(post):
     """
