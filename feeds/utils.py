@@ -372,7 +372,7 @@ def org_reco_api_query(
             Q(title__icontains=search) |
             Q(description__icontains=search)
         )
-    post_ids = Post.objects.filter(post_query).exclude(exclusion_query or Q(id=None)).distinct("id").values_list("id", flat=True)
+    post_ids = list(Post.objects.filter(post_query).exclude(exclusion_query or Q(id=None)).distinct("id").values_list("id", flat=True))
     return get_related_objects_qs(
         Post.objects.filter(id__in=post_ids).order_by('-priority', '-created_on')
     )
