@@ -62,7 +62,7 @@ def accessible_posts_by_user(user, organization, allow_feedback=False, appreciat
 
     if appreciations:
         query.add(Q(post_type=POST_TYPE.USER_CREATED_APPRECIATION,
-                    created_by__organization__in=user.get_affiliated_orgs(), mark_delete=False), Q.OR)
+                    created_by__organization__in=user.orgs_to_access_appreciation, mark_delete=False), Q.OR)
 
     # get the post belongs to organization
     result = Post.objects.filter(query)
@@ -258,7 +258,7 @@ def accessible_posts_by_user_v2(
 
     if appreciations:
         post_query.add(Q(post_type=POST_TYPE.USER_CREATED_APPRECIATION,
-                         created_by__organization__in=user.get_affiliated_orgs(), mark_delete=False), Q.OR)
+                         created_by__organization__in=user.orgs_to_access_appreciation, mark_delete=False), Q.OR)
 
     feedback_query = Q(post_type=POST_TYPE.FEEDBACK_POST)
     post_query = post_query & (feedback_query if allow_feedback else ~feedback_query)
