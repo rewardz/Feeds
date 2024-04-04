@@ -294,7 +294,6 @@ def fetch_feeds(post_query, limited_date_query, exclusion_query, page_size, orde
     )
 
 
-
 def post_api_query(version, user, post_id, appreciations, query_params):
     """Used to return the list API query for the PostViewSet"""
     departments = user.cached_departments
