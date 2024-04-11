@@ -44,6 +44,7 @@ def accessible_posts_by_user(user, organization, allow_feedback=False, appreciat
     user_depts = getattr(user, USER_DEPARTMENT_RELATED_NAME).all()
     post_query = (
             Q(organizations__in=organization) |
+            Q(user=user) |
             Q(departments__in=user_depts) |
             Q(shared_with=SHARED_WITH.ALL_DEPARTMENTS, created_by__organization__in=organization) |
             Q(shared_with=SHARED_WITH.SELF_DEPARTMENT, created_by__departments__in=user.departments.all()) |
@@ -240,6 +241,7 @@ def accessible_posts_by_user_v2(
     post_query = (
             Q(organizations__in=organization) |
             Q(departments__in=user_depts) |
+            Q(user=user) |
             Q(shared_with=SHARED_WITH.ALL_DEPARTMENTS, created_by__organization__in=organization) |
             Q(shared_with=SHARED_WITH.SELF_DEPARTMENT, created_by__departments__in=user_depts) |
             Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS, job_families__in=[job_family])
