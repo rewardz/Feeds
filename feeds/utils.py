@@ -278,8 +278,28 @@ def accessible_posts_by_user_v2(
     return post_query, get_exclusion_query(user, admin_orgs, user_depts, org_reco_api, job_family), admin_orgs
 
 
-def post_api_query(version, allow_feedback, created_by, user, org, post_id, appreciations, departments):
+def fetch_feeds(post_query, limited_date_query, exclusion_query, page_size, ordering_fields):
+    """Return feeds queryset based on Q queries"""
+    # IMP: Do not remove list from here because with the list it is actually faster refer this
+    # https://github.com/rewardz/Feeds/pull/223#issuecomment-2024339238
+    post_ids = list(Post.objects.filter(limited_date_query).exclude(
+        exclusion_query or Q(id=None)).distinct("id").values_list("id", flat=True))
+
+    if len(post_ids) < page_size:
+        post_ids = list(Post.objects.filter(
+            post_query).exclude(exclusion_query or Q(id=None)).distinct("id").values_list("id", flat=True))
+
+    return get_related_objects_qs(
+        Post.objects.filter(id__in=post_ids).order_by(*ordering_fields)
+    )
+
+
+def post_api_query(version, user, post_id, appreciations, query_params):
     """Used to return the list API query for the PostViewSet"""
+    departments = user.cached_departments
+    allow_feedback = str(query_params.get('feedback', None)) == "true"
+    created_by = query_params.get('created_by', None)
+    org = user.organization
     admin_orgs = user.child_organizations if user.is_staff else None
     exclusion_query = get_exclusion_query(user, admin_orgs, departments, False, user.job_family)
 
@@ -311,18 +331,20 @@ def post_api_query(version, allow_feedback, created_by, user, org, post_id, appr
         exclusion_query = exclusion_query | Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post")
 
     post_query = post_query | posts_shared_with_org_department_query(user, admin_orgs) | get_nomination_query(user)
-    # IMP: Do not remove list from here because with the list it is actually faster refer this
-    # https://github.com/rewardz/Feeds/pull/223#issuecomment-2024339238
-    post_ids = list(Post.objects.filter(post_query).exclude(
-            exclusion_query or Q(id=None)).distinct("id").values_list("id", flat=True))
-    return get_related_objects_qs(
-        Post.objects.filter(id__in=post_ids).order_by('-priority', '-modified_on', '-created_on')
-    )
+    return fetch_feeds(
+        post_query, post_query if allow_feedback else post_query & extract_date_query(query_params),
+        exclusion_query, query_params.get("page_size", settings.FEEDS_PAGE_SIZE),
+        ('-priority', '-modified_on', '-created_on'))
 
-def org_reco_api_query(
-        user, organization, departments, post_polls, version, post_polls_filter, greeting,user_id, search
-):
+
+def org_reco_api_query(user, post_polls, version, greeting, query_params):
     """Used to return the list API query for the org_reco API"""
+    organization = user.organization
+    departments = user.cached_departments
+    post_polls_filter = query_params.get("post_polls_filter", None)
+    user_id = query_params.get("user", None)
+    search = query_params.get("search", None)
+
     post_query, exclusion_query, admin_orgs = accessible_posts_by_user_v2(
         user, organization, False, False if post_polls else True, None, departments, True)
 
@@ -374,12 +396,9 @@ def org_reco_api_query(
             Q(title__icontains=search) |
             Q(description__icontains=search)
         )
-    # IMP: Do not remove list from here because with the list it is actually faster refer this
-    # https://github.com/rewardz/Feeds/pull/223#issuecomment-2024339238
-    post_ids = list(Post.objects.filter(post_query).exclude(exclusion_query or Q(id=None)).distinct("id").values_list("id", flat=True))
-    return get_related_objects_qs(
-        Post.objects.filter(id__in=post_ids).order_by('-priority', '-created_on')
-    )
+    return fetch_feeds(
+        post_query, post_query & extract_date_query(query_params), exclusion_query,
+        query_params.get("page_size", settings.FEEDS_PAGE_SIZE), ('-priority', '-created_on'))
 
 
 def validate_priority(data):
@@ -868,3 +887,19 @@ def get_related_objects_qs(feeds):
         ).prefetch_related(
             "organizations", "transactions", "cc_users", "departments", "job_families", "tagged_users", "tags",
             "images_set", "documents_set", "postliked_set", "comment_set")
+
+
+def extract_date_query(query_params):
+    """Extract date query based on url params to limit the Post results"""
+    days = 90
+    if query_params.get("created_on_after", {}):
+        return Q(created_on__gte=query_params.get("created_on_after"))
+    elif query_params.get("created_on_before", {}):
+        return Q(created_on__lte=query_params.get("created_on_before"))
+    elif query_params.get("created_during", {}):
+        try:
+            days = int(query_params.get("created_during"))
+        except ValueError:
+            pass
+    start_date, end_date = get_date_range(days)
+    return Q(created_on__gte=start_date, created_on__lte=end_date)

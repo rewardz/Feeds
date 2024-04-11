@@ -74,14 +74,11 @@ class PostViewSet(viewsets.ModelViewSet):
     filter_backends = (filters.DjangoFilterBackend,)
 
     def optimized_queryset(self):
-        feedback = self.request.query_params.get('feedback', None)
-        created_by = self.request.query_params.get('created_by', None)
+        query_params = self.request.query_params
         post_id = self.kwargs.get("pk", None)
         user = self.request.user
-        org = user.organization
         result = post_api_query(
-            self.request.version, feedback is not None and feedback == "true", created_by, user, org,
-            post_id, is_appreciation_post(post_id) if post_id else False, user.cached_departments)
+            self.request.version, user, post_id, is_appreciation_post(post_id) if post_id else False, query_params)
         result = PostFilter(self.request.GET, queryset=result).qs
         return result
 
@@ -1246,11 +1243,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         post_polls = request.query_params.get("post_polls", None)
         greeting = request.query_params.get("greeting", None)
         filter_appreciations = Post.objects.none()
-        feeds = org_reco_api_query(
-            user, user.organization, user.cached_departments, post_polls, request.version,
-            request.query_params.get("post_polls_filter", None), greeting, request.query_params.get("user", None),
-            self.request.query_params.get("search", None)
-        )
+        feeds = org_reco_api_query(user, post_polls, request.version, greeting, request.query_params)
         feeds = PostFilter(self.request.GET, queryset=feeds).qs
         if post_polls is None and greeting is None:
             if self.request.GET.get("user_strength", 0):
