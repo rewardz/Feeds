@@ -1244,11 +1244,10 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         greeting = request.query_params.get("greeting", None)
         filter_appreciations = Post.objects.none()
         feeds = org_reco_api_query(user, post_polls, request.version, greeting, request.query_params)
-        feeds = PostFilter(self.request.GET, queryset=feeds).qs
         if post_polls is None and greeting is None:
             if self.request.GET.get("user_strength", 0):
                 filter_appreciations = self.filter_appreciations(feeds)
-
+        feeds = PostFilter(self.request.GET, queryset=feeds).qs
         if filter_appreciations.exists():
             feeds = (feeds | filter_appreciations).distinct()
         page = self.paginate_queryset(feeds)
