@@ -1067,7 +1067,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         requested_user = self.request.user
         user = self.get_user_by_id(user_id, requested_user) if user_id else requested_user
         organization = user.organization
-        posts = accessible_posts_by_user(user, organization)
+        posts = self.get_queryset()
         approvals_count = posts.filter(
             Q(nomination__assigned_reviewer=user) | Q(nomination__alternate_reviewer=user),
             post_type=POST_TYPE.USER_CREATED_NOMINATION
