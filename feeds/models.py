@@ -157,6 +157,7 @@ class Post(UserInfo):
     description = models.TextField(null=True, blank=True)
     user = models.ForeignKey(CustomUser, related_name="appreciated_user", on_delete=models.CASCADE, null=True,
                              blank=True)
+    users = models.ManyToManyField(CustomUser, related_name="appreciated_posts", null=True, blank=True)
     transaction = models.ForeignKey(
         Transaction, related_name="posts", on_delete=models.CASCADE, null=True, blank=True)
     transactions = models.ManyToManyField(Transaction, blank=True)
