@@ -15,7 +15,7 @@ class Command(BaseCommand):
                 user = post.user
                 if user is not None and not post.users.all():
                     post.users.add(user)
-                    if post.user.all().first() != user:
+                    if post.users.all().first() != user:
                         raise Exception("Invalid user migration {}".format(post.id))
             except Exception as e:
                 print("Exception {}".format(str(e)))
