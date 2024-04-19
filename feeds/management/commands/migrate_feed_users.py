@@ -10,8 +10,12 @@ class Command(BaseCommand):
     @write_process_monitor_logs(site="skor", command="migrate_feed_users")
     def handle(self, *args, **options):
         posts = Post.objects.all()
+        cnt = posts.count()
+        print(cnt)
         for post in posts.iterator():
             try:
+                cnt -= 1
+                print(cnt)
                 user = post.user
                 if user is not None and not post.users.all():
                     post.users.add(user)
