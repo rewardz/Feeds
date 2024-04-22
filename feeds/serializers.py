@@ -41,15 +41,17 @@ def get_user_detail(user_id):
 
 
 def get_user_detail_with_org(post, context):
-    user = post.user
-    user_details = UserInfoSerializer(instance=user, read_only=True, context=context).data
+    users = post.users.all()
+    user_details = UserInfoSerializer(users, read_only=True, context=context, many=True).data
     if post.greeting:
-        user_details.update({
-            "organization_name": user.organization.name,
-            "organization_logo": (
-                get_absolute_url(user.organization.display_img_url) if user.organization.display_img_url else ""
-            )
-        })
+        user = users.first()
+        for user_detail in user_details:
+            user_detail.update({
+                "organization_name": user.organization.name,
+                "organization_logo": (
+                    get_absolute_url(user.organization.display_img_url) if user.organization.display_img_url else ""
+                )
+            })
     return user_details
 
 
@@ -62,7 +64,7 @@ def get_info_for_greeting_post(post):
     context = {}
     if post.title == "greeting_post":
         context.update(
-            {"show_greeting_department": post.user.organization.has_setting_to_show_greeting_department})
+            {"show_greeting_department": post.users.first().organization.has_setting_to_show_greeting_department})
     return RepeatedEventSerializer(post.greeting, context=context).data
 
 

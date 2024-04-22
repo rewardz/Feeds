@@ -532,8 +532,7 @@ class PostCertificateRecord(models.Model):
     image = models.ForeignKey(Images, on_delete=models.CASCADE, null=True, blank=True)
 
     def __str__(self):
-        user_email = self.post.user.email if self.post.user else ""
-        return "{}: {}".format(self.post.title, user_email)
+        return "{}: {}".format(self.post.title, ", ".join(self.post.users.values_list("email", flat=True)))
 
 
 auditlog.register(Post, include_fields=['shared_with'])
