@@ -44,7 +44,7 @@ def accessible_posts_by_user(user, organization, allow_feedback=False, appreciat
     user_depts = getattr(user, USER_DEPARTMENT_RELATED_NAME).all()
     post_query = (
             Q(organizations__in=organization) |
-            Q(user=user) |
+            Q(users__in=[user]) |
             Q(departments__in=user_depts) |
             Q(shared_with=SHARED_WITH.ALL_DEPARTMENTS, created_by__organization__in=organization) |
             Q(shared_with=SHARED_WITH.SELF_DEPARTMENT, created_by__departments__in=user.departments.all()) |
@@ -120,7 +120,7 @@ def shared_with_all_departments_but_not_belongs_to_user_org_query(user, exclude_
         return exclude_query
     query = Q(shared_with=SHARED_WITH.ALL_DEPARTMENTS)
     query.add(~Q(created_by__organization=user.organization) &
-              ~Q(created_by=user) & ~Q(user=user) & ~Q(cc_users__in=[user]), query.connector)
+              ~Q(created_by=user) & ~Q(users__in=[user]) & ~Q(cc_users__in=[user]), query.connector)
     return query | exclude_query if exclude_query else query
 
 
@@ -161,7 +161,7 @@ def admin_feeds_to_exclude_query(user, exclude_query):
     """
     if user.is_staff:
         return
-    return exclude_query | (Q(shared_with=SHARED_WITH.ADMIN_ONLY) & (~Q(created_by=user) & ~Q(cc_users__in=[user]) & ~Q(user=user)))
+    return exclude_query | (Q(shared_with=SHARED_WITH.ADMIN_ONLY) & (~Q(created_by=user) & ~Q(cc_users__in=[user]) & ~Q(users__in=[user])))
 
 
 def posts_not_shared_with_self_department_query(user, departments):
@@ -175,7 +175,7 @@ def posts_not_shared_with_self_department_query(user, departments):
         return None
     return (
         Q(shared_with=SHARED_WITH.SELF_DEPARTMENT) & ~Q(created_by__departments__in=departments) &
-        ~Q(user=user) & ~Q(cc_users__in=[user])
+        ~Q(users__in=[user]) & ~Q(cc_users__in=[user])
     )
 
 
@@ -241,7 +241,7 @@ def accessible_posts_by_user_v2(
     post_query = (
             Q(organizations__in=organization) |
             Q(departments__in=user_depts) |
-            Q(user=user) |
+            Q(users__in=[user]) |
             Q(shared_with=SHARED_WITH.ALL_DEPARTMENTS, created_by__organization__in=organization) |
             Q(shared_with=SHARED_WITH.SELF_DEPARTMENT, created_by__departments__in=user_depts) |
             Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS, job_families__in=[job_family])
@@ -355,11 +355,11 @@ def org_reco_api_query(user, post_polls, version, greeting, query_params):
         query_poll = Q(post_type=POST_TYPE.USER_CREATED_POLL)
         if int(version) >= 12:
             query_post.add(
-                Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post", user__is_dob_public=True,
+                Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post", users__is_dob_public=True,
                   greeting__event_type=REPEATED_EVENT_TYPES.event_birthday), Q.OR
             )
             query_post.add(
-                Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post", user__is_anniversary_public=True,
+                Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post", users__is_anniversary_public=True,
                   greeting__event_type=REPEATED_EVENT_TYPES.event_anniversary), Q.OR
             )
 
@@ -372,7 +372,7 @@ def org_reco_api_query(user, post_polls, version, greeting, query_params):
         post_query = post_query & query
     elif greeting:
         post_query = post_query & Q(
-            post_type=POST_TYPE.GREETING_MESSAGE, title="greeting", greeting_id=greeting, user=user,
+            post_type=POST_TYPE.GREETING_MESSAGE, title="greeting", greeting_id=greeting, users__in=[user],
             organizations__in=[organization], created_on__year=timezone.now().year
         )
     else:
@@ -380,20 +380,20 @@ def org_reco_api_query(user, post_polls, version, greeting, query_params):
                  Q(nomination__nom_status=NOMINATION_STATUS.approved, organizations__in=[organization]))
 
         if user_id and str(user_id).isdigit():
-            query.add(Q(user_id=user_id), query.AND)
+            query.add(Q(users__in=[user_id]), query.AND)
 
         post_query =  post_query & query
-        exclusion_query = exclusion_query | Q(user__hide_appreciation=True)
+        exclusion_query = exclusion_query | Q(users__hide_appreciation=True)
 
     if post_polls:
         post_query = post_query | posts_shared_with_org_department_query(user, admin_orgs)
     if search:
         post_query = post_query & (
-            Q(user__first_name__icontains=search) |
-            Q(user__last_name__icontains=search) |
+            Q(users__first_name__icontains=search) |
+            Q(users__last_name__icontains=search) |
             Q(created_by__first_name__icontains=search) |
             Q(created_by__last_name__icontains=search) |
-            Q(user__email__icontains=search) |
+            Q(users__email__icontains=search) |
             Q(created_by__email__icontains=search) |
             Q(title__icontains=search) |
             Q(description__icontains=search)
@@ -701,7 +701,7 @@ def posts_not_shared_with_self_department(posts, user):
 
     return posts.filter(
         Q(shared_with=SHARED_WITH.SELF_DEPARTMENT) & ~Q(created_by__departments__in=user.departments.all()) &
-        ~Q(user=user) & ~Q(cc_users__in=[user])
+        ~Q(users__in=[user]) & ~Q(cc_users__in=[user])
     )
 
 
@@ -758,7 +758,7 @@ def admin_feeds_to_exclude(posts, user):
         return Post.objects.none()
     posts = posts.filter(shared_with=SHARED_WITH.ADMIN_ONLY)
     query = Q(shared_with=SHARED_WITH.ADMIN_ONLY)
-    query.add(~Q(created_by=user) & ~Q(cc_users__in=[user.id]) & ~Q(user=user), query.connector)
+    query.add(~Q(created_by=user) & ~Q(cc_users__in=[user.id]) & ~Q(users__in=[user]), query.connector)
     return posts.filter(query)
 
 
@@ -775,7 +775,7 @@ def shared_with_all_departments_but_not_belongs_to_user_org(posts, user):
 
     query = Q(shared_with=SHARED_WITH.ALL_DEPARTMENTS)
     query.add(~Q(created_by__organization=user.organization) &
-              ~Q(created_by=user) & ~Q(user=user) & ~Q(cc_users__in=[user.id]), query.connector)
+              ~Q(created_by=user) & ~Q(users__in=[user]) & ~Q(cc_users__in=[user.id]), query.connector)
     return posts.filter(query)
 
 
@@ -885,10 +885,10 @@ def get_user_reaction_type(user, post):
 def get_related_objects_qs(feeds):
     """Returns the all related objects in same QS to enhance the performance"""
     return feeds.select_related(
-            "user", "transaction", "nomination", "greeting", "ecard", "modified_by", "created_by"
+            "transaction", "nomination", "greeting", "ecard", "modified_by", "created_by"
         ).prefetch_related(
             "organizations", "transactions", "cc_users", "departments", "job_families", "tagged_users", "tags",
-            "images_set", "documents_set", "postliked_set", "comment_set")
+            "images_set", "documents_set", "postliked_set", "comment_set", "users")
 
 
 def extract_date_query(query_params):
