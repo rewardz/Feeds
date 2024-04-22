@@ -16,7 +16,7 @@ CustomUser = settings.AUTH_USER_MODEL
 @admin.register(Post)
 class PostAdmin(admin.ModelAdmin):
     form = make_ajax_form(Post, {
-        'user': 'CustomUser',
+        'users': 'CustomUser',
     })
     list_display = (
         'title', 'shared_with', 'post_type',
@@ -31,7 +31,7 @@ class PostAdmin(admin.ModelAdmin):
             "widget": FilteredSelectMultiple("", is_stacked=False)
         }
     }
-    search_fields = ('user__email', 'created_by__email', "organizations__name", )
+    search_fields = ('users__email', 'created_by__email', "organizations__name", )
 
 
 @admin.register(Comment)
