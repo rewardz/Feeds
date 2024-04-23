@@ -221,9 +221,10 @@ def posts_shared_with_org_department_query(user, admin_orgs):
     params: admin_orgs: QuerySet[Organization]
     """
     if user.is_staff:
-        return Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS, created_by__organization__in=admin_orgs)
+        return Q(mark_delete=False, shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS, created_by__organization__in=admin_orgs)
+
     return ((Q(created_by=user) | Q(departments__in=[user.department]) | Q(job_families__in=user.job_families)) &
-            Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS,
+            Q(mark_delete=False, shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS,
               post_type__in=[POST_TYPE.USER_CREATED_POST, POST_TYPE.USER_CREATED_POLL]))
 
 
