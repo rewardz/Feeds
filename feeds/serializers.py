@@ -490,7 +490,7 @@ class PostSerializer(DynamicFieldsModelSerializer):
             "shared_with", "images", "documents", "videos",
             "is_owner", "can_edit", "can_delete", "has_appreciated",
             "appreciation_count", "comments_count", "tagged_users", "is_admin", "tags", "reaction_type", "nomination",
-            "feed_type", "user_strength", "user", "user_reaction_type", "gif", "ecard", "points", "time_left",
+            "feed_type", "user_strength", "users", "user_reaction_type", "gif", "ecard", "points", "time_left",
             "images_with_ecard", "departments", "organization", "department", "job_families"
         )
 
@@ -681,7 +681,7 @@ class CommentsLikedSerializer(serializers.ModelSerializer):
 class PostDetailSerializer(PostSerializer):
     comments = serializers.SerializerMethodField()
     appreciated_by = serializers.SerializerMethodField()
-    user = serializers.SerializerMethodField()
+    users = serializers.SerializerMethodField()
     ecard = ECardSerializer(read_only=True)
     category = serializers.CharField(read_only=True)
     category_name = serializers.CharField(read_only=True)
@@ -704,7 +704,7 @@ class PostDetailSerializer(PostSerializer):
             "priority", "prior_till", "shared_with", "images", "documents", "videos",
             "is_owner", "can_edit", "can_delete", "has_appreciated",
             "appreciation_count", "appreciated_by", "comments_count", "comments",
-            "tagged_users", "is_admin", "nomination", "feed_type", "user_strength", "user",
+            "tagged_users", "is_admin", "nomination", "feed_type", "user_strength", "users",
             "gif", "ecard", "points", "user_reaction_type", "images_with_ecard", "reaction_type", "category",
             "category_name", "sub_category", "sub_category_name", "organization_name", "display_status",
             "department_name", "departments", "can_download", "is_download_choice_needed", "greeting_info",
@@ -745,7 +745,7 @@ class PostDetailSerializer(PostSerializer):
     def get_can_download(self, instance):
         return self.context.get("request").user in (instance.user, instance.created_by)
 
-    def get_user(self, post):
+    def get_users(self, post):
         return get_user_detail_with_org(post, {"request": self.context.get("request")})
 
     @staticmethod
@@ -788,7 +788,7 @@ class PostDetailSerializer(PostSerializer):
 
 
 class PostFeedSerializer(PostSerializer):
-    user = serializers.SerializerMethodField()
+    users = serializers.SerializerMethodField()
     ecard = ECardSerializer(read_only=True)
     greeting_info = serializers.SerializerMethodField()
 
@@ -796,7 +796,7 @@ class PostFeedSerializer(PostSerializer):
     def get_greeting_info(post):
         return get_info_for_greeting_post(post)
 
-    def get_user(self, post):
+    def get_users(self, post):
         return get_user_detail_with_org(post, {"request": self.context.get("request")})
 
     class Meta:
@@ -1071,7 +1071,7 @@ class OrganizationRecognitionSerializer(GreetingSerializerBase):
     user_reaction_type = serializers.SerializerMethodField()
     points = serializers.SerializerMethodField()
     nomination = serializers.SerializerMethodField()
-    user = serializers.SerializerMethodField()
+    users = serializers.SerializerMethodField()
 
     def get_modified_on(self, instance):
         if instance.modified_on:
@@ -1121,7 +1121,7 @@ class OrganizationRecognitionSerializer(GreetingSerializerBase):
             instance=instance.nomination, context={"user": self.user}, fields=self.context.get('nomination_fields')
         ).data
 
-    def get_user(self, post):
+    def get_users(self, post):
         return get_user_detail_with_org(post, {"request": self.request})
 
     class Meta:
@@ -1129,7 +1129,7 @@ class OrganizationRecognitionSerializer(GreetingSerializerBase):
         fields = GreetingSerializerBase.Meta.fields + (
             "modified_by", "modified_on", "poll_info", "active_days", "priority", "prior_till", "can_edit",
             "can_delete", "has_appreciated", "appreciation_count", "comments_count", "reaction_type", "nomination",
-            "user_strength", "user", "user_reaction_type", "points", "departments", "job_families"
+            "user_strength", "users", "user_reaction_type", "points", "departments", "job_families"
         )
 
 
