@@ -714,13 +714,12 @@ class PostDetailSerializer(PostSerializer):
     def get_job_families(instance):
         return instance.job_families.values_list("id", flat=True)
 
-    @staticmethod
-    def get_is_download_choice_needed(post):
+    def get_is_download_choice_needed(self, post):
         """
         Decides if popup should be open or not to select image in frontend
         """
         is_download_choice_needed = True
-        if post.certificate_records.count():
+        if post.certificate_records.filter(user=self.context.get("request").user).count():
             # already we have choice selected
             is_download_choice_needed = False
         else:
