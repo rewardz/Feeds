@@ -1,5 +1,5 @@
 from __future__ import print_function
-from feeds.models import Post
+from feeds.models import Post, PostCertificateRecord
 from django.core.management.base import BaseCommand
 from rewardz_utils.processmonitor.decorators import write_process_monitor_logs
 
@@ -24,3 +24,10 @@ class Command(BaseCommand):
             except Exception as e:
                 print("Exception {}".format(str(e)))
                 continue
+
+        appreciation_cert_records = PostCertificateRecord.objects.all()
+        for appreciation_cert_record in appreciation_cert_records:
+            if appreciation_cert_record.user:
+                continue
+            appreciation_cert_record.user = appreciation_cert_record.post.user
+            appreciation_cert_record.save()
