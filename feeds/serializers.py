@@ -41,10 +41,9 @@ def get_user_detail(user_id):
 
 
 def get_user_detail_with_org(post, context):
-    users = post.users.all()
-    user_details = UserInfoSerializer(users, read_only=True, context=context, many=True).data
+    user_details = UserInfoSerializer(post.users, read_only=True, context=context, many=True).data
     if post.greeting:
-        user = users.first()
+        user = post.users.first()
         for user_detail in user_details:
             user_detail.update({
                 "organization_name": user.organization.name,
