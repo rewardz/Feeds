@@ -209,11 +209,14 @@ class PostViewSet(viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         data = self._create_or_update(request, create=True)
+        users =  data.pop("users", [])
         tag_users = data.get('tag_users', None)
         tags = data.get('tags', None)
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
         instance = serializer.save()
+        if users:
+            instance.users.add(*users)
         post_id = instance.id
         if tag_users:
             tag_users_to_post(instance, tag_users)
