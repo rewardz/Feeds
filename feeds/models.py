@@ -157,6 +157,7 @@ class Post(UserInfo):
     description = models.TextField(null=True, blank=True)
     user = models.ForeignKey(CustomUser, related_name="appreciated_user", on_delete=models.CASCADE, null=True,
                              blank=True)
+    users = models.ManyToManyField(CustomUser, related_name="appreciated_posts", null=True, blank=True)
     transaction = models.ForeignKey(
         Transaction, related_name="posts", on_delete=models.CASCADE, null=True, blank=True)
     transactions = models.ManyToManyField(Transaction, blank=True)
@@ -529,10 +530,11 @@ class PostCertificateRecord(models.Model):
     post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name="certificate_records")
     attachment_type = models.SmallIntegerField(choices=POST_CERTIFICATE_ATTACHMENTS(), null=True, blank=True)
     image = models.ForeignKey(Images, on_delete=models.CASCADE, null=True, blank=True)
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, null=True, blank=True,
+                             related_name="post_certificate_records")
 
     def __str__(self):
-        user_email = self.post.user.email if self.post.user else ""
-        return "{}: {}".format(self.post.title, user_email)
+        return "{}: {}".format(self.post.title, getattr(self.user, "email", ""))
 
 
 auditlog.register(Post, include_fields=['shared_with'])
