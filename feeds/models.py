@@ -364,7 +364,6 @@ class Post(UserInfo):
         return self.title if self.title else str(self.pk)
 
     class Meta:
-        models.Index(fields=['created_on'], name='post_created_on_idx'),
         ordering = ("-pk",)
 
 

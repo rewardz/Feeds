@@ -11,7 +11,6 @@ from django.utils import timezone
 from datetime import timedelta
 import calendar
 
-from feeds.filters import PostJobFamilyFilter
 from rest_framework import exceptions, serializers
 
 from .constants import POST_TYPE, SHARED_WITH
@@ -285,6 +284,8 @@ def fetch_feeds(post_query, limited_date_query, exclusion_query, page_size, orde
     """Return feeds queryset based on Q queries"""
     # IMP: Do not remove list from here because with the list it is actually faster refer this
     # https://github.com/rewardz/Feeds/pull/223#issuecomment-2024339238
+    from .filters import PostJobFamilyFilter
+
     queryset = Post.objects.filter(limited_date_query).exclude(exclusion_query)
     if post_ids.count() < page_size:
         queryset = Post.objects.filter(post_query).exclude(exclusion_query)
