@@ -144,7 +144,7 @@ def posts_not_shared_with_org_department_query(user, admin_orgs, departments, ex
                 ~Q(organizations__in=[user.organization]) & ~Q(created_by=user)
         )
         try:
-            query = query & ~Q(job_families__in=[user.job_family])
+            query = query
         except Exception:
             pass
 
@@ -223,7 +223,7 @@ def posts_shared_with_org_department_query(user, admin_orgs):
     if user.is_staff:
         return Q(mark_delete=False, shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS, created_by__organization__in=admin_orgs)
 
-    return ((Q(created_by=user) | Q(departments__in=[user.department]) | Q(job_families__in=user.job_families)) &
+    return ((Q(created_by=user) | Q(departments__in=[user.department])) &
             Q(mark_delete=False, shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS,
               post_type__in=[POST_TYPE.USER_CREATED_POST, POST_TYPE.USER_CREATED_POLL]))
 
@@ -244,8 +244,7 @@ def accessible_posts_by_user_v2(
             Q(departments__in=user_depts) |
             Q(user=user) |
             Q(shared_with=SHARED_WITH.ALL_DEPARTMENTS, created_by__organization__in=organization) |
-            Q(shared_with=SHARED_WITH.SELF_DEPARTMENT, created_by__departments__in=user_depts) |
-            Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS, job_families__in=[job_family])
+            Q(shared_with=SHARED_WITH.SELF_DEPARTMENT, created_by__departments__in=user_depts)
     )
     admin_orgs = None
 
@@ -281,19 +280,23 @@ def accessible_posts_by_user_v2(
     return post_query, get_exclusion_query(user, admin_orgs, user_depts, org_reco_api, job_family), admin_orgs
 
 
-def fetch_feeds(post_query, limited_date_query, exclusion_query, page_size, ordering_fields):
+def fetch_feeds(post_query, limited_date_query, exclusion_query, page_size, ordering_fields, user):
     """Return feeds queryset based on Q queries"""
     # IMP: Do not remove list from here because with the list it is actually faster refer this
     # https://github.com/rewardz/Feeds/pull/223#issuecomment-2024339238
-    post_ids = list(Post.objects.filter(limited_date_query).exclude(
-        exclusion_query or Q(id=None)).distinct("id").values_list("id", flat=True))
+    queryset = Post.objects.filter(limited_date_query).exclude(exclusion_query)
+    if post_ids.count() < page_size:
+        queryset = Post.objects.filter(post_query).exclude(exclusion_query)
 
-    if len(post_ids) < page_size:
-        post_ids = list(Post.objects.filter(
-            post_query).exclude(exclusion_query or Q(id=None)).distinct("id").values_list("id", flat=True))
-
+    post_ids = set(queryset.values_list('id', flat=True))
+    filter_params = {
+        'job_families_non_null': True,
+        'job_families__in': [user.job_family.id],
+    }
+    queryset = PostFilter(filter_params, queryset=Post.objects.filter(id__in=set(post_ids.values_list('id', flat=True)))).queryset
     return get_related_objects_qs(
-        Post.objects.filter(id__in=post_ids).order_by(*ordering_fields)
+        Post.objects.filter(id__in=post_ids)
+        .order_by(*ordering_fields)
     )
 
 
@@ -337,7 +340,7 @@ def post_api_query(version, user, post_id, appreciations, query_params):
     return fetch_feeds(
         post_query, post_query if allow_feedback else post_query & extract_date_query(query_params),
         exclusion_query, query_params.get("page_size", settings.FEEDS_PAGE_SIZE),
-        ('-priority', '-modified_on', '-created_on'))
+        ('-priority', '-modified_on', '-created_on'), user)
 
 
 def org_reco_api_query(user, post_polls, version, greeting, query_params):
@@ -401,7 +404,7 @@ def org_reco_api_query(user, post_polls, version, greeting, query_params):
         )
     return fetch_feeds(
         post_query, post_query & extract_date_query(query_params), exclusion_query,
-        query_params.get("page_size", settings.FEEDS_PAGE_SIZE), ('-priority', '-created_on'))
+        query_params.get("page_size", settings.FEEDS_PAGE_SIZE), ('-priority', '-created_on'), user)
 
 
 def validate_priority(data):
