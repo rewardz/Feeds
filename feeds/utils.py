@@ -287,7 +287,7 @@ def fetch_feeds(post_query, limited_date_query, exclusion_query, page_size, orde
     from .filters import PostJobFamilyFilter
 
     queryset = Post.objects.filter(limited_date_query).exclude(exclusion_query)
-    if post_ids.count() < page_size:
+    if queryset.count() < page_size:
         queryset = Post.objects.filter(post_query).exclude(exclusion_query)
 
     post_ids = set(queryset.values_list('id', flat=True))
