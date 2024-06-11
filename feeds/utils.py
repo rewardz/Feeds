@@ -11,6 +11,7 @@ from django.utils import timezone
 from datetime import timedelta
 import calendar
 
+from feeds.filters import PostJobFamilyFilter
 from rest_framework import exceptions, serializers
 
 from .constants import POST_TYPE, SHARED_WITH
@@ -290,13 +291,12 @@ def fetch_feeds(post_query, limited_date_query, exclusion_query, page_size, orde
 
     post_ids = set(queryset.values_list('id', flat=True))
     filter_params = {
-        'job_families_non_null': True,
         'job_families__in': [user.job_family.id],
     }
-    queryset = PostFilter(filter_params, queryset=Post.objects.filter(id__in=set(post_ids.values_list('id', flat=True)))).queryset
+    queryset = Post.objects.filter(id__in=post_ids)
+    queryset = PostJobFamilyFilter(filter_params, queryset=queryset).queryset
     return get_related_objects_qs(
-        Post.objects.filter(id__in=post_ids)
-        .order_by(*ordering_fields)
+        queryset.order_by(*ordering_fields)
     )
 
 
