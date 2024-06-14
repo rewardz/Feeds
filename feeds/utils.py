@@ -283,11 +283,11 @@ def fetch_feeds(post_query, limited_date_query, exclusion_query, page_size, orde
         queryset = Post.objects.filter(post_query).exclude(exclusion_query)
 
     post_ids = set(queryset.values_list('id', flat=True))
+    queryset = Post.objects.filter(id__in=post_ids)
     if getattr(user, 'job_family', None):
         filter_params = {
             'job_families__in': [user.job_family.id],
         }
-        queryset = Post.objects.filter(id__in=post_ids)
         queryset = PostJobFamilyFilter(filter_params, queryset=queryset).queryset
     return get_related_objects_qs(
         queryset.order_by(*ordering_fields)

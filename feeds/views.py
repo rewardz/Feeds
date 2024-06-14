@@ -536,9 +536,9 @@ class PostViewSet(viewsets.ModelViewSet):
         if not post_id:
             raise ValidationError(_('Post ID required to appreciate a post'))
         post_id = int(post_id)
-        accessible_posts = accessible_posts_by_user(
+        accessible_posts = set(accessible_posts_by_user(
             user, user.organization, False, is_appreciation_post(post_id), post_id
-        ).values_list('id', flat=True)
+        ).values_list('id', flat=True))
         if post_id not in accessible_posts:
             raise ValidationError(_('You do not have access to this post'))
         reaction_type = self.request.data.get('type', 0)  # to handle existing workflow
@@ -592,8 +592,8 @@ class PostViewSet(viewsets.ModelViewSet):
         if not post_id:
             raise ValidationError(_('Post ID required to appreciate a post'))
         post_id = int(post_id)
-        accessible_posts = accessible_posts_by_user(user, organization, False, False, post_id). \
-            values_list('id', flat=True)
+        accessible_posts =set(accessible_posts_by_user(user, organization, False, False, post_id). \
+            values_list('id', flat=True))
         if post_id not in accessible_posts:
             raise ValidationError(_('You do not have access to this post'))
         posts_liked = PostLiked.objects.filter(post_id=post_id)
@@ -613,7 +613,7 @@ class PostViewSet(viewsets.ModelViewSet):
         if not post_id:
             raise ValidationError(_('Post ID required to retrieve all the related answers'))
         post_id = int(post_id)
-        accessible_posts = accessible_posts_by_user(user, organization, False, False, post_id).values_list('id', flat=True)
+        accessible_posts = set(accessible_posts_by_user(user, organization, False, False, post_id).values_list('id', flat=True))
         accessible_polls = accessible_posts.filter(post_type=POST_TYPE.USER_CREATED_POLL)
         if post_id not in accessible_polls:
             raise ValidationError(_('This is not a poll.'))
@@ -644,7 +644,7 @@ class PostViewSet(viewsets.ModelViewSet):
         if not post_id:
             raise ValidationError(_('Post ID required to vote'))
         post_id = int(post_id)
-        accessible_posts = accessible_posts_by_user(user, organization, False, False, post_id).values_list('id', flat=True)
+        accessible_posts = set(accessible_posts_by_user(user, organization, False, False, post_id).values_list('id', flat=True))
         if post_id not in accessible_posts:
             raise ValidationError(_('You do not have access'))
         accessible_polls = accessible_posts.filter(
@@ -672,9 +672,9 @@ class PostViewSet(viewsets.ModelViewSet):
         post_id = int(post_id)
         payload = self.request.data
         data = {k: v for k, v in payload.items()}
-        accessible_posts = accessible_posts_by_user(
+        accessible_posts = set(accessible_posts_by_user(
             user, user.organization, False, is_appreciation_post(post_id), post_id
-        ).values_list('id', flat=True)
+        ).values_list('id', flat=True))
         if post_id not in accessible_posts:
             raise ValidationError(_('You do not have access'))
         data["flagger"] = user.id
@@ -699,7 +699,7 @@ class PostViewSet(viewsets.ModelViewSet):
         if not post_id:
             raise ValidationError(_('Post ID required to set priority'))
         post_id = int(post_id)
-        accessible_posts = accessible_posts_by_user(user, organization, False, False, post_id).values_list('id', flat=True)
+        accessible_posts = set(accessible_posts_by_user(user, organization, False, False, post_id).values_list('id', flat=True))
         if post_id not in accessible_posts:
             raise ValidationError(_('You do not have access'))
         try:
