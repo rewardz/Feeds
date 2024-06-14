@@ -276,19 +276,16 @@ def fetch_feeds(post_query, limited_date_query, exclusion_query, page_size, orde
     """Return feeds queryset based on Q queries"""
     # IMP: Do not remove list from here because with the list it is actually faster refer this
     # https://github.com/rewardz/Feeds/pull/223#issuecomment-2024339238
-    from .filters import PostJobFamilyFilter
 
     queryset = Post.objects.filter(limited_date_query).exclude(exclusion_query)
     if queryset.count() < page_size:
         queryset = Post.objects.filter(post_query).exclude(exclusion_query)
 
     post_ids = set(queryset.values_list('id', flat=True))
-    queryset = Post.objects.filter(id__in=post_ids)
     if getattr(user, 'job_family', None):
-        filter_params = {
-            'job_families__in': [user.job_family.id],
-        }
-        queryset = PostJobFamilyFilter(filter_params, queryset=queryset).queryset
+        new_queryset = user.job_family.posts.values_list('id', flat=True)
+        post_ids = set(new_queryset).union(post_ids)
+    queryset = Post.objects.filter(id__in=post_ids)
     return get_related_objects_qs(
         queryset.order_by(*ordering_fields)
     )

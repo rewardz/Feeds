@@ -89,11 +89,3 @@ class PostFilter(PostFilterBase):
     @staticmethod
     def user_strength_filter(queryset, name, value):
         return queryset.filter(nomination__user_strength__in=value)
-
-
-class PostJobFamilyFilter(django_filters.FilterSet):
-    class Meta:
-        model = Post
-        fields = {
-            'job_families': ['in']
-        }
