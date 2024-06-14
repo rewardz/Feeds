@@ -364,7 +364,7 @@ class PostViewSet(viewsets.ModelViewSet):
             # Whenever there's post_id, which means we just want to get one post only
             # so better to filter using that post_id, so that it's a lot faster as our get_queryset is not fully
             # lazily evaluated
-            result = result.filter(id=post_id)
+            result = result.filter(id=post_id).distinct()
         else:
             post_ids = set(result.values_list('id', flat=True))
             result = Post.objects.filter(id__in=post_ids)
