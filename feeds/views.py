@@ -329,8 +329,13 @@ class PostViewSet(viewsets.ModelViewSet):
         else:
             if allow_feedback and user.is_staff:
                 org = list(user.child_organizations.values_list("id", flat=True))
-            result = accessible_posts_by_user(user, org, allow_feedback=allow_feedback,
-                                              appreciations=is_appreciation_post(post_id) if post_id else False)
+            result = accessible_posts_by_user(
+                user,
+                org,
+                allow_feedback=allow_feedback,
+                appreciations=is_appreciation_post(post_id) if post_id else False,
+                post_id=post_id
+            )
 
         if created_by in ("user_org", "user_dept"):
             if user.is_staff:
@@ -348,16 +353,22 @@ class PostViewSet(viewsets.ModelViewSet):
             # For list api below version 12 we are excluding system created greeting post
             result = result.exclude(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post")
 
-        posts_ids_to_exclude = list(posts_not_shared_with_self_department(result, user).values_list("id", flat=True))
-        posts_ids_to_exclude.extend(list(posts_not_shared_with_job_family(result, user).values_list("id", flat=True)))
+        posts_ids_to_exclude = set(posts_not_shared_with_self_department(result, user).values_list("id", flat=True))
+        posts_ids_to_exclude.union(set(posts_not_shared_with_job_family(result, user).values_list("id", flat=True)))
         posts_ids_not_to_exclude = assigned_nomination_post_ids(user)
-        posts_ids_to_exclude = list(set(posts_ids_to_exclude) - set(posts_ids_not_to_exclude))
+        posts_ids_to_exclude = posts_ids_to_exclude - set(posts_ids_not_to_exclude)
 
         result = result.exclude(id__in=posts_ids_to_exclude)
-
-        result = get_related_objects_qs((result | posts_shared_with_org_department(
-            user, [POST_TYPE.USER_CREATED_POST, POST_TYPE.USER_CREATED_POLL],
-            result.values_list("id", flat=True)))).distinct()
+        result |= posts_shared_with_org_department(user, [POST_TYPE.USER_CREATED_POST, POST_TYPE.USER_CREATED_POLL], [])
+        if post_id:
+            # Whenever there's post_id, which means we just want to get one post only
+            # so better to filter using that post_id, so that it's a lot faster as our get_queryset is not fully
+            # lazily evaluated
+            result = result.filter(id=post_id).distinct()
+        else:
+            post_ids = set(result.values_list('id', flat=True))
+            result = Post.objects.filter(id__in=post_ids)
+        result = get_related_objects_qs(result)
 
         result = PostFilter(self.request.GET, queryset=result).qs
         result = result.order_by('-priority', '-modified_on', '-created_on')
@@ -525,9 +536,9 @@ class PostViewSet(viewsets.ModelViewSet):
         if not post_id:
             raise ValidationError(_('Post ID required to appreciate a post'))
         post_id = int(post_id)
-        accessible_posts = accessible_posts_by_user(
+        accessible_posts = set(accessible_posts_by_user(
             user, user.organization, False, is_appreciation_post(post_id), post_id
-        ).values_list('id', flat=True)
+        ).values_list('id', flat=True))
         if post_id not in accessible_posts:
             raise ValidationError(_('You do not have access to this post'))
         reaction_type = self.request.data.get('type', 0)  # to handle existing workflow
@@ -661,9 +672,9 @@ class PostViewSet(viewsets.ModelViewSet):
         post_id = int(post_id)
         payload = self.request.data
         data = {k: v for k, v in payload.items()}
-        accessible_posts = accessible_posts_by_user(
+        accessible_posts = set(accessible_posts_by_user(
             user, user.organization, False, is_appreciation_post(post_id), post_id
-        ).values_list('id', flat=True)
+        ).values_list('id', flat=True))
         if post_id not in accessible_posts:
             raise ValidationError(_('You do not have access'))
         data["flagger"] = user.id
@@ -1098,7 +1109,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             except ValueError:
                 raise ValidationError(_('strength should be numeric value.'))
 
-            posts = accessible_posts_by_user(user, organization, False, True, None)
+            posts = accessible_posts_by_user(user, organization, False, True, None).distinct()
             user_appreciations = posts.filter(
                 user=user, post_type=POST_TYPE.USER_CREATED_APPRECIATION).values(
                 'transactions__context', 'transactions__creator')

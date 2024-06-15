@@ -79,7 +79,6 @@ def accessible_posts_by_user(user, organization, allow_feedback=False, appreciat
     # after calling this method
     if not user.is_staff:
         return result
-    post_ids = list(set(result.values_list("id", flat=True)))
 
     # If the post is shared with self department and admin's department is another than creators department
     # then post org will be None, so we have to allow that post to admin
@@ -90,22 +89,15 @@ def accessible_posts_by_user(user, organization, allow_feedback=False, appreciat
     else:
         post_query = post_query & Q(created_by__organization=user.organization)
 
-    posts = Post.objects.filter(post_query).exclude(id__in=post_ids).values_list("id", flat=True)
-
-    if posts:
-        post_ids.extend(list(posts))
+    posts = Post.objects.filter(post_query) | result
 
     if post_id:
         # Added this condition because we are allowing admin to see the post if that post does not belongs
         # to his department then admin can access that post
         orgs = admin_orgs.values_list("id", flat=True) if allow_feedback else [user.organization_id]
-        if (
-                post_id not in post_ids
-                and Post.objects.filter(id=post_id, created_by__organization_id__in=orgs).exists()
-        ):
-            post_ids.append(post_id)
+        posts |= Post.objects.filter(id=post_id, created_by__organization_id__in=orgs)
 
-    return Post.objects.filter(id__in=post_ids, mark_delete=False)
+    return posts.filter(mark_delete=False)
 
 
 def shared_with_all_departments_but_not_belongs_to_user_org_query(user, exclude_query):
@@ -284,7 +276,6 @@ def fetch_feeds(post_query, limited_date_query, exclusion_query, page_size, orde
     """Return feeds queryset based on Q queries"""
     # IMP: Do not remove list from here because with the list it is actually faster refer this
     # https://github.com/rewardz/Feeds/pull/223#issuecomment-2024339238
-    from .filters import PostJobFamilyFilter
 
     queryset = Post.objects.filter(limited_date_query).exclude(exclusion_query)
     if queryset.count() < page_size:
@@ -292,11 +283,9 @@ def fetch_feeds(post_query, limited_date_query, exclusion_query, page_size, orde
 
     post_ids = set(queryset.values_list('id', flat=True))
     if getattr(user, 'job_family', None):
-        filter_params = {
-            'job_families__in': [user.job_family.id],
-        }
-        queryset = Post.objects.filter(id__in=post_ids)
-        queryset = PostJobFamilyFilter(filter_params, queryset=queryset).queryset
+        new_queryset = user.job_family.posts.values_list('id', flat=True)
+        post_ids = set(new_queryset).union(post_ids)
+    queryset = Post.objects.filter(id__in=post_ids)
     return get_related_objects_qs(
         queryset.order_by(*ordering_fields)
     )
