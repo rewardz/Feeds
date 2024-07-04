@@ -167,7 +167,7 @@ class Post(UserInfo):
     gif = models.URLField(null=True, blank=True)
     cc_users = models.ManyToManyField(CustomUser, related_name="cc_users", blank=True)
     published_date = models.DateTimeField(blank=True, null=True)
-    priority = models.BooleanField(default=False)
+    priority = models.BooleanField(default=False, db_index=True)
     prior_till = models.DateTimeField(blank=True, null=True)
     shared_with = models.SmallIntegerField(
         choices=SHARED_WITH(),
