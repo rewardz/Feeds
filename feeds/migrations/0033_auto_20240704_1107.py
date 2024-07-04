@@ -9,7 +9,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
-        ('feeds', '0033_auto_20240418_0715'),
+        ('feeds', '0032_auto_20240329_0504'),
     ]
 
     operations = [
@@ -18,4 +18,9 @@ class Migration(migrations.Migration):
             name='users',
             field=models.ManyToManyField(related_name='appreciated_posts', null=True, to=settings.AUTH_USER_MODEL, blank=True),
         ),
+        migrations.AddField(
+            model_name='postcertificaterecord',
+            name='user',
+            field=models.ForeignKey(related_name='post_certificate_records', blank=True, to=settings.AUTH_USER_MODEL, null=True),
+        )
     ]
