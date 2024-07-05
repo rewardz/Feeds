@@ -1185,7 +1185,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         # ToDo : once app updated, remove it ("badges" from nomination_field)
         serializer = PostFeedSerializer(queryset, many=True, context={
             "request": request, "nomination_fields": ["badges", "badge", "strength"]}, fields=[
-            "id", "description", "nomination"])
+            "id", "description", "nomination", "created_on"])
         return Response({"badges": serializer.data})
 
     @list_route(methods=["GET"], permission_classes=(IsOptionsOrAuthenticated,))
