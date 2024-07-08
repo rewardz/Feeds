@@ -22,7 +22,7 @@ class PostAdmin(admin.ModelAdmin):
         'title', 'shared_with', 'post_type',
         'created_by', 'created_on', 'modified_on', 'modified_by', 'mark_delete',
     )
-    readonly_fields = ('transactions', 'nomination', 'cc_users', 'created_by', 'modified_by',)
+    readonly_fields = ('transaction', 'transactions', 'nomination', 'cc_users', 'created_by', 'modified_by',)
     list_filter = ('priority', 'mark_delete', 'organizations')
 
     formfield_overrides = {
