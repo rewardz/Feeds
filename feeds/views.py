@@ -420,13 +420,17 @@ class PostViewSet(viewsets.ModelViewSet):
         """
         Allow Owner or if user is admin
         """
-        user = self.request.user
-        feedback_post_creators = list(accessible_posts_queryset.values_list("created_by_id", flat=True))
-        # Allow if user is creator or admin
-        if user.id in feedback_post_creators or user.is_staff:
-            return True
+        try:
 
-        raise ValidationError(_('You do not have access to comment on this post'))
+            user = self.request.user
+            if user.is_staff:
+                return
+            feedback_post_creators = list(accessible_posts_queryset.values_list("created_by_id", flat=True))
+            # Allow if user is creator or admin
+            if user.id in feedback_post_creators or user.is_staff:
+                return True
+
+            raise ValidationError(_('You do not have access to comment on this post'))
 
     @detail_route(methods=["GET", "POST"], permission_classes=(IsOptionsOrAuthenticated,))
     def comments(self, request, *args, **kwargs):
@@ -451,9 +455,13 @@ class PostViewSet(viewsets.ModelViewSet):
         )
         accessible_posts_queryset = accessible_posts_by_user(
             user, org, allow_feedback, is_appreciation_post(post_id), post_id
-        ).values_list('id', flat=True)
-        accessible_posts = accessible_posts_queryset.values_list('id', flat=True)
-        if post_id not in accessible_posts:
+        )
+        try:
+            query = Q(id=post_id, mark_delete=False)
+            if self.request.method == "POST" and allow_feedback and not user.is_staff:
+                query = query & Q(created_by=user)
+            post = accessible_posts_queryset.distinct().get(query)
+        except Post.DoesNotExist:
             raise ValidationError(_('You do not have access to comment on this post'))
         if self.request.method == "GET":
             serializer_context = {'request': self.request}
@@ -483,9 +491,6 @@ class PostViewSet(viewsets.ModelViewSet):
                 comments, many=True, read_only=True, context=serializer_context)
             return Response(serializer.data)
         elif self.request.method == "POST":
-            if allow_feedback:
-                self.user_allowed_to_comment(accessible_posts_queryset=accessible_posts_queryset)
-
             payload = self.request.data
             data = {k: v for k, v in payload.items()}
 
@@ -523,7 +528,6 @@ class PostViewSet(viewsets.ModelViewSet):
 
             if tag_users:
                 tag_users_to_comment(inst, tag_users)
-            post = Post.objects.filter(id=post_id).first()
             if post:
                 notify_new_comment(inst, self.request.user)
             return Response(serializer.data)
