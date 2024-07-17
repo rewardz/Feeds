@@ -374,6 +374,7 @@ class PostViewSet(viewsets.ModelViewSet):
         result = result.order_by('-priority', '-modified_on', '-created_on')
         return result
 
+
     @list_route(methods=["POST"], permission_classes=(IsOptionsOrAuthenticated,))
     def create_poll(self, request, *args, **kwargs):
         context = {'request': request}
@@ -447,6 +448,7 @@ class PostViewSet(viewsets.ModelViewSet):
             post = accessible_posts_queryset.distinct().get(query)
         except Post.DoesNotExist:
             raise ValidationError(_('You do not have access to comment on this post'))
+
         if self.request.method == "GET":
             serializer_context = {'request': self.request}
 
@@ -524,15 +526,19 @@ class PostViewSet(viewsets.ModelViewSet):
         if not post_id:
             raise ValidationError(_('Post ID required to appreciate a post'))
         post_id = int(post_id)
-        accessible_posts = set(accessible_posts_by_user(
+        accessible_posts = accessible_posts_by_user(
             user, user.organization, False, is_appreciation_post(post_id), post_id
-        ).values_list('id', flat=True))
-        if post_id not in accessible_posts:
+        )
+        try:
+            post = accessible_posts.distinct().get(id=post_id)
+        except Post.DoesNotExist:
             raise ValidationError(_('You do not have access to this post'))
+
         reaction_type = self.request.data.get('type', 0)  # to handle existing workflow
         object_type = NOTIFICATION_OBJECT_TYPE
-        if PostLiked.objects.filter(post_id=post_id, created_by=user).exists():
-            user_reactions = PostLiked.objects.filter(post_id=post_id, created_by=user, reaction_type=reaction_type)
+        post_liked = PostLiked.objects.filter(post_id=post_id, created_by=user)
+        if post_liked.exists():
+            user_reactions = post_liked.filter(reaction_type=reaction_type)
             if user_reactions.exists():
                 user_reactions.delete()
                 liked = False
@@ -548,7 +554,6 @@ class PostViewSet(viewsets.ModelViewSet):
             message = "Successfully Added Reaction"
             liked = True
             response_status = status.HTTP_201_CREATED
-            post = Post.objects.filter(id=post_id).first()
             user_name = get_user_name(user)
             if post:
                 send_notification = True
@@ -580,9 +585,10 @@ class PostViewSet(viewsets.ModelViewSet):
         if not post_id:
             raise ValidationError(_('Post ID required to appreciate a post'))
         post_id = int(post_id)
-        accessible_posts = accessible_posts_by_user(user, organization, False, False, post_id). \
-            values_list('id', flat=True)
-        if post_id not in accessible_posts:
+        try:
+            accessible_posts = accessible_posts_by_user(user, organization, False, False, post_id)
+            accessible_posts.distinct().get(id=post_id)
+        except Post.DoesNotExist:
             raise ValidationError(_('You do not have access to this post'))
         posts_liked = PostLiked.objects.filter(post_id=post_id)
         page = self.paginate_queryset(posts_liked)
@@ -601,12 +607,13 @@ class PostViewSet(viewsets.ModelViewSet):
         if not post_id:
             raise ValidationError(_('Post ID required to retrieve all the related answers'))
         post_id = int(post_id)
-        accessible_posts = accessible_posts_by_user(user, organization, False, False, post_id).values_list('id', flat=True)
-        accessible_polls = accessible_posts.filter(post_type=POST_TYPE.USER_CREATED_POLL)
-        if post_id not in accessible_polls:
-            raise ValidationError(_('This is not a poll.'))
-        if post_id not in accessible_posts:
-            raise ValidationError(_('You do not have access to check the answers to this poll'))
+        try:
+            accessible_posts_by_user(user, organization, False, False, post_id).distinct().get(
+                post_type=POST_TYPE.USER_CREATED_POLL, id=post_id
+            )
+        except Post.DoesNotExist:
+            raise ValidationError(_('You do not have access to this poll'))
+
         if request.method == 'GET':
             answers = PollsAnswer.objects.filter(question=post_id)
             serializer = PollsAnswerSerializer(answers, many=True, read_only=True)
@@ -632,20 +639,13 @@ class PostViewSet(viewsets.ModelViewSet):
         if not post_id:
             raise ValidationError(_('Post ID required to vote'))
         post_id = int(post_id)
-        accessible_posts = accessible_posts_by_user(user, organization, False, False, post_id).values_list('id', flat=True)
-        if post_id not in accessible_posts:
-            raise ValidationError(_('You do not have access'))
-        accessible_polls = accessible_posts.filter(
-            post_type=POST_TYPE.USER_CREATED_POLL
-        )
-        if post_id not in accessible_polls:
-            raise ValidationError(_('This is not a poll question'))
-        poll = None
         try:
-            poll = Post.objects.get(id=post_id)
-            poll.vote(user, answer_id)
+            poll = accessible_posts_by_user(user, organization, False, False, post_id).distinct().get(
+                post_type=POST_TYPE.USER_CREATED_POLL, id=post_id)
         except Post.DoesNotExist:
-            raise ValidationError(_('Poll does not exist.'))
+            raise ValidationError(_('You do not have access to this poll'))
+        try:
+            poll.vote(user, answer_id)
         except PollsAnswer.DoesNotExist:
             raise ValidationError(_('This is not a correct answer.'))
         serializer = self.get_serializer(poll)
