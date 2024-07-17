@@ -416,22 +416,6 @@ class PostViewSet(viewsets.ModelViewSet):
             order_by = default_order
         return order_by
 
-    def user_allowed_to_comment(self, accessible_posts_queryset):
-        """
-        Allow Owner or if user is admin
-        """
-        try:
-
-            user = self.request.user
-            if user.is_staff:
-                return
-            feedback_post_creators = list(accessible_posts_queryset.values_list("created_by_id", flat=True))
-            # Allow if user is creator or admin
-            if user.id in feedback_post_creators or user.is_staff:
-                return True
-
-            raise ValidationError(_('You do not have access to comment on this post'))
-
     @detail_route(methods=["GET", "POST"], permission_classes=(IsOptionsOrAuthenticated,))
     def comments(self, request, *args, **kwargs):
         """
