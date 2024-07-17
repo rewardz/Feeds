@@ -421,7 +421,7 @@ class PostViewSet(viewsets.ModelViewSet):
         try:
             return accessible_posts_by_user(user, org, allow_feedback, appreciations, post_id).distinct().get(query)
         except Post.DoesNotExist:
-            raise ValidationError(_('You do not have access to this post'))
+            raise ValidationError(_('You do not have access'))
 
     @detail_route(methods=["GET", "POST"], permission_classes=(IsOptionsOrAuthenticated,))
     def comments(self, request, *args, **kwargs):
