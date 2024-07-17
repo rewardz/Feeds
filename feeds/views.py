@@ -374,7 +374,6 @@ class PostViewSet(viewsets.ModelViewSet):
         result = result.order_by('-priority', '-modified_on', '-created_on')
         return result
 
-
     @list_route(methods=["POST"], permission_classes=(IsOptionsOrAuthenticated,))
     def create_poll(self, request, *args, **kwargs):
         context = {'request': request}
@@ -417,6 +416,13 @@ class PostViewSet(viewsets.ModelViewSet):
             order_by = default_order
         return order_by
 
+    @staticmethod
+    def get_post_by_id(user, org, allow_feedback, appreciations, post_id, query):
+        try:
+            return accessible_posts_by_user(user, org, allow_feedback, appreciations, post_id).distinct().get(query)
+        except Post.DoesNotExist:
+            raise ValidationError(_('You do not have access to this post'))
+
     @detail_route(methods=["GET", "POST"], permission_classes=(IsOptionsOrAuthenticated,))
     def comments(self, request, *args, **kwargs):
         """
@@ -438,16 +444,11 @@ class PostViewSet(viewsets.ModelViewSet):
             list(user.child_organizations.values_list("id", flat=True))
             if allow_feedback and user.is_staff else user.organization
         )
-        accessible_posts_queryset = accessible_posts_by_user(
-            user, org, allow_feedback, is_appreciation_post(post_id), post_id
-        )
-        try:
-            query = Q(id=post_id, mark_delete=False)
-            if self.request.method == "POST" and allow_feedback and not user.is_staff:
-                query = query & Q(created_by=user)
-            post = accessible_posts_queryset.distinct().get(query)
-        except Post.DoesNotExist:
-            raise ValidationError(_('You do not have access to comment on this post'))
+        query = Q(id=post_id, mark_delete=False)
+        if self.request.method == "POST" and allow_feedback and not user.is_staff:
+            query = query & Q(created_by=user)
+
+        post = self.get_post_by_id(user, org, allow_feedback, is_appreciation_post(post_id), post_id, query)
 
         if self.request.method == "GET":
             serializer_context = {'request': self.request}
@@ -526,14 +527,8 @@ class PostViewSet(viewsets.ModelViewSet):
         if not post_id:
             raise ValidationError(_('Post ID required to appreciate a post'))
         post_id = int(post_id)
-        accessible_posts = accessible_posts_by_user(
-            user, user.organization, False, is_appreciation_post(post_id), post_id
-        )
-        try:
-            post = accessible_posts.distinct().get(id=post_id)
-        except Post.DoesNotExist:
-            raise ValidationError(_('You do not have access to this post'))
-
+        organization = user.organization
+        post = self.get_post_by_id(user, organization, False, is_appreciation_post(post_id), post_id, Q(id=post_id))
         reaction_type = self.request.data.get('type', 0)  # to handle existing workflow
         object_type = NOTIFICATION_OBJECT_TYPE
         post_liked = PostLiked.objects.filter(post_id=post_id, created_by=user)
@@ -585,11 +580,7 @@ class PostViewSet(viewsets.ModelViewSet):
         if not post_id:
             raise ValidationError(_('Post ID required to appreciate a post'))
         post_id = int(post_id)
-        try:
-            accessible_posts = accessible_posts_by_user(user, organization, False, False, post_id)
-            accessible_posts.distinct().get(id=post_id)
-        except Post.DoesNotExist:
-            raise ValidationError(_('You do not have access to this post'))
+        post = self.get_post_by_id(user, organization, False, False, post_id, Q(id=post_id))
         posts_liked = PostLiked.objects.filter(post_id=post_id)
         page = self.paginate_queryset(posts_liked)
         if page is not None:
@@ -607,13 +598,8 @@ class PostViewSet(viewsets.ModelViewSet):
         if not post_id:
             raise ValidationError(_('Post ID required to retrieve all the related answers'))
         post_id = int(post_id)
-        try:
-            accessible_posts_by_user(user, organization, False, False, post_id).distinct().get(
-                post_type=POST_TYPE.USER_CREATED_POLL, id=post_id
-            )
-        except Post.DoesNotExist:
-            raise ValidationError(_('You do not have access to this poll'))
-
+        self.get_post_by_id(
+            user, organization, False, False, post_id, Q(id=post_id, post_type=POST_TYPE.USER_CREATED_POLL))
         if request.method == 'GET':
             answers = PollsAnswer.objects.filter(question=post_id)
             serializer = PollsAnswerSerializer(answers, many=True, read_only=True)
@@ -639,11 +625,8 @@ class PostViewSet(viewsets.ModelViewSet):
         if not post_id:
             raise ValidationError(_('Post ID required to vote'))
         post_id = int(post_id)
-        try:
-            poll = accessible_posts_by_user(user, organization, False, False, post_id).distinct().get(
-                post_type=POST_TYPE.USER_CREATED_POLL, id=post_id)
-        except Post.DoesNotExist:
-            raise ValidationError(_('You do not have access to this poll'))
+        poll = self.get_post_by_id(
+            user, organization, False, False, post_id, Q(id=post_id, post_type=POST_TYPE.USER_CREATED_POLL))
         try:
             poll.vote(user, answer_id)
         except PollsAnswer.DoesNotExist:
@@ -660,22 +643,15 @@ class PostViewSet(viewsets.ModelViewSet):
         post_id = int(post_id)
         payload = self.request.data
         data = {k: v for k, v in payload.items()}
-        accessible_posts = set(accessible_posts_by_user(
-            user, user.organization, False, is_appreciation_post(post_id), post_id
-        ).values_list('id', flat=True))
-        if post_id not in accessible_posts:
-            raise ValidationError(_('You do not have access'))
+        post = self.get_post_by_id(
+            user, user.organization, False, is_appreciation_post(post_id), post_id, Q(id=post_id))
         data["flagger"] = user.id
-        try:
-            post = Post.objects.get(id=post_id)
-            data["post"] = post.pk
-            serializer = FlagPostSerializer(data=data)
-            serializer.is_valid(raise_exception=True)
-            serializer.save()
-            notify_flagged_post(post, self.request.user, data["notes"])
-            return Response(serializer.data)
-        except Post.DoesNotExist:
-            raise ValidationError(_('Post does not exist.'))
+        data["post"] = post_id
+        serializer = FlagPostSerializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        notify_flagged_post(post, self.request.user, data["notes"])
+        return Response(serializer.data)
 
     @list_route(methods=["POST"], permission_classes=(IsOptionsOrAuthenticated,))
     def pinned_post(self, request, *args, **kwargs):
@@ -686,21 +662,16 @@ class PostViewSet(viewsets.ModelViewSet):
         post_id = payload.get("post_id", None)
         if not post_id:
             raise ValidationError(_('Post ID required to set priority'))
-        post_id = int(post_id)
-        accessible_posts = accessible_posts_by_user(user, organization, False, False, post_id).values_list('id', flat=True)
-        if post_id not in accessible_posts:
-            raise ValidationError(_('You do not have access'))
-        try:
-            post = Post.objects.get(pk=post_id)
-            if post.priority:
-                post.priority = False
-                post.prior_till = None
-                post.save()
-            else:
-                post.pinned(user, prior_till=prior_till)
-            return Response(self.get_serializer(post).data)
-        except Post.DoesNotExist:
-            raise ValidationError(_('Post does not exist.'))
+
+        post = self.get_post_by_id(user, organization, False, False, post_id, Q(id=post_id))
+
+        if post.priority:
+            post.priority = False
+            post.prior_till = None
+            post.save()
+        else:
+            post.pinned(user, prior_till=prior_till)
+        return Response(self.get_serializer(post).data)
 
     @detail_route(methods=["GET"], permission_classes=(IsOptionsOrAuthenticated,))
     def post_appreciations(self, request, *args, **kwargs):
