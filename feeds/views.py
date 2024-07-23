@@ -284,13 +284,17 @@ class PostViewSet(viewsets.ModelViewSet):
                 point_source=POINT_SOURCE.revoked_feed, organization=user.organization
             )
             for appreciation_trxn in appreciation_trxns:
+                use_own_points = appreciation_trxn.context.get("use_own_points")
+                context_dict = {"appreciation_trxn": appreciation_trxn.id, "message": message}
+                if use_own_points:
+                    context_dict.update({"use_own_points": True})
                 txn = Transaction.objects.create(
                     user=appreciation_trxn.user, creator=appreciation_trxn.creator,
                     organization=appreciation_trxn.user.organization,
                     points=-appreciation_trxn.points, reason=reason, message=message,
-                    context={"appreciation_trxn": appreciation_trxn.id, "message": message}
+                    context=context_dict
                 )
-                if appreciation_trxn.context.get("use_own_points"):
+                if use_own_points:
                     Transaction.objects.create(
                         user=txn.creator, creator=appreciation_trxn.user,
                         organization=appreciation_trxn.user.organization,
