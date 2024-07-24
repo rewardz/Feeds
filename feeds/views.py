@@ -109,13 +109,13 @@ class PostViewSet(viewsets.ModelViewSet):
         tag_users = []
         title_str = data.get('title', None)
         if title_str:
-            title_tagged = extract_tagged_users(title_str)
+            title_tagged = extract_tagged_users(title_str, current_user.organization)
             if title_tagged:
                 tag_users.extend(title_tagged)
 
         description_str = data.get('description', None)
         if description_str:
-            description_tagged = extract_tagged_users(description_str)
+            description_tagged = extract_tagged_users(description_str, current_user.organization)
             if description_tagged:
                 tag_users.extend(description_tagged)
 
@@ -488,7 +488,7 @@ class PostViewSet(viewsets.ModelViewSet):
             tag_users = []
             content = data.get('content', None)
             if content:
-                tagged = extract_tagged_users(content)
+                tagged = extract_tagged_users(content, user.organization)
                 if tagged:
                     tag_users.extend(tagged)
 

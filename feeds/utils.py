@@ -611,7 +611,7 @@ def push_notification(sender, message, recipient, object_type=None, object_id=No
         return False
 
 
-def extract_tagged_users(match_string):
+def extract_tagged_users(match_string, organization=None):
     pattern = "<tag.*?>(.*?)<\\/tag>"
     matches = []
     user_ids = []
@@ -631,7 +631,7 @@ def extract_tagged_users(match_string):
         user_id = user_info['user_id']
         if not user_id:
             try:
-                user = USERMODEL.objects.get(email=email)
+                user = USERMODEL.objects.get(email=email, organization=organization)
                 user_ids.append(user.id)
             except Exception:
                 continue
