@@ -49,7 +49,7 @@ def notify_user_via_email(self, comment_id):
         feedback_title=post.title[:80],
         new_comment=comment.content
     )
-    from_user = check_org_email(comment.created_by.email)
+    from_user = check_org_email(comment.created_by.email, comment.created_by.organization)
     PendingEmail.objects.send_email(
         email=recipient.email,
         from_user=from_user,
