@@ -54,7 +54,7 @@ class PostFilterBase(django_filters.FilterSet):
     def department_filter(self, queryset, name, value):
         if isinstance(value, int):
             value = [value]
-        return queryset.filter(created_by__departments__in=value)
+        return queryset.filter(Q(created_by__departments__in=value) | Q(departments__in=value))
 
     def nom_status_filter(self, queryset, name, value):
         if value == "pending":
