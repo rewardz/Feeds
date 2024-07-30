@@ -804,7 +804,7 @@ class PostFeedSerializer(PostSerializer):
             "organizations", "created_by_user_info",
             "title", "description", "post_type", "poll_info", "active_days",
             "priority", "prior_till",
-            "shared_with", "images", "documents", "videos",
+            "shared_with", "images", "documents", "videos", "users",
             "is_owner", "can_edit", "can_delete", "has_appreciated",
             "appreciation_count", "comments_count", "tagged_users", "is_admin", "tags", "reaction_type", "nomination",
             "feed_type", "user_strength", "user", "user_reaction_type", "gif", "ecard", "points", "time_left",
