@@ -209,11 +209,14 @@ class PostViewSet(viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         data = self._create_or_update(request, create=True)
+        users =  data.pop("users", [])
         tag_users = data.get('tag_users', None)
         tags = data.get('tags', None)
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
         instance = serializer.save()
+        if users:
+            instance.users.add(*users)
         post_id = instance.id
         if tag_users:
             tag_users_to_post(instance, tag_users)
@@ -1003,7 +1006,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         feeds = get_related_objects_qs(feeds)
         if feed_flag == "received":
             # returning only approved nominations with all the received appreciations
-            feeds = feeds.filter(user=user).filter(Q(nomination__nom_status=NOMINATION_STATUS.approved) | Q(
+            feeds = feeds.filter(users__in=[user]).filter(Q(nomination__nom_status=NOMINATION_STATUS.approved) | Q(
                 post_type=POST_TYPE.USER_CREATED_APPRECIATION))
         elif feed_flag == "given":
             feeds = feeds.filter(Q(created_by=user, post_type=POST_TYPE.USER_CREATED_APPRECIATION) | Q(
@@ -1021,12 +1024,12 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         elif feed_flag == "my_nomination":
             feeds = feeds.filter(nomination__nominator=user)
         else:
-            feeds = feeds.filter(Q(nomination__nominator=user) | Q(user=user) |
+            feeds = feeds.filter(Q(nomination__nominator=user) | Q(users__in=[user]) |
                 Q(nomination__assigned_reviewer=user) | Q(nomination__alternate_reviewer=user) |
                 Q(nomination__histories__reviewer=user))
         if search:
             feeds = feeds.filter(Q(user__first_name__istartswith=search) | Q(
-                user__last_name__istartswith=search) | Q(created_by__first_name__istartswith=search) | Q(
+                users__last_name__istartswith=search) | Q(created_by__first_name__istartswith=search) | Q(
                 created_by__last_name__istartswith=search))
 
         return self.get_filtered_feeds_according_to_shared_with(feeds=feeds, user=user,
@@ -1074,7 +1077,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
 
             posts = accessible_posts_by_user(user, organization, False, True, None).distinct()
             user_appreciations = posts.filter(
-                user=user, post_type=POST_TYPE.USER_CREATED_APPRECIATION).values(
+                users__in=[user], post_type=POST_TYPE.USER_CREATED_APPRECIATION).values(
                 'transactions__context', 'transactions__creator')
 
             my_appreciations_user = [user_appreciation.get('transactions__creator') for user_appreciation in

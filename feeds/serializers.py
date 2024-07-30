@@ -41,15 +41,16 @@ def get_user_detail(user_id):
 
 
 def get_user_detail_with_org(post, context):
-    user = post.user
-    user_details = UserInfoSerializer(instance=user, read_only=True, context=context).data
+    user_details = UserInfoSerializer(post.users, read_only=True, context=context, many=True).data
     if post.greeting:
-        user_details.update({
-            "organization_name": user.organization.name,
-            "organization_logo": (
-                get_absolute_url(user.organization.display_img_url) if user.organization.display_img_url else ""
-            )
-        })
+        user = post.users.first()
+        for user_detail in user_details:
+            user_detail.update({
+                "organization_name": user.organization.name,
+                "organization_logo": (
+                    get_absolute_url(user.organization.display_img_url) if user.organization.display_img_url else ""
+                )
+            })
     return user_details
 
 
@@ -62,7 +63,7 @@ def get_info_for_greeting_post(post):
     context = {}
     if post.title == "greeting_post":
         context.update(
-            {"show_greeting_department": post.user.organization.has_setting_to_show_greeting_department})
+            {"show_greeting_department": post.users.first().organization.has_setting_to_show_greeting_department})
     return RepeatedEventSerializer(post.greeting, context=context).data
 
 
@@ -478,7 +479,7 @@ class PostSerializer(DynamicFieldsModelSerializer):
             "shared_with", "images", "documents", "videos",
             "is_owner", "can_edit", "can_delete", "has_appreciated",
             "appreciation_count", "comments_count", "tagged_users", "is_admin", "tags", "reaction_type", "nomination",
-            "feed_type", "user_strength", "user", "user_reaction_type", "gif", "ecard", "points", "time_left",
+            "feed_type", "user_strength", "users", "user_reaction_type", "gif", "ecard", "points", "time_left",
             "images_with_ecard", "departments", "organization", "department", "job_families"
         )
 
@@ -669,7 +670,7 @@ class CommentsLikedSerializer(serializers.ModelSerializer):
 class PostDetailSerializer(PostSerializer):
     comments = serializers.SerializerMethodField()
     appreciated_by = serializers.SerializerMethodField()
-    user = serializers.SerializerMethodField()
+    users = serializers.SerializerMethodField()
     ecard = ECardSerializer(read_only=True)
     category = serializers.CharField(read_only=True)
     category_name = serializers.CharField(read_only=True)
@@ -692,7 +693,7 @@ class PostDetailSerializer(PostSerializer):
             "priority", "prior_till", "shared_with", "images", "documents", "videos",
             "is_owner", "can_edit", "can_delete", "has_appreciated",
             "appreciation_count", "appreciated_by", "comments_count", "comments",
-            "tagged_users", "is_admin", "nomination", "feed_type", "user_strength", "user",
+            "tagged_users", "is_admin", "nomination", "feed_type", "user_strength", "users",
             "gif", "ecard", "points", "user_reaction_type", "images_with_ecard", "reaction_type", "category",
             "category_name", "sub_category", "sub_category_name", "organization_name", "display_status",
             "department_name", "departments", "can_download", "is_download_choice_needed", "greeting_info",
@@ -703,13 +704,12 @@ class PostDetailSerializer(PostSerializer):
     def get_job_families(instance):
         return instance.job_families.values_list("id", flat=True)
 
-    @staticmethod
-    def get_is_download_choice_needed(post):
+    def get_is_download_choice_needed(self, post):
         """
         Decides if popup should be open or not to select image in frontend
         """
         is_download_choice_needed = True
-        if post.certificate_records.count():
+        if post.certificate_records.filter(user=self.context.get("request").user).count():
             # already we have choice selected
             is_download_choice_needed = False
         else:
@@ -733,7 +733,7 @@ class PostDetailSerializer(PostSerializer):
     def get_can_download(self, instance):
         return self.context.get("request").user in (instance.user, instance.created_by)
 
-    def get_user(self, post):
+    def get_users(self, post):
         return get_user_detail_with_org(post, {"request": self.context.get("request")})
 
     @staticmethod
@@ -776,7 +776,7 @@ class PostDetailSerializer(PostSerializer):
 
 
 class PostFeedSerializer(PostSerializer):
-    user = serializers.SerializerMethodField()
+    users = serializers.SerializerMethodField()
     ecard = ECardSerializer(read_only=True)
     greeting_info = serializers.SerializerMethodField()
 
@@ -784,7 +784,7 @@ class PostFeedSerializer(PostSerializer):
     def get_greeting_info(post):
         return get_info_for_greeting_post(post)
 
-    def get_user(self, post):
+    def get_users(self, post):
         return get_user_detail_with_org(post, {"request": self.context.get("request")})
 
     class Meta:
@@ -794,7 +794,7 @@ class PostFeedSerializer(PostSerializer):
             "organizations", "created_by_user_info",
             "title", "description", "post_type", "poll_info", "active_days",
             "priority", "prior_till",
-            "shared_with", "images", "documents", "videos",
+            "shared_with", "images", "documents", "videos", "users",
             "is_owner", "can_edit", "can_delete", "has_appreciated",
             "appreciation_count", "comments_count", "tagged_users", "is_admin", "tags", "reaction_type", "nomination",
             "feed_type", "user_strength", "user", "user_reaction_type", "gif", "ecard", "points", "time_left",
@@ -1059,7 +1059,7 @@ class OrganizationRecognitionSerializer(GreetingSerializerBase):
     user_reaction_type = serializers.SerializerMethodField()
     points = serializers.SerializerMethodField()
     nomination = serializers.SerializerMethodField()
-    user = serializers.SerializerMethodField()
+    users = serializers.SerializerMethodField()
 
     def get_modified_on(self, instance):
         if instance.modified_on:
@@ -1109,7 +1109,7 @@ class OrganizationRecognitionSerializer(GreetingSerializerBase):
             instance=instance.nomination, context={"user": self.user}, fields=self.context.get('nomination_fields')
         ).data
 
-    def get_user(self, post):
+    def get_users(self, post):
         return get_user_detail_with_org(post, {"request": self.request})
 
     class Meta:
@@ -1117,7 +1117,7 @@ class OrganizationRecognitionSerializer(GreetingSerializerBase):
         fields = GreetingSerializerBase.Meta.fields + (
             "modified_by", "modified_on", "poll_info", "active_days", "priority", "prior_till", "can_edit",
             "can_delete", "has_appreciated", "appreciation_count", "comments_count", "reaction_type", "nomination",
-            "user_strength", "user", "user_reaction_type", "points", "departments", "job_families"
+            "user_strength", "users", "user_reaction_type", "points", "departments", "job_families"
         )
 
 
