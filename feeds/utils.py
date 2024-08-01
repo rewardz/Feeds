@@ -878,7 +878,7 @@ def get_related_objects_qs(feeds):
 
 def extract_date_query(query_params):
     """Extract date query based on url params to limit the Post results"""
-    days = 90
+    days = 60
     if query_params.get("created_on_after", {}):
         return Q(created_on__gte=query_params.get("created_on_after"))
     elif query_params.get("created_on_before", {}):
