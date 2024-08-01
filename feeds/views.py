@@ -35,7 +35,7 @@ from .utils import (
     tag_users_to_post, user_can_delete, user_can_edit, get_date_range, since_last_appreciation,
     get_current_month_end_date, get_absolute_url, posts_not_visible_to_user,
     get_job_families, get_related_objects_qs, org_reco_api_query, post_api_query, posts_not_shared_with_self_department,
-    posts_not_shared_with_job_family, assigned_nomination_post_ids, posts_shared_with_org_department,
+    posts_not_shared_with_job_family, assigned_nomination_post_ids, posts_shared_with_org_department, fetch_feeds,
 )
 
 CustomUser = import_string(settings.CUSTOM_USER_MODEL)
@@ -73,19 +73,24 @@ class PostViewSet(viewsets.ModelViewSet):
     pagination_class = FeedsResultsSetPagination
     filter_backends = (filters.DjangoFilterBackend,)
 
-    def optimized_queryset(self):
+    def custom_paginated_queryset(self, result):
+        result = PostFilter(self.request.GET, queryset=result).qs
+        page = self.paginate_queryset(result)
+        serializer = self.get_serializer(page, many=True)
+        return self.get_paginated_response(serializer.data)
+
+    def list(self, request, *args, **kwargs):
         query_params = self.request.query_params
         post_id = self.kwargs.get("pk", None)
         user = self.request.user
-        result = post_api_query(
+        result, post_query, exclusion_query = post_api_query(
             self.request.version, user, post_id, is_appreciation_post(post_id) if post_id else False, query_params)
-        result = PostFilter(self.request.GET, queryset=result).qs
-        return result
-
-    def list(self, request, *args, **kwargs):
-        page = self.paginate_queryset(self.optimized_queryset())
-        serializer = self.get_serializer(page, many=True)
-        return self.get_paginated_response(serializer.data)
+        response = self.custom_paginated_queryset(result)
+        if response.get("count", 0) < query_params.get("page_size", settings.FEEDS_PAGE_SIZE):
+            feeds = fetch_feeds(
+                post_query, exclusion_query, ('-priority', '-modified_on', '-created_on'), user)
+            response = self.custom_paginated_queryset(feeds)
+        return response
 
     def _create_or_update(self, request, create=False):
         payload = request.data
@@ -1210,13 +1215,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             if loads(feed.get("transactions__context") or '{}').get("strength_id") == strength_id
         ])).qs
 
-    @list_route(methods=["GET"], permission_classes=(IsOptionsOrAuthenticated,))
-    def organization_recognitions(self, request, *args, **kwargs):
-        user = self.request.user
-        post_polls = request.query_params.get("post_polls", None)
-        greeting = request.query_params.get("greeting", None)
-        filter_appreciations = Post.objects.none()
-        feeds = org_reco_api_query(user, post_polls, request.version, greeting, request.query_params)
+    def load_posts(self, request, post_polls, greeting, feeds, filter_appreciations):
         if post_polls is None and greeting is None:
             if self.request.GET.get("user_strength", 0):
                 filter_appreciations = self.filter_appreciations(feeds)
@@ -1227,6 +1226,22 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         serializer = GreetingSerializer if greeting else OrganizationRecognitionSerializer
         serializer = serializer(page, context={"request": request}, many=True)
         return self.get_paginated_response(serializer.data)
+
+    @list_route(methods=["GET"], permission_classes=(IsOptionsOrAuthenticated,))
+    def organization_recognitions(self, request, *args, **kwargs):
+        user = self.request.user
+        post_polls = request.query_params.get("post_polls", None)
+        greeting = request.query_params.get("greeting", None)
+        query_params = request.query_params
+        filter_appreciations = Post.objects.none()
+        feeds, post_query, exclusion_query = org_reco_api_query(
+            user, post_polls, request.version, greeting, query_params)
+        response = self.load_posts(request, post_polls, greeting, feeds, filter_appreciations)
+        if response.get("count", 0) < query_params.get("page_size", settings.FEEDS_PAGE_SIZE):
+            feeds = fetch_feeds(post_query, exclusion_query, ('-priority', '-created_on'), user)
+            response = self.load_posts(request, post_polls, greeting, feeds, filter_appreciations)
+        return response
+
 
 
 class InspireMeViewSet(viewsets.ModelViewSet):

@@ -272,15 +272,11 @@ def accessible_posts_by_user_v2(
     return post_query, get_exclusion_query(user, admin_orgs, user_depts, org_reco_api, job_family), admin_orgs
 
 
-def fetch_feeds(post_query, limited_date_query, exclusion_query, page_size, ordering_fields, user):
+def fetch_feeds(post_query, exclusion_query, ordering_fields, user):
     """Return feeds queryset based on Q queries"""
     # IMP: Do not remove list from here because with the list it is actually faster refer this
     # https://github.com/rewardz/Feeds/pull/223#issuecomment-2024339238
-
-    queryset = Post.objects.filter(limited_date_query).exclude(exclusion_query)
-    if queryset.count() < page_size:
-        queryset = Post.objects.filter(post_query).exclude(exclusion_query)
-
+    queryset = Post.objects.filter(post_query).exclude(exclusion_query)
     post_ids = set(queryset.values_list('id', flat=True))
     if getattr(user, 'job_family', None):
         new_queryset = user.job_family.posts.values_list('id', flat=True)
@@ -329,9 +325,9 @@ def post_api_query(version, user, post_id, appreciations, query_params):
 
     post_query = post_query | posts_shared_with_org_department_query(user, admin_orgs) | get_nomination_query(user)
     return fetch_feeds(
-        post_query, post_query if allow_feedback else post_query & extract_date_query(query_params),
-        exclusion_query, query_params.get("page_size", settings.FEEDS_PAGE_SIZE),
-        ('-priority', '-modified_on', '-created_on'), user)
+        post_query if allow_feedback else (post_query & extract_date_query(query_params)),
+        exclusion_query, ('-priority', '-modified_on', '-created_on'), user
+    ), post_query, exclusion_query
 
 
 def org_reco_api_query(user, post_polls, version, greeting, query_params):
@@ -393,9 +389,8 @@ def org_reco_api_query(user, post_polls, version, greeting, query_params):
             Q(title__icontains=search) |
             Q(description__icontains=search)
         )
-    return fetch_feeds(
-        post_query, post_query & extract_date_query(query_params), exclusion_query,
-        query_params.get("page_size", settings.FEEDS_PAGE_SIZE), ('-priority', '-created_on'), user)
+    return fetch_feeds(post_query & extract_date_query(query_params), exclusion_query,
+                       ('-priority', '-created_on'), user), post_query, exclusion_query
 
 
 def validate_priority(data):
