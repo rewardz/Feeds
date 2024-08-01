@@ -1236,11 +1236,11 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         filter_appreciations = Post.objects.none()
         feeds, post_query, exclusion_query = org_reco_api_query(
             user, post_polls, request.version, greeting, query_params)
-        response = self.load_posts(request, post_polls, greeting, feeds, filter_appreciations)
+        response = self.load_posts(request, post_polls, greeting, feeds, filter_appreciations).data
         if response.get("count", 0) < query_params.get("page_size", settings.FEEDS_PAGE_SIZE):
             feeds = fetch_feeds(post_query, exclusion_query, ('-priority', '-created_on'), user)
-            response = self.load_posts(request, post_polls, greeting, feeds, filter_appreciations)
-        return response
+            response = self.load_posts(request, post_polls, greeting, feeds, filter_appreciations).data
+        return Response(response)
 
 
 
