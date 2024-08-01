@@ -188,6 +188,7 @@ class Post(UserInfo):
         CustomUser, related_name="tagged_users",
         through="PostTaggedUsers", blank=True
     )
+    source_language = models.CharField(max_length=100, null=True, blank=True)
     tags = TaggableManager()
 
     @property
