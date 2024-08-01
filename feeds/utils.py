@@ -278,9 +278,9 @@ def fetch_feeds(post_query, exclusion_query, ordering_fields, user):
     # https://github.com/rewardz/Feeds/pull/223#issuecomment-2024339238
     if getattr(user, 'job_family', None):
         post_query = post_query | Q(mark_delete=False, job_families__in=[user.job_family])
-    post_ids = set(
+    post_ids = set(list(
         Post.objects.filter(post_query & Q(mark_delete=False)).exclude(exclusion_query).values_list("id", flat=True)
-    )
+    ))
     return get_related_objects_qs(Post.objects.filter(id__in=post_ids)).order_by(*ordering_fields)
 
 
