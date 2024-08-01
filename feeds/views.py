@@ -85,12 +85,12 @@ class PostViewSet(viewsets.ModelViewSet):
         user = self.request.user
         result, post_query, exclusion_query = post_api_query(
             self.request.version, user, post_id, is_appreciation_post(post_id) if post_id else False, query_params)
-        response = self.custom_paginated_queryset(result)
+        response = self.custom_paginated_queryset(result).data
         if response.get("count", 0) < query_params.get("page_size", settings.FEEDS_PAGE_SIZE):
             feeds = fetch_feeds(
                 post_query, exclusion_query, ('-priority', '-modified_on', '-created_on'), user)
-            response = self.custom_paginated_queryset(feeds)
-        return response
+            response = self.custom_paginated_queryset(feeds).data
+        return Response(response)
 
     def _create_or_update(self, request, create=False):
         payload = request.data
