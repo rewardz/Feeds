@@ -332,7 +332,7 @@ class CategoriesSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = NominationCategory
-        fields = ("id", "name", "img", "is_group_nomination", "can_attach_badge")
+        fields = ("id", "name", "img", "is_group_nomination")
 
 
 class NominationsSerializer(DynamicFieldsModelSerializer):
