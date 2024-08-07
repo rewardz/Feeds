@@ -217,7 +217,7 @@ class PollSerializer(serializers.ModelSerializer):
         model = Post
         fields = (
             'id', 'question', 'answers', 'is_poll_active', 'poll_remaining_time',
-            'user_has_voted', 'total_votes', 'active_days',)
+            'user_has_voted', 'total_votes', 'active_days', "source_language")
 
     def get_question(self, instance):
         return instance.title
@@ -1042,7 +1042,7 @@ class GreetingSerializerBase(serializers.ModelSerializer):
         fields = (
             "id", "created_by", "created_on", "organizations", "created_by_user_info", "title", "description",
             "post_type", "priority", "shared_with", "is_owner", "is_admin", "feed_type",
-            "gif", "ecard", "images_with_ecard", "greeting_info"
+            "gif", "ecard", "images_with_ecard", "greeting_info", "source_language"
         )
 
 
@@ -1117,7 +1117,8 @@ class OrganizationRecognitionSerializer(GreetingSerializerBase):
         fields = GreetingSerializerBase.Meta.fields + (
             "modified_by", "modified_on", "poll_info", "active_days", "priority", "prior_till", "can_edit",
             "can_delete", "has_appreciated", "appreciation_count", "comments_count", "reaction_type", "nomination",
-            "user_strength", "user", "user_reaction_type", "points", "departments", "job_families"
+            "user_strength", "user", "user_reaction_type", "points", "departments", "job_families",
+            "source_language"
         )
 
 
