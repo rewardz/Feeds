@@ -479,7 +479,7 @@ class PostSerializer(DynamicFieldsModelSerializer):
             "is_owner", "can_edit", "can_delete", "has_appreciated",
             "appreciation_count", "comments_count", "tagged_users", "is_admin", "tags", "reaction_type", "nomination",
             "feed_type", "user_strength", "user", "user_reaction_type", "gif", "ecard", "points", "time_left",
-            "images_with_ecard", "departments", "organization", "department", "job_families"
+            "images_with_ecard", "departments", "organization", "department", "job_families", "source_language"
         )
 
     def get_organization(self, instance):
@@ -696,7 +696,7 @@ class PostDetailSerializer(PostSerializer):
             "gif", "ecard", "points", "user_reaction_type", "images_with_ecard", "reaction_type", "category",
             "category_name", "sub_category", "sub_category_name", "organization_name", "display_status",
             "department_name", "departments", "can_download", "is_download_choice_needed", "greeting_info",
-            "job_families"
+            "job_families", "source_language"
         )
 
     @staticmethod
@@ -798,7 +798,7 @@ class PostFeedSerializer(PostSerializer):
             "is_owner", "can_edit", "can_delete", "has_appreciated",
             "appreciation_count", "comments_count", "tagged_users", "is_admin", "tags", "reaction_type", "nomination",
             "feed_type", "user_strength", "user", "user_reaction_type", "gif", "ecard", "points", "time_left",
-            "images_with_ecard", "greeting_info", "departments", "job_families"
+            "images_with_ecard", "greeting_info", "departments", "job_families", "source_language"
         )
 
 
