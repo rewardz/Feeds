@@ -813,9 +813,12 @@ class CommentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Comment
-        fields = ("id", "content", "created_by", "created_on", "modified_by",
-                  "modified_on", "post", "commented_by_user_info", "reaction_types",
-                  "liked_count", "liked_by", "has_liked", "tagged_users", "images", "documents")
+        fields = (
+            "id", "content", "created_by", "created_on", "modified_by",
+            "modified_on", "post", "commented_by_user_info", "reaction_types",
+            "liked_count", "liked_by", "has_liked", "tagged_users", "images",
+            "documents", "source_language"
+        )
 
     def get_images(self, instance):
         """
@@ -880,8 +883,11 @@ class CommentCreateSerializer(CommentSerializer):
 
     class Meta:
         model = Comment
-        fields = ("id", "count", "content", "created_by", "created_on",
-                  "modified_by", "post", "commented_by_user_info", "images", "documents")
+        fields = (
+            "id", "count", "content", "created_by", "created_on",
+            "modified_by", "post", "commented_by_user_info",
+            "images", "documents", "source_language"
+        )
 
     def get_count(self, instance):
         return Comment.objects.filter(post=instance.post).count()
@@ -897,6 +903,7 @@ class CommentDetailSerializer(CommentSerializer):
             "id", "content", "created_by", "created_on", "modified_by",
             "modified_on", "post", "commented_by_user_info",
             "liked_count", "liked_by", "has_liked", "tagged_users",
+            "source_language"
         )
 
     def update(self, instance, validated_data):

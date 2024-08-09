@@ -16,4 +16,9 @@ class Migration(migrations.Migration):
             name='source_language',
             field=models.CharField(max_length=100, null=True, blank=True),
         ),
+        migrations.AddField(
+            model_name='Comment',
+            name='source_language',
+            field=models.CharField(max_length=100, null=True, blank=True),
+        ),
     ]

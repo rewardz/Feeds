@@ -378,6 +378,7 @@ class Comment(UserInfo):
         CustomUser, related_name="comment_tagged_users",
         through="CommentTaggedUsers", blank=True
     )
+    source_language = models.CharField(max_length=100, null=True, blank=True)
     mark_delete = models.BooleanField(default=False)
 
     def tag_user(self, user):
