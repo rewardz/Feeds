@@ -876,7 +876,7 @@ def get_user_reaction_type(user, post):
 def get_related_objects_qs(feeds):
     """Returns the all related objects in same QS to enhance the performance"""
     return feeds.select_related(
-            "transaction", "nomination", "greeting", "ecard", "modified_by", "created_by"
+            "user", "transaction", "nomination", "greeting", "ecard", "modified_by", "created_by"
         ).prefetch_related(
             "organizations", "transactions", "cc_users", "departments", "job_families", "tagged_users", "tags",
             "images_set", "documents_set", "postliked_set", "comment_set", "users")

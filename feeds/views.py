@@ -217,7 +217,7 @@ class PostViewSet(viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         data = self._create_or_update(request, create=True)
-        users =  data.pop("users", [])
+        users = data.pop("users", [])
         tag_users = data.get('tag_users', None)
         tags = data.get('tags', None)
         serializer = self.get_serializer(data=data)
@@ -284,6 +284,7 @@ class PostViewSet(viewsets.ModelViewSet):
             instance.tags.set(*tags)
         if request.FILES:
             self._upload_files(request, instance.pk)
+
         self.perform_update(serializer)
         return Response(serializer.data)
 
