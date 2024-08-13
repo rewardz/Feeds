@@ -706,7 +706,7 @@ class PostDetailSerializer(PostSerializer):
             "priority", "prior_till", "shared_with", "images", "documents", "videos",
             "is_owner", "can_edit", "can_delete", "has_appreciated",
             "appreciation_count", "appreciated_by", "comments_count", "comments",
-            "tagged_users", "is_admin", "nomination", "feed_type", "user_strength", "users",
+            "tagged_users", "is_admin", "nomination", "feed_type", "user_strength", "user", "users",
             "gif", "ecard", "points", "user_reaction_type", "images_with_ecard", "reaction_type", "category",
             "category_name", "sub_category", "sub_category_name", "organization_name", "display_status",
             "department_name", "departments", "can_download", "is_download_choice_needed", "greeting_info",
@@ -792,6 +792,7 @@ class PostDetailSerializer(PostSerializer):
 
 
 class PostFeedSerializer(PostSerializer):
+    user = serializers.SerializerMethodField()
     users = serializers.SerializerMethodField()
     ecard = ECardSerializer(read_only=True)
     greeting_info = serializers.SerializerMethodField()
@@ -800,8 +801,11 @@ class PostFeedSerializer(PostSerializer):
     def get_greeting_info(post):
         return get_info_for_greeting_post(post)
 
-    def get_users(self, post):
+    def get_user(self, post):
         return get_user_detail_with_org(post, {"request": self.context.get("request")})
+
+    def get_users(self, post):
+        return get_users_detail_with_org(post, {"request": self.context.get("request")})
 
     class Meta:
         model = Post
@@ -1075,6 +1079,7 @@ class OrganizationRecognitionSerializer(GreetingSerializerBase):
     user_reaction_type = serializers.SerializerMethodField()
     points = serializers.SerializerMethodField()
     nomination = serializers.SerializerMethodField()
+    user = serializers.SerializerMethodField()
     users = serializers.SerializerMethodField()
 
     def get_modified_on(self, instance):
@@ -1125,15 +1130,18 @@ class OrganizationRecognitionSerializer(GreetingSerializerBase):
             instance=instance.nomination, context={"user": self.user}, fields=self.context.get('nomination_fields')
         ).data
 
-    def get_users(self, post):
+    def get_user(self, post):
         return get_user_detail_with_org(post, {"request": self.request})
+
+    def get_users(self, post):
+        return get_users_detail_with_org(post, {"request": self.request})
 
     class Meta:
         model = Post
         fields = GreetingSerializerBase.Meta.fields + (
             "modified_by", "modified_on", "poll_info", "active_days", "priority", "prior_till", "can_edit",
             "can_delete", "has_appreciated", "appreciation_count", "comments_count", "reaction_type", "nomination",
-            "user_strength", "users", "user_reaction_type", "points", "departments", "job_families"
+            "user_strength", "user", "users", "user_reaction_type", "points", "departments", "job_families"
         )
 
 
