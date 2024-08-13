@@ -260,6 +260,10 @@ class PostViewSet(viewsets.ModelViewSet):
                 data["organizations"] = [user.organization_id]
             instance.organizations.add(*data.get("organizations"))
 
+        if data.get("users"):
+            instance.users.clear()
+            instance.users.add(*data.get("users"))
+
         if "departments" in data:
             instance.departments.clear()
             if shared_with and int(shared_with) == SHARED_WITH.SELF_DEPARTMENT:
