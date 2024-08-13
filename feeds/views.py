@@ -103,8 +103,12 @@ class PostViewSet(viewsets.ModelViewSet):
 
         data = {}
         for key, value in payload.items():
-            if key in ["organizations", "departments", "job_families"] and isinstance(payload.get(key), unicode):
+            if key in ["organizations", "departments", "job_families", "users"] and isinstance(
+                    payload.get(key), unicode):
                 data.update({key: loads(value)})
+                continue
+            elif key == "user" and not payload.get("users", []):
+                data.update({"users": [value]})
                 continue
             data.update({key: value})
 
