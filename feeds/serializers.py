@@ -333,7 +333,7 @@ class CategoriesSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = NominationCategory
-        fields = ("id", "name", "img", "is_group_nomination")
+        fields = ("id", "name", "img", "is_group_nomination", "can_attach_badge")
 
 
 class NominationsSerializer(DynamicFieldsModelSerializer):
@@ -342,11 +342,9 @@ class NominationsSerializer(DynamicFieldsModelSerializer):
     review_level = serializers.SerializerMethodField()
     nominator_name = serializers.SerializerMethodField()
     question = serializers.SerializerMethodField()
-    badges = serializers.SerializerMethodField()
     badge = TrophyBadgeSerializer(read_only=True)
     user_strength = UserStrengthSerializer()
     strength = serializers.SerializerMethodField()
-    nominated_team_member = UserInfoSerializer()
     nominees = UserInfoSerializer(many=True)
     nom_status = serializers.SerializerMethodField()
     nom_status_color = serializers.SerializerMethodField()
@@ -364,10 +362,8 @@ class NominationsSerializer(DynamicFieldsModelSerializer):
                   "question",
                   "comment",
                   "created",
-                  "badges",
                   "badge",
                   "user_strength",
-                  "nominated_team_member",
                   "nominees",
                   "message_to_reviewer",
                   "strength",
@@ -393,12 +389,6 @@ class NominationsSerializer(DynamicFieldsModelSerializer):
         questions = instance.question.all()
         serializer = QuestionSerializer(instance=questions, many=True, context={'nomination_id': instance.id})
         return serializer.data
-
-    def get_badges(self, instance):
-        # ToDo : once app updated, remove it
-        if instance.badge:
-            return TrophyBadgeSerializer(instance=instance.badge).data
-        return None
 
     @staticmethod
     def get_strength(instance):
