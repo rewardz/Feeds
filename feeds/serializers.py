@@ -40,8 +40,8 @@ def get_user_detail(user_id):
         return
 
 
-def get_user_detail_with_org(post, context):
-    user_details = UserInfoSerializer(post.users, read_only=True, context=context, many=True).data
+def get_users_detail_with_org(post, context):
+    user_details = UserInfoSerializer(post.users.all(), read_only=True, context=context, many=True).data
     if post.greeting:
         user = post.users.first()
         for user_detail in user_details:
@@ -51,6 +51,18 @@ def get_user_detail_with_org(post, context):
                     get_absolute_url(user.organization.display_img_url) if user.organization.display_img_url else ""
                 )
             })
+
+
+def get_user_detail_with_org(post, context):
+    user = post.user
+    user_details = UserInfoSerializer(instance=user, read_only=True, context=context).data
+    if post.greeting:
+        user_details.update({
+            "organization_name": user.organization.name,
+            "organization_logo": (
+                get_absolute_url(user.organization.display_img_url) if user.organization.display_img_url else ""
+            )
+        })
     return user_details
 
 
@@ -479,7 +491,7 @@ class PostSerializer(DynamicFieldsModelSerializer):
             "shared_with", "images", "documents", "videos",
             "is_owner", "can_edit", "can_delete", "has_appreciated",
             "appreciation_count", "comments_count", "tagged_users", "is_admin", "tags", "reaction_type", "nomination",
-            "feed_type", "user_strength", "users", "user_reaction_type", "gif", "ecard", "points", "time_left",
+            "feed_type", "user_strength", "user", "users", "user_reaction_type", "gif", "ecard", "points", "time_left",
             "images_with_ecard", "departments", "organization", "department", "job_families"
         )
 
@@ -670,6 +682,7 @@ class CommentsLikedSerializer(serializers.ModelSerializer):
 class PostDetailSerializer(PostSerializer):
     comments = serializers.SerializerMethodField()
     appreciated_by = serializers.SerializerMethodField()
+    user = serializers.SerializerMethodField()
     users = serializers.SerializerMethodField()
     ecard = ECardSerializer(read_only=True)
     category = serializers.CharField(read_only=True)
@@ -733,8 +746,11 @@ class PostDetailSerializer(PostSerializer):
     def get_can_download(self, instance):
         return self.context.get("request").user in (instance.user, instance.created_by)
 
-    def get_users(self, post):
+    def get_user(self, post):
         return get_user_detail_with_org(post, {"request": self.context.get("request")})
+
+    def get_users(self, post):
+        return get_users_detail_with_org(post, {"request": self.context.get("request")})
 
     @staticmethod
     def get_greeting_info(post):
