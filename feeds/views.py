@@ -109,7 +109,6 @@ class PostViewSet(viewsets.ModelViewSet):
                 continue
             elif key == "user" and not payload.get("users", []):
                 data.update({"users": [value]})
-                continue
             data.update({key: value})
 
         delete_image_ids = data.get('delete_image_ids', None)
