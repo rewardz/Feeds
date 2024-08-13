@@ -51,6 +51,7 @@ def get_users_detail_with_org(post, context):
                     get_absolute_url(user.organization.display_img_url) if user.organization.display_img_url else ""
                 )
             })
+    return user_details
 
 
 def get_user_detail_with_org(post, context):
