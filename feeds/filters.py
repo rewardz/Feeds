@@ -12,7 +12,7 @@ NOMINATION_STATUS = import_string(settings.NOMINATION_STATUS)
 class PostFilterBase(django_filters.FilterSet):
     post_type = django_filters.BaseInFilter(name="post_type")
     shared_with = django_filters.BaseInFilter(name="shared_with")
-    organizations = django_filters.BaseInFilter(name="organizations")
+    organizations = django_filters.BaseInFilter(name="organizations", method="organizations_filter")
     department = django_filters.BaseInFilter(name="department", method="department_filter")
     created_on_after = django_filters.DateFilter(name="created_on__gte", method="date_range_filter")
     created_on_before = django_filters.DateFilter(name="created_on__lte", method="date_range_filter")
@@ -29,6 +29,11 @@ class PostFilterBase(django_filters.FilterSet):
     def __init__(self, *args, **kwargs):
         self.user = kwargs.pop('user') if 'user' in kwargs.keys() else None
         super(PostFilterBase, self).__init__(*args, **kwargs)
+
+    def organizations_filter(self, queryset, name, value):
+        if self.data.get("department") or self.data.get("job_family"):
+            return queryset
+        return queryset.filter(organizations__in=value)
 
     @staticmethod
     def job_family_filter(queryset, name, value):
@@ -49,7 +54,7 @@ class PostFilterBase(django_filters.FilterSet):
     def department_filter(self, queryset, name, value):
         if isinstance(value, int):
             value = [value]
-        return queryset.filter(created_by__departments__in=value)
+        return queryset.filter(Q(created_by__departments__in=value) | Q(departments__in=value))
 
     def nom_status_filter(self, queryset, name, value):
         if value == "pending":
