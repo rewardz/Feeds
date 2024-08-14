@@ -33,7 +33,7 @@ class PostFilterBase(django_filters.FilterSet):
     def organizations_filter(self, queryset, name, value):
         if self.data.get("department") or self.data.get("job_family"):
             return queryset
-        return queryset.filter(organizations__in=value)
+        return queryset.filter(organizations__in=value, organizations__isnull=False)
 
     @staticmethod
     def job_family_filter(queryset, name, value):
