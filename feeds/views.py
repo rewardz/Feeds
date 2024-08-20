@@ -275,7 +275,7 @@ class PostViewSet(viewsets.ModelViewSet):
         if request.FILES:
             self._upload_files(request, instance.pk)
         self.perform_update(serializer)
-        return Response(self.get_serializer(instance).data)
+        return Response(self.get_serializer(Post.objects.get(id=instance.id)).data)
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
