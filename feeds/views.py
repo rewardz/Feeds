@@ -266,6 +266,7 @@ class PostViewSet(viewsets.ModelViewSet):
             instance.job_families.add(*job_families)
         serializer = self.get_serializer(instance, data=data)
         serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
         if tag_users:
             tag_users_to_post(instance, tag_users)
         if tags:
@@ -274,7 +275,6 @@ class PostViewSet(viewsets.ModelViewSet):
             instance.tags.set(*tags)
         if request.FILES:
             self._upload_files(request, instance.pk)
-        self.perform_update(serializer)
         return Response(serializer.data)
 
     def destroy(self, request, *args, **kwargs):
