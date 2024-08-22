@@ -10,7 +10,7 @@ from django.utils.translation import ugettext as _
 
 from rest_framework import permissions, viewsets, serializers, status, views, filters
 from rest_framework.decorators import api_view, detail_route, list_route, permission_classes
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import ValidationError, NotFound
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
 from feeds.constants import SHARED_WITH
@@ -1236,7 +1236,10 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         filter_appreciations = Post.objects.none()
         feeds, post_query, exclusion_query = org_reco_api_query(
             user, post_polls, request.version, greeting, query_params)
-        response = self.load_posts(request, post_polls, greeting, feeds, filter_appreciations).data
+        try:
+            response = self.load_posts(request, post_polls, greeting, feeds, filter_appreciations).data
+        except NotFound:
+            response = {}
         if response.get("count", 0) < query_params.get("page_size", settings.FEEDS_PAGE_SIZE):
             feeds = fetch_feeds(post_query, exclusion_query, ('-priority', '-created_on'), user)
             response = self.load_posts(request, post_polls, greeting, feeds, filter_appreciations).data
