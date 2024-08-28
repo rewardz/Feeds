@@ -445,6 +445,7 @@ class PostSerializer(DynamicFieldsModelSerializer):
     can_delete = serializers.SerializerMethodField()
     tagged_users = serializers.SerializerMethodField()
     is_admin = serializers.SerializerMethodField()
+    cc_users_data = serializers.SerializerMethodField()
     tags = serializers.SerializerMethodField()
     departments = serializers.PrimaryKeyRelatedField(
         many=True, queryset=DEPARTMENT_MODEL.objects.all(),
@@ -474,7 +475,7 @@ class PostSerializer(DynamicFieldsModelSerializer):
             "id", "created_by", "created_on", "modified_by", "modified_on",
             "organizations", "created_by_user_info",
             "title", "description", "post_type", "poll_info", "active_days",
-            "priority", "prior_till",
+            "priority", "prior_till", "cc_users_data",
             "shared_with", "images", "documents", "videos",
             "is_owner", "can_edit", "can_delete", "has_appreciated",
             "appreciation_count", "comments_count", "tagged_users", "is_admin", "tags", "reaction_type", "nomination",
@@ -489,6 +490,18 @@ class PostSerializer(DynamicFieldsModelSerializer):
     def get_department(self, instance):
         department = instance.departments.first()
         return department.id if department else department
+
+    def get_cc_users_data(self, obj):
+        cc_users_data = []
+        for cc_user in obj.cc_users.all():
+            cc_users_data.append({
+                "cc_user_pk": cc_user.id,
+                "cc_user_email": cc_user.email,
+                "cc_user_first_name": cc_user.first_name,
+                "cc_user_last_name": cc_user.last_name,
+                "cc_user_profile_pic_url": cc_user.thumbnail_img_url if cc_user.img else None,
+            })
+        return cc_users_data
 
     def get_tags(self, obj):
         return list(obj.tags.values_list("name", flat=True))
@@ -793,7 +806,7 @@ class PostFeedSerializer(PostSerializer):
             "id", "created_by", "created_on", "modified_by", "modified_on",
             "organizations", "created_by_user_info",
             "title", "description", "post_type", "poll_info", "active_days",
-            "priority", "prior_till",
+            "priority", "prior_till", "cc_users_data",
             "shared_with", "images", "documents", "videos",
             "is_owner", "can_edit", "can_delete", "has_appreciated",
             "appreciation_count", "comments_count", "tagged_users", "is_admin", "tags", "reaction_type", "nomination",
