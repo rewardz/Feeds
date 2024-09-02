@@ -3,6 +3,7 @@ from __future__ import division, print_function, unicode_literals
 from django.conf import settings
 from django.utils.module_loading import import_string
 from django.db.models import Count
+from datetime import datetime, timedelta
 
 from rest_framework import serializers
 
@@ -467,6 +468,7 @@ class PostSerializer(DynamicFieldsModelSerializer):
     job_families = serializers.SerializerMethodField()
     created_on = serializers.SerializerMethodField()
     modified_on = serializers.SerializerMethodField()
+    is_new_post = serializers.SerializerMethodField()
 
     class Meta:
         model = Post
@@ -479,7 +481,8 @@ class PostSerializer(DynamicFieldsModelSerializer):
             "is_owner", "can_edit", "can_delete", "has_appreciated",
             "appreciation_count", "comments_count", "tagged_users", "is_admin", "tags", "reaction_type", "nomination",
             "feed_type", "user_strength", "user", "user_reaction_type", "gif", "ecard", "points", "time_left",
-            "images_with_ecard", "departments", "organization", "department", "job_families", "source_language"
+            "images_with_ecard", "departments", "organization", "department", "job_families", "source_language",
+            "is_new_post"
         )
 
     def get_organization(self, instance):
@@ -561,6 +564,14 @@ class PostSerializer(DynamicFieldsModelSerializer):
         if not user:
             return instance.created_on
         return get_user_localtime(instance.created_on, user.organization.timezone)
+
+    def get_is_new_post(self, instance):
+        now = datetime.now()
+        created_on = instance.created_on + timedelta(hours=24)
+        if created_on > now:
+            return True
+        return False
+
 
     def create(self, validated_data):
         request = self.context.get('request', None)
