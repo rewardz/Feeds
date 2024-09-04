@@ -631,10 +631,15 @@ def extract_tagged_users(match_string, organization=None):
         user_id = user_info['user_id']
         if not user_id:
             try:
-                user = USERMODEL.objects.get(email=email, organization=organization)
+                user = USERMODEL.objects.get(email=email)
                 user_ids.append(user.id)
-            except Exception:
+            except USERMODEL.DoesNotExist:
                 continue
+            except USERMODEL.MultipleObjectsReturned:
+                users = USERMODEL.objects.filter(email=email, organization=organization)
+                if users.exists():
+                    user = users.first()
+                    user_ids.append(user.id)
         else:
             user_ids.append(user_id)
     return user_ids
