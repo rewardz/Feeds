@@ -33,6 +33,10 @@ class PostFilterBase(django_filters.FilterSet):
     def organizations_filter(self, queryset, name, value):
         if self.data.get("department") or self.data.get("job_family"):
             return queryset
+        try:
+            value = [int(value)]
+        except Exception:
+            value = value.split(",")
         return queryset.filter(
             Q(organizations__in=value) | Q(created_by__organization__in=value) | Q(user__organization__in=value)
         )
