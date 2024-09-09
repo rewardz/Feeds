@@ -36,7 +36,8 @@ class PostFilterBase(django_filters.FilterSet):
         try:
             value = [int(value)]
         except Exception:
-            value = value.split(",")
+            if not isinstance(value, list):
+                value = value.split(",")
         return queryset.filter(
             Q(organizations__in=value) | Q(created_by__organization__in=value) | Q(user__organization__in=value)
         )
