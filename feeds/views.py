@@ -1224,8 +1224,8 @@ class UserFeedViewSet(viewsets.ModelViewSet):
                 filter_appreciations = self.filter_appreciations(feeds)
         feeds = PostFilter(self.request.GET, queryset=feeds).qs
         if filter_appreciations.exists():
-            feeds = (feeds | filter_appreciations).distinct()
-        page = self.paginate_queryset(feeds)
+            feeds = (feeds | filter_appreciations)
+        page = self.paginate_queryset(feeds.distinct())
         serializer = GreetingSerializer if greeting else OrganizationRecognitionSerializer
         serializer = serializer(page, context={"request": request}, many=True)
         return self.get_paginated_response(serializer.data)

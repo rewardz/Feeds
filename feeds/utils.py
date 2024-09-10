@@ -338,6 +338,7 @@ def org_reco_api_query(user, post_polls, version, greeting, query_params):
     post_polls_filter = query_params.get("post_polls_filter", None)
     user_id = query_params.get("user", None)
     search = query_params.get("search", None)
+    query = None
 
     post_query, exclusion_query, admin_orgs = accessible_posts_by_user_v2(
         user, organization, False, False if post_polls else True, None, departments, True)
@@ -390,6 +391,8 @@ def org_reco_api_query(user, post_polls, version, greeting, query_params):
             Q(title__icontains=search) |
             Q(description__icontains=search)
         )
+    if query:
+        post_query = post_query & query
     return fetch_feeds(post_query & extract_date_query(query_params), exclusion_query,
                        ('-priority', '-created_on'), user), post_query, exclusion_query
 
