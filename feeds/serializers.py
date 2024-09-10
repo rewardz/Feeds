@@ -1027,6 +1027,7 @@ class GreetingSerializerBase(serializers.ModelSerializer):
     ecard = ECardSerializer(read_only=True)
     images_with_ecard = serializers.SerializerMethodField()
     greeting_info = serializers.SerializerMethodField()
+    is_new_post = serializers.SerializerMethodField()
 
     def __init__(self, *args, **kwargs):
         super(GreetingSerializerBase, self).__init__(*args, **kwargs)
@@ -1046,6 +1047,13 @@ class GreetingSerializerBase(serializers.ModelSerializer):
 
     def get_is_admin(self, instance):
         return self.user.is_staff
+    
+    def get_is_new_post(self, instance):
+        now = datetime.now()
+        created_on = instance.created_on + timedelta(hours=24)
+        if created_on > now:
+            return True
+        return False
 
     @staticmethod
     def get_feed_type(instance):
