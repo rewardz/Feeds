@@ -1,5 +1,6 @@
 from __future__ import division, print_function, unicode_literals
 
+import pytz
 from django.conf import settings
 from django.utils.module_loading import import_string
 from django.db.models import Count
@@ -33,6 +34,7 @@ ORGANIZATION_SETTINGS_MODEL = import_string(settings.ORGANIZATION_SETTINGS_MODEL
 MULTI_ORG_POST_ENABLE_FLAG = settings.MULTI_ORG_POST_ENABLE_FLAG
 RepeatedEventSerializer = import_string(settings.REPEATED_EVENT_SERIALIZER)
 
+utc = pytz.UTC
 
 def get_user_detail(user_id):
     try:
@@ -578,7 +580,7 @@ class PostSerializer(DynamicFieldsModelSerializer):
         return get_user_localtime(instance.created_on, user.organization.timezone)
     
     def get_is_new_post(self, instance):
-        now = datetime.now()
+        now = datetime.now().replace(tzinfo=utc)
         created_on = instance.created_on + timedelta(hours=24)
         if created_on > now:
             return True
@@ -1049,7 +1051,7 @@ class GreetingSerializerBase(serializers.ModelSerializer):
         return self.user.is_staff
     
     def get_is_new_post(self, instance):
-        now = datetime.now()
+        now = datetime.now().replace(tzinfo=utc)
         created_on = instance.created_on + timedelta(hours=24)
         if created_on > now:
             return True
