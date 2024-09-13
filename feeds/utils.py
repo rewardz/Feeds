@@ -330,6 +330,21 @@ def post_api_query(version, user, post_id, appreciations, query_params):
         exclusion_query, ('-priority', '-modified_on', '-created_on'), user
     ), post_query, exclusion_query
 
+def load_greeting_posts_for_affiliated_orgs(orgs):
+    """
+    Load greeting_post based on below conditions
+    Should not be deleted, post's organization must belong to logged in user's affiliated orgs,
+    birthday or anniversary, shared with all departments (All users of Organization), title should be "greeting_post"
+    """
+    return (
+        Q(user__is_dob_public=True, greeting__event_type=REPEATED_EVENT_TYPES.event_birthday) |
+        Q(user__is_anniversary_public=True, greeting__event_type=REPEATED_EVENT_TYPES.event_anniversary)
+    ) & (
+        Q(
+            mark_delete=False, shared_with=SHARED_WITH.ALL_DEPARTMENTS, post_type=POST_TYPE.GREETING_MESSAGE,
+            title="greeting_post", organizations__in=orgs
+        )
+    )
 
 def org_reco_api_query(user, post_polls, version, greeting, query_params):
     """Used to return the list API query for the org_reco API"""
@@ -380,6 +395,9 @@ def org_reco_api_query(user, post_polls, version, greeting, query_params):
 
     if post_polls:
         post_query = post_query | posts_shared_with_org_department_query(user, admin_orgs)
+        if organization.show_greetings_from_affiliated and int(version) >= 12:
+            post_query = post_query | load_greeting_posts_for_affiliated_orgs(user.get_affiliated_orgs())
+
     if search:
         post_query = post_query & (
             Q(user__first_name__icontains=search) |
