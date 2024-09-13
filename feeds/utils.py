@@ -388,22 +388,24 @@ def org_reco_api_query(user, post_polls, version, greeting, query_params):
 
     if post_polls:
         post_query = post_query | posts_shared_with_org_department_query(user, admin_orgs)
-        if int(version) >= 12:
-            post_query = post_query | load_greeting_posts(organization, user)
-
-    if search:
-        post_query = post_query & (
-            Q(user__first_name__icontains=search) |
-            Q(user__last_name__icontains=search) |
-            Q(created_by__first_name__icontains=search) |
-            Q(created_by__last_name__icontains=search) |
-            Q(user__email__icontains=search) |
-            Q(created_by__email__icontains=search) |
-            Q(title__icontains=search) |
-            Q(description__icontains=search)
-        )
     if query:
         post_query = post_query & query
+    if post_polls and int(version) >= 12:
+        post_query = post_query | load_greeting_posts(organization, user)
+
+    if search:
+        search_query = (
+                Q(user__first_name__icontains=search) |
+                Q(user__last_name__icontains=search) |
+                Q(created_by__first_name__icontains=search) |
+                Q(created_by__last_name__icontains=search) |
+                Q(user__email__icontains=search) |
+                Q(created_by__email__icontains=search) |
+                Q(title__icontains=search) |
+                Q(description__icontains=search)
+        )
+        post_query = post_query & search_query
+
     return fetch_feeds(post_query & extract_date_query(query_params), exclusion_query,
                        ('-priority', '-created_on'), user), post_query, exclusion_query
 
