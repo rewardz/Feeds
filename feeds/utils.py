@@ -111,7 +111,7 @@ def shared_with_all_departments_but_not_belongs_to_user_org_query(user, exclude_
     if user.is_staff:
         return exclude_query
     query = Q(shared_with=SHARED_WITH.ALL_DEPARTMENTS)
-    query.add(~Q(created_by__organization=user.organization) &
+    query.add(~Q(created_by__organization=user.organization) & ~Q(title="greeting_post") &
               ~Q(created_by=user) & ~Q(user=user) & ~Q(cc_users__in=[user]), query.connector)
     return query | exclude_query if exclude_query else query
 
@@ -330,12 +330,15 @@ def post_api_query(version, user, post_id, appreciations, query_params):
         exclusion_query, ('-priority', '-modified_on', '-created_on'), user
     ), post_query, exclusion_query
 
-def load_greeting_posts_for_affiliated_orgs(orgs):
+def load_greeting_posts(org, user):
     """
     Load greeting_post based on below conditions
     Should not be deleted, post's organization must belong to logged in user's affiliated orgs,
     birthday or anniversary, shared with all departments (All users of Organization), title should be "greeting_post"
     """
+    orgs = [org]
+    if org.show_greetings_from_affiliated:
+        orgs = [user.get_affiliated_orgs()]
     return (
         Q(user__is_dob_public=True, greeting__event_type=REPEATED_EVENT_TYPES.event_birthday) |
         Q(user__is_anniversary_public=True, greeting__event_type=REPEATED_EVENT_TYPES.event_anniversary)
@@ -361,16 +364,6 @@ def org_reco_api_query(user, post_polls, version, greeting, query_params):
     if post_polls:
         query_post = Q(post_type=POST_TYPE.USER_CREATED_POST)
         query_poll = Q(post_type=POST_TYPE.USER_CREATED_POLL)
-        if int(version) >= 12:
-            query_post.add(
-                Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post", user__is_dob_public=True,
-                  greeting__event_type=REPEATED_EVENT_TYPES.event_birthday), Q.OR
-            )
-            query_post.add(
-                Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post", user__is_anniversary_public=True,
-                  greeting__event_type=REPEATED_EVENT_TYPES.event_anniversary), Q.OR
-            )
-
         if post_polls_filter == "post":
             query = query_post
         elif post_polls_filter == "poll":
@@ -395,8 +388,8 @@ def org_reco_api_query(user, post_polls, version, greeting, query_params):
 
     if post_polls:
         post_query = post_query | posts_shared_with_org_department_query(user, admin_orgs)
-        if organization.show_greetings_from_affiliated and int(version) >= 12:
-            post_query = post_query | load_greeting_posts_for_affiliated_orgs(user.get_affiliated_orgs())
+        if int(version) >= 12:
+            post_query = post_query | load_greeting_posts(organization, user)
 
     if search:
         post_query = post_query & (
