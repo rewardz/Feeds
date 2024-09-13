@@ -338,7 +338,7 @@ def load_greeting_posts(org, user):
     """
     orgs = [org]
     if org.show_greetings_from_affiliated:
-        orgs = [user.get_affiliated_orgs()]
+        orgs = user.get_affiliated_orgs()
     return (
         Q(user__is_dob_public=True, greeting__event_type=REPEATED_EVENT_TYPES.event_birthday) |
         Q(user__is_anniversary_public=True, greeting__event_type=REPEATED_EVENT_TYPES.event_anniversary)
