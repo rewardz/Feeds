@@ -36,7 +36,7 @@ EmployeeIDStore = import_string(settings.EMPLOYEE_ID_STORE)
 REPEATED_EVENT_TYPES = import_string(settings.REPEATED_EVENT_TYPES_CHOICE)
 
 
-def accessible_posts_by_user(user, organization, allow_feedback=False, appreciations=False, post_id=None):
+def accessible_posts_by_user(user, organization, allow_feedback=False, appreciations=False, post_id=None, feed_version=0):
     if not isinstance(organization, (list, tuple)):
         organization = [organization]
 
@@ -77,6 +77,11 @@ def accessible_posts_by_user(user, organization, allow_feedback=False, appreciat
     # possible that result might contains duplicate posts due to OR query
     # we can not apply distinct over here since order by is used at some places
     # after calling this method
+    if int(feed_version) >= 12:
+        _query = load_greeting_posts(user.organization, user)
+        if post_id:
+            _query = _query & Q(id=post_id)
+        result |= Post.objects.filter(_query)
     if not user.is_staff:
         return result
 
