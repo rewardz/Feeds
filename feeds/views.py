@@ -468,7 +468,6 @@ class PostViewSet(viewsets.ModelViewSet):
 
         if self.request.method == "GET":
             serializer_context = {'request': self.request}
-
             # prepare a query dict
             query_dict = {
                 "post_id": post_id,

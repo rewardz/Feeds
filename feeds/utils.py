@@ -82,6 +82,8 @@ def accessible_posts_by_user(user, organization, allow_feedback=False, appreciat
         if post_id:
             _query = _query & Q(id=post_id)
         result |= Post.objects.filter(_query)
+    else:
+        result = result.exclude(title="greeting_post")
     if not user.is_staff:
         return result
 
