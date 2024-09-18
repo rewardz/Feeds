@@ -346,7 +346,7 @@ class PostViewSet(viewsets.ModelViewSet):
                 org,
                 allow_feedback=allow_feedback,
                 appreciations=is_appreciation_post(post_id) if post_id else False,
-                post_id=post_id
+                post_id=post_id, feed_version=int(self.request.version)
             )
 
         if created_by in ("user_org", "user_dept"):
