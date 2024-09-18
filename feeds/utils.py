@@ -320,6 +320,9 @@ def post_api_query(version, user, post_id, appreciations, query_params):
         # For list api excluded personal greeting message (events.api.EventViewSet.message)
         exclusion_query = exclusion_query | Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting")
 
+    if int(version) >= 12:
+        post_query = post_query | load_greeting_posts(org, user)
+
     if int(version) < 12 and not post_id:
         # For list api below version 12 we are excluding system created greeting post
         exclusion_query = exclusion_query | Q(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post")
