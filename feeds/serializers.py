@@ -471,7 +471,6 @@ class PostSerializer(DynamicFieldsModelSerializer):
     job_families = serializers.SerializerMethodField()
     created_on = serializers.SerializerMethodField()
     modified_on = serializers.SerializerMethodField()
-    is_new_post = serializers.SerializerMethodField()
 
     class Meta:
         model = Post
@@ -484,7 +483,7 @@ class PostSerializer(DynamicFieldsModelSerializer):
             "is_owner", "can_edit", "can_delete", "has_appreciated",
             "appreciation_count", "comments_count", "tagged_users", "is_admin", "tags", "reaction_type", "nomination",
             "feed_type", "user_strength", "user", "user_reaction_type", "gif", "ecard", "points", "time_left",
-            "images_with_ecard", "departments", "organization", "department", "job_families", "is_new_post"
+            "images_with_ecard", "departments", "organization", "department", "job_families"
         )
 
     def get_organization(self, instance):
@@ -578,13 +577,6 @@ class PostSerializer(DynamicFieldsModelSerializer):
         if not user:
             return instance.created_on
         return get_user_localtime(instance.created_on, user.organization.timezone)
-    
-    def get_is_new_post(self, instance):
-        now = datetime.now().replace(tzinfo=utc)
-        created_on = instance.created_on + timedelta(hours=24)
-        if created_on > now:
-            return True
-        return False
 
     def create(self, validated_data):
         request = self.context.get('request', None)
@@ -1029,7 +1021,6 @@ class GreetingSerializerBase(serializers.ModelSerializer):
     ecard = ECardSerializer(read_only=True)
     images_with_ecard = serializers.SerializerMethodField()
     greeting_info = serializers.SerializerMethodField()
-    is_new_post = serializers.SerializerMethodField()
 
     def __init__(self, *args, **kwargs):
         super(GreetingSerializerBase, self).__init__(*args, **kwargs)
@@ -1049,13 +1040,6 @@ class GreetingSerializerBase(serializers.ModelSerializer):
 
     def get_is_admin(self, instance):
         return self.user.is_staff
-    
-    def get_is_new_post(self, instance):
-        now = datetime.now().replace(tzinfo=utc)
-        created_on = instance.created_on + timedelta(hours=24)
-        if created_on > now:
-            return True
-        return False
 
     @staticmethod
     def get_feed_type(instance):
@@ -1074,7 +1058,7 @@ class GreetingSerializerBase(serializers.ModelSerializer):
         fields = (
             "id", "created_by", "created_on", "organizations", "created_by_user_info", "title", "description",
             "post_type", "priority", "shared_with", "is_owner", "is_admin", "feed_type",
-            "gif", "ecard", "images_with_ecard", "greeting_info", "is_new_post"
+            "gif", "ecard", "images_with_ecard", "greeting_info"
         )
 
 
