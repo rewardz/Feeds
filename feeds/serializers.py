@@ -1,8 +1,10 @@
 from __future__ import division, print_function, unicode_literals
 
+import pytz
 from django.conf import settings
 from django.utils.module_loading import import_string
 from django.db.models import Count
+from datetime import datetime, timedelta
 
 from rest_framework import serializers
 
@@ -32,6 +34,7 @@ ORGANIZATION_SETTINGS_MODEL = import_string(settings.ORGANIZATION_SETTINGS_MODEL
 MULTI_ORG_POST_ENABLE_FLAG = settings.MULTI_ORG_POST_ENABLE_FLAG
 RepeatedEventSerializer = import_string(settings.REPEATED_EVENT_SERIALIZER)
 
+utc = pytz.UTC
 
 def get_user_detail(user_id):
     try:
