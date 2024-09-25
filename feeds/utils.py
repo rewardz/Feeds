@@ -11,6 +11,8 @@ from django.utils import timezone
 from datetime import timedelta
 import calendar
 
+from django.db.models import F, DateTimeField
+
 from rest_framework import exceptions, serializers
 
 from .constants import POST_TYPE, SHARED_WITH
@@ -277,7 +279,22 @@ def fetch_feeds(post_query, exclusion_query, ordering_fields, user):
     # IMP: Do not remove list from here because with the list it is actually faster refer this
     # https://github.com/rewardz/Feeds/pull/223#issuecomment-2024339238
 
-    queryset = Post.objects.filter(post_query).exclude(exclusion_query)
+    query = None
+    annotation = False
+    now_dateTime = None
+    hold_certificate_time = user.organization.hold_certificate_time
+    setting_last_modification = user.organization.get_hold_certificate_time_last_modification
+
+    if hold_certificate_time and setting_last_modification:
+        query = Q(created_on__gt=setting_last_modification, created_on__lt=now_dateTime)
+        annotation = True
+
+    if annotation:
+        queryset = Post.objects.filter(post_query).annotate(
+            now_dateTime=F("created_on") + F(timedelta(minutes=hold_certificate_time)), output_field=DateTimeField()
+        ).exclude(exclusion_query | query)
+    else:
+        queryset = Post.objects.filter(post_query).exclude(exclusion_query)
     post_ids = set(queryset.values_list('id', flat=True))
     if getattr(user, 'job_family', None):
         new_queryset = user.job_family.posts.values_list('id', flat=True)
