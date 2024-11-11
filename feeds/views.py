@@ -390,6 +390,8 @@ class PostViewSet(viewsets.ModelViewSet):
     def create_poll(self, request, *args, **kwargs):
         context = {'request': request}
         user = self.request.user
+        if not user.is_staff:
+            raise ValidationError(_("You are not authorised to create the poll"))
         payload = self.request.data
         data = {k: v for k, v in payload.items()}
         question = data.get('title', None)
