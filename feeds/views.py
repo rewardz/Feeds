@@ -7,6 +7,7 @@ from django.db.models import Case, IntegerField, Q, Count, When
 from django.http import Http404
 from django.utils.module_loading import import_string
 from django.utils.translation import ugettext as _
+from feeds.utils import admin_feeds_to_exclude
 
 from rest_framework import permissions, viewsets, serializers, status, views, filters
 from rest_framework.decorators import api_view, detail_route, list_route, permission_classes
@@ -366,6 +367,7 @@ class PostViewSet(viewsets.ModelViewSet):
             result = result.exclude(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post")
 
         posts_ids_to_exclude = set(posts_not_shared_with_self_department(result, user).values_list("id", flat=True))
+        posts_ids_to_exclude.union(set(admin_feeds_to_exclude(result, user).values_list("id", flat=True)))
         posts_ids_to_exclude.union(set(posts_not_shared_with_job_family(result, user).values_list("id", flat=True)))
         posts_ids_not_to_exclude = assigned_nomination_post_ids(user)
         posts_ids_to_exclude = posts_ids_to_exclude - set(posts_ids_not_to_exclude)
@@ -381,7 +383,6 @@ class PostViewSet(viewsets.ModelViewSet):
             post_ids = set(result.values_list('id', flat=True))
             result = Post.objects.filter(id__in=post_ids)
         result = get_related_objects_qs(result)
-
         result = PostFilter(self.request.GET, queryset=result).qs
         result = result.order_by('-priority', '-modified_on', '-created_on')
         return result

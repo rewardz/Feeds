@@ -191,8 +191,8 @@ def get_exclusion_query(user, admin_orgs, departments, org_reco_api, job_family)
     """Returns the combined query to exclude the post based on shared_with flag and user type"""
     exclude_query = posts_not_shared_with_self_department_query(user, departments)
     exclude_query = posts_not_shared_with_job_family_query(user, exclude_query, job_family)
+    exclude_query = admin_feeds_to_exclude_query(user, exclude_query)
     if org_reco_api:
-        exclude_query = admin_feeds_to_exclude_query(user, exclude_query)
         exclude_query = posts_not_shared_with_org_department_query(user, admin_orgs, departments, exclude_query)
         exclude_query = shared_with_all_departments_but_not_belongs_to_user_org_query(user, exclude_query)
 
