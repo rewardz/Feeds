@@ -112,6 +112,11 @@ class PostViewSet(viewsets.ModelViewSet):
                 continue
             data.update({key: value})
 
+        if current_user.organization not in current_user.get_affiliated_orgs():
+            raise serializers.ValidationError(_(
+                "User is not allowed to create post for different organization"
+            ))
+
         delete_image_ids = data.get('delete_image_ids', None)
         delete_document_ids = data.get('delete_document_ids', None)
 
@@ -286,7 +291,7 @@ class PostViewSet(viewsets.ModelViewSet):
         user = request.user
         if not user_can_delete(user, instance):
             raise serializers.ValidationError(_("You do not have permission to delete"))
-        appreciation_trxns = instance.transactions.all()
+        appreciation_trxns = instance.transactions.filter(organization_id__in=user.get_affiliated_orgs())
         message = "reverting transaction for appreciation post {}".format(instance.title)
         if request.data.get("revert_transaction", False):
             reason, _ = PointsTable.objects.get_or_create(
@@ -399,6 +404,11 @@ class PostViewSet(viewsets.ModelViewSet):
             raise ValidationError(_("You are not authorised to create the poll"))
         payload = self.request.data
         data = {k: v for k, v in payload.items()}
+        if user.organization_id not in user.get_affiliated_orgs():
+            raise serializers.ValidationError(_(
+                "User is not allowed to create post for different organization"
+            ))
+
         question = data.get('title', None)
         if not question:
             raise ValidationError(_('Question(title) is required to create a poll'))
@@ -694,10 +704,11 @@ class PostViewSet(viewsets.ModelViewSet):
 
     @detail_route(methods=["GET"], permission_classes=(IsOptionsOrAuthenticated,))
     def post_appreciations(self, request, *args, **kwargs):
+        user = self.request.user
         post_id = self.kwargs.get("pk", None)
         recent = request.query_params.get("recent", None)
         reaction_type = request.query_params.get("reaction_type", None)
-        post = Post.objects.get(id=post_id)
+        post = Post.objects.get(id=post_id, organization_id__in=user.get_affiliated_orgs())
         post_likes = post.postliked_set.all().order_by("-id")
         all_reaction_count = post_likes.count()
         if recent:
