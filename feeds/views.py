@@ -402,7 +402,7 @@ class PostViewSet(viewsets.ModelViewSet):
             raise ValidationError(_("You are not authorised to create the poll"))
         payload = self.request.data
         data = {k: v for k, v in payload.items()}
-        if user.organization_id not in user.get_affiliated_orgs():
+        if user.organization not in user.get_affiliated_orgs():
             raise serializers.ValidationError(_(
                 "User is not allowed to create post for different organization"
             ))
