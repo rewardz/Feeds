@@ -10,7 +10,7 @@ pylint==1.6.4
 pylint-django==0.7.2
 psycopg2>=2.5.4,<=2.8.4
 django-annoying==0.8.4
-django-tinymce==2.0.5
+django-tinymce==3.4.0
 django-redis==4.8.0
 gunicorn==19.6.0
 django-taggit==0.22.2
