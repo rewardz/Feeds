@@ -100,6 +100,7 @@ class PostViewSet(viewsets.ModelViewSet):
     def _create_or_update(self, request, create=False):
         payload = request.data
         current_user = self.request.user
+        affiliated_orgs = current_user.get_affiliated_orgs()
         if not current_user:
             raise serializers.ValidationError({'created_by': _('Created by is required!')})
 
@@ -109,11 +110,14 @@ class PostViewSet(viewsets.ModelViewSet):
         data = {}
         for key, value in payload.items():
             if key in ["organizations", "departments", "job_families"] and isinstance(payload.get(key), unicode):
-                data.update({key: loads(value)})
+                val = loads(value)
+                if val and affiliated_orgs.filter(id__in=val).count() != len(val):
+                    raise serializers.ValidationError(_("Invalid organization id"))
+                data.update({key: val})
                 continue
             data.update({key: value})
 
-        if current_user.organization not in current_user.get_affiliated_orgs():
+        if current_user.organization not in affiliated_orgs:
             raise serializers.ValidationError(_(
                 "User is not allowed to create post for different organization"
             ))
