@@ -175,6 +175,16 @@ class UserInfoSerializer(DynamicFieldsModelSerializer):
 class ImagesSerializer(serializers.ModelSerializer):
     name = serializers.SerializerMethodField()
 
+    @staticmethod
+    def validate_name(value):
+        if value.split(".")[-1].lower() not in ["png", "jpg", "jpeg"]:
+            raise serializers.ValidationError("Please upload valid image.")
+        return value
+
+    def validate(self, data):
+        self.validate_name(data["name"])
+        return data
+
     class Meta:
         model = Images
         fields = (
