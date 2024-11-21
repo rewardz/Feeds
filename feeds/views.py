@@ -15,6 +15,7 @@ from rest_framework.exceptions import ValidationError, NotFound
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
 from feeds.constants import SHARED_WITH
+
 from .filters import PostFilter, PostFilterBase
 from .constants import POST_TYPE, SHARED_WITH
 from .models import (
@@ -181,11 +182,8 @@ class PostViewSet(viewsets.ModelViewSet):
                 data = {'post': post_id}
                 data['image'] = img
                 image_serializer = ImagesSerializer(data=data)
-                if image_serializer.is_valid():
-                    image_serializer.save()
-                else:
-                    return Response({'message': 'Image not uploaded'},
-                                    status=status.HTTP_400_BAD_REQUEST)
+                image_serializer.is_valid(raise_exception=True)
+                image_serializer.save()
 
         documents = dict((request.FILES).lists()).get('documents', None)
         if documents:
