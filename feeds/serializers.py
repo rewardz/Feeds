@@ -961,7 +961,7 @@ class PollsAnswerSerializer(serializers.ModelSerializer):
         return UserInfoSerializer(voters, many=True, read_only=True).data
 
 
-class PollsAnswerSerializerReadOnly(serializers.ModelSerializer):
+class PollsAnswerSerializerLite(serializers.ModelSerializer):
     voters_info = serializers.SerializerMethodField()
 
     class Meta:
@@ -977,7 +977,7 @@ class PollsAnswerSerializerReadOnly(serializers.ModelSerializer):
         return UserInfoSerializer(voters, many=True, read_only=True, fields=["pk"]).data
 
 
-class SubmittedPollsAnswerSerializer(PollsAnswerSerializerReadOnly):
+class SubmittedPollsAnswerSerializer(PollsAnswerSerializerLite):
     has_voted = serializers.SerializerMethodField()
 
     class Meta:
