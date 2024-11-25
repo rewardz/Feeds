@@ -961,7 +961,23 @@ class PollsAnswerSerializer(serializers.ModelSerializer):
         return UserInfoSerializer(voters, many=True, read_only=True).data
 
 
-class SubmittedPollsAnswerSerializer(PollsAnswerSerializer):
+class PollsAnswerSerializerLite(serializers.ModelSerializer):
+    voters_info = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PollsAnswer
+        fields = (
+            "id", "question", "answer_text", "votes", "voters_info",
+        )
+
+    @staticmethod
+    def get_voters_info(instance):
+        voters = instance.get_voters()
+        voters = UserModel.objects.filter(pk__in=voters)
+        return UserInfoSerializer(voters, many=True, read_only=True, fields=["pk"]).data
+
+
+class SubmittedPollsAnswerSerializer(PollsAnswerSerializerLite):
     has_voted = serializers.SerializerMethodField()
 
     class Meta:
