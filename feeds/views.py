@@ -52,6 +52,7 @@ Transaction = import_string(settings.TRANSACTION_MODEL)
 PointsTable = import_string(settings.POINTS_TABLE)
 POINT_SOURCE = import_string(settings.POINT_SOURCE)
 REPEATED_EVENT_TYPES = import_string(settings.REPEATED_EVENT_TYPES_CHOICE)
+FILE_VALIDATOR = import_string(settings.FILE_VALIDATOR)
 
 # InspireMe API wrapper
 InspireMeAPI = import_string(settings.API_WRAPPER_CLASS)
@@ -181,6 +182,7 @@ class PostViewSet(viewsets.ModelViewSet):
 
     def _upload_files(self, request, post_id):
         images = dict((request.FILES).lists()).get('images', None)
+        FILE_VALIDATOR(['.jpg', '.jpeg', '.png', '.gif', '.heic']).is_valid_files(images)
         if images:
             for img in images:
                 data = {'post': post_id}
