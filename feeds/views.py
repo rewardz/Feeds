@@ -710,7 +710,10 @@ class PostViewSet(viewsets.ModelViewSet):
         post_id = self.kwargs.get("pk", None)
         recent = request.query_params.get("recent", None)
         reaction_type = request.query_params.get("reaction_type", None)
-        post = Post.objects.get(id=post_id, organizations__in=user.get_affiliated_orgs())
+        post = Post.objects.get(
+            Q(organizations__in=user.get_affiliated_orgs()) | Q(authors__isnull=True),
+            id=post_id
+        )
         post_likes = post.postliked_set.all().order_by("-id")
         all_reaction_count = post_likes.count()
         if recent:
