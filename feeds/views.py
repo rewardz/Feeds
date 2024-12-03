@@ -111,7 +111,7 @@ class PostViewSet(viewsets.ModelViewSet):
         for key, value in payload.items():
             if key in ["organizations", "departments", "job_families"] and isinstance(payload.get(key), unicode):
                 val = loads(value)
-                if val and affiliated_orgs.filter(id__in=val).count() != len(val):
+                if key in ["organizations"] and val and affiliated_orgs.filter(id__in=val).count() != len(val):
                     raise serializers.ValidationError(_("Invalid organization id"))
                 data.update({key: val})
                 continue
