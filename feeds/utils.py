@@ -37,19 +37,34 @@ REPEATED_EVENT_TYPES = import_string(settings.REPEATED_EVENT_TYPES_CHOICE)
 
 
 def accessible_posts_by_user(user, organization, allow_feedback=False, appreciations=False, post_id=None):
+    show_appreciations_from_affiliated_org = False
+    if appreciations and user.organization.show_appreciations_from_affiliated_org:
+        affiliated_orgs = user.get_affiliated_orgs()
+        show_appreciations_from_affiliated_org = True
+
     if not isinstance(organization, (list, tuple)):
         organization = [organization]
 
     # get the departments to which this user belongs
     user_depts = getattr(user, USER_DEPARTMENT_RELATED_NAME).all()
     post_query = (
-            Q(organizations__in=organization) |
             Q(user=user) |
             Q(departments__in=user_depts) |
-            Q(shared_with=SHARED_WITH.ALL_DEPARTMENTS, created_by__organization__in=organization) |
             Q(shared_with=SHARED_WITH.SELF_DEPARTMENT, created_by__departments__in=user.departments.all()) |
             Q(shared_with=SHARED_WITH.ORGANIZATION_DEPARTMENTS, job_families__in=user.job_families)
     )
+    if show_appreciations_from_affiliated_org:
+        post_query = (
+                post_query |
+                Q(organizations__in=affiliated_orgs, post_type=POST_TYPE.USER_CREATED_APPRECIATION) |
+                Q(shared_with=SHARED_WITH.ALL_DEPARTMENTS, created_by__organization__in=affiliated_orgs,
+                  post_type=POST_TYPE.USER_CREATED_APPRECIATION)
+        )
+    else:
+        post_query = (
+                post_query | Q(organizations__in=organization) |
+                Q(shared_with=SHARED_WITH.ALL_DEPARTMENTS, created_by__organization__in=organization)
+        )
 
     if user.is_staff:
         admin_orgs = user.child_organizations
@@ -86,6 +101,8 @@ def accessible_posts_by_user(user, organization, allow_feedback=False, appreciat
     post_query = Q(organizations=None, shared_with=SHARED_WITH.SELF_DEPARTMENT)
     if user.is_staff:
         post_query = post_query & admin_query
+    elif show_appreciations_from_affiliated_org:
+        post_query = post_query & Q(created_by__organization=affiliated_orgs)
     else:
         post_query = post_query & Q(created_by__organization=user.organization)
 
@@ -94,7 +111,11 @@ def accessible_posts_by_user(user, organization, allow_feedback=False, appreciat
     if post_id:
         # Added this condition because we are allowing admin to see the post if that post does not belongs
         # to his department then admin can access that post
-        orgs = admin_orgs.values_list("id", flat=True) if allow_feedback else [user.organization_id]
+        orgs = admin_orgs.values_list("id", flat=True) if allow_feedback else (
+            affiliated_orgs.values_list("id", flat=True)
+            if show_appreciations_from_affiliated_org
+            else [user.organization_id]
+        )
         posts |= Post.objects.filter(id=post_id, created_by__organization_id__in=orgs)
 
     return posts.filter(mark_delete=False)
