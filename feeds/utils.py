@@ -232,12 +232,20 @@ def accessible_posts_by_user_v2(
     user_depts = departments or getattr(user, USER_DEPARTMENT_RELATED_NAME).all()
     job_family = user.job_family
     post_query = (
-            Q(organizations__in=organization) |
             Q(departments__in=user_depts) |
             Q(user=user) |
-            Q(shared_with=SHARED_WITH.ALL_DEPARTMENTS, created_by__organization__in=organization) |
             Q(shared_with=SHARED_WITH.SELF_DEPARTMENT, created_by__departments__in=user_depts)
     )
+    if appreciations and user.organization.show_appreciations_from_affiliated_org:
+        post_query = post_query | Q(
+            organizations__in=user.get_affiliated_orgs(), post_type=POST_TYPE.USER_CREATED_APPRECIATION
+        ) | Q(
+            shared_with=SHARED_WITH.ALL_DEPARTMENTS, created_by__organization__in=user.get_affiliated_orgs(),
+            post_type=POST_TYPE.USER_CREATED_APPRECIATION)
+    else:
+        post_query = post_query | Q(organizations__in=organization) | Q(
+            shared_with=SHARED_WITH.ALL_DEPARTMENTS, created_by__organization__in=organization
+        )
     admin_orgs = None
 
     if user.is_staff:
@@ -267,7 +275,11 @@ def accessible_posts_by_user_v2(
         post_query = post_query | query
         if post_id:
             post_query = post_query | Q(mark_delete=False, id=post_id, created_by__organization_id__in=(
-                admin_orgs if allow_feedback else [user.organization]))
+                admin_orgs if allow_feedback else (
+                    user.get_affiliated_orgs()
+                    if appreciations and user.organization.show_appreciations_from_affiliated_org
+                    else [user.organization]
+                )))
     # Final version
     return post_query, get_exclusion_query(user, admin_orgs, user_depts, org_reco_api, job_family), admin_orgs
 
@@ -366,11 +378,11 @@ def org_reco_api_query(user, post_polls, version, greeting, query_params):
     elif greeting:
         post_query = post_query & Q(
             post_type=POST_TYPE.GREETING_MESSAGE, title="greeting", greeting_id=greeting, user=user,
-            organizations__in=[organization], created_on__year=timezone.now().year
+            organizations__in=organization, created_on__year=timezone.now().year
         )
     else:
         query = (Q(post_type=POST_TYPE.USER_CREATED_APPRECIATION) |
-                 Q(nomination__nom_status=NOMINATION_STATUS.approved, organizations__in=[organization]))
+                 Q(nomination__nom_status=NOMINATION_STATUS.approved, organizations__in=organization))
 
         if user_id and str(user_id).isdigit():
             query.add(Q(user_id=user_id), query.AND)
