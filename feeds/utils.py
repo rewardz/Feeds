@@ -193,8 +193,8 @@ def get_exclusion_query(user, admin_orgs, departments, org_reco_api, job_family)
     """Returns the combined query to exclude the post based on shared_with flag and user type"""
     exclude_query = posts_not_shared_with_self_department_query(user, departments)
     exclude_query = posts_not_shared_with_job_family_query(user, exclude_query, job_family)
+    exclude_query = admin_feeds_to_exclude_query(user, exclude_query)
     if org_reco_api:
-        exclude_query = admin_feeds_to_exclude_query(user, exclude_query)
         exclude_query = posts_not_shared_with_org_department_query(user, admin_orgs, departments, exclude_query)
         exclude_query = shared_with_all_departments_but_not_belongs_to_user_org_query(user, exclude_query)
 
@@ -353,6 +353,7 @@ def org_reco_api_query(user, post_polls, version, greeting, query_params):
     post_polls_filter = query_params.get("post_polls_filter", None)
     user_id = query_params.get("user", None)
     search = query_params.get("search", None)
+    query = None
 
     post_query, exclusion_query, admin_orgs = accessible_posts_by_user_v2(
         user, organization, False, False if post_polls else True, None, departments, True)
@@ -405,6 +406,8 @@ def org_reco_api_query(user, post_polls, version, greeting, query_params):
             Q(title__icontains=search) |
             Q(description__icontains=search)
         )
+    if query:
+        post_query = post_query & query
     return fetch_feeds(post_query & extract_date_query(query_params), exclusion_query,
                        ('-priority', '-created_on'), user), post_query, exclusion_query
 
@@ -861,6 +864,9 @@ def get_job_families(user, shared_with, data):
 
 def get_user_localtime(date, org_timezone, date_format="%Y-%m-%d"):
     return timezone.localtime(date, pytz.timezone(org_timezone)).strftime(date_format)
+
+def get_user_localdatetime(date, org_timezone):
+    return timezone.localtime(date, pytz.timezone(org_timezone))
 
 def get_feed_type(post):
     """

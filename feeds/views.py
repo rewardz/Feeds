@@ -7,6 +7,7 @@ from django.db.models import Case, IntegerField, Q, Count, When
 from django.http import Http404
 from django.utils.module_loading import import_string
 from django.utils.translation import ugettext as _
+from feeds.utils import admin_feeds_to_exclude
 
 from datetime import datetime, timedelta
 from rest_framework import permissions, viewsets, serializers, status, views, filters
@@ -15,6 +16,7 @@ from rest_framework.exceptions import ValidationError, NotFound
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
 from feeds.constants import SHARED_WITH
+
 from .filters import PostFilter, PostFilterBase
 from .constants import POST_TYPE, SHARED_WITH
 from .models import (
@@ -99,6 +101,7 @@ class PostViewSet(viewsets.ModelViewSet):
     def _create_or_update(self, request, create=False):
         payload = request.data
         current_user = self.request.user
+        affiliated_orgs = current_user.get_affiliated_orgs()
         if not current_user:
             raise serializers.ValidationError({'created_by': _('Created by is required!')})
 
@@ -108,9 +111,17 @@ class PostViewSet(viewsets.ModelViewSet):
         data = {}
         for key, value in payload.items():
             if key in ["organizations", "departments", "job_families"] and isinstance(payload.get(key), unicode):
-                data.update({key: loads(value)})
+                val = loads(value)
+                if key in ["organizations"] and val and affiliated_orgs.filter(id__in=val).count() != len(val):
+                    raise serializers.ValidationError(_("Invalid organization id"))
+                data.update({key: val})
                 continue
             data.update({key: value})
+
+        if current_user.organization not in affiliated_orgs:
+            raise serializers.ValidationError(_(
+                "User is not allowed to create post for different organization"
+            ))
 
         delete_image_ids = data.get('delete_image_ids', None)
         delete_document_ids = data.get('delete_document_ids', None)
@@ -176,11 +187,8 @@ class PostViewSet(viewsets.ModelViewSet):
                 data = {'post': post_id}
                 data['image'] = img
                 image_serializer = ImagesSerializer(data=data)
-                if image_serializer.is_valid():
-                    image_serializer.save()
-                else:
-                    return Response({'message': 'Image not uploaded'},
-                                    status=status.HTTP_400_BAD_REQUEST)
+                image_serializer.is_valid(raise_exception=True)
+                image_serializer.save()
 
         documents = dict((request.FILES).lists()).get('documents', None)
         if documents:
@@ -286,7 +294,7 @@ class PostViewSet(viewsets.ModelViewSet):
         user = request.user
         if not user_can_delete(user, instance):
             raise serializers.ValidationError(_("You do not have permission to delete"))
-        appreciation_trxns = instance.transactions.all()
+        appreciation_trxns = instance.transactions.filter(organization_id__in=user.get_affiliated_orgs())
         message = "reverting transaction for appreciation post {}".format(instance.title)
         if request.data.get("revert_transaction", False):
             reason, _ = PointsTable.objects.get_or_create(
@@ -367,7 +375,12 @@ class PostViewSet(viewsets.ModelViewSet):
             result = result.exclude(post_type=POST_TYPE.GREETING_MESSAGE, title="greeting_post")
 
         posts_ids_to_exclude = set(posts_not_shared_with_self_department(result, user).values_list("id", flat=True))
-        posts_ids_to_exclude.union(set(posts_not_shared_with_job_family(result, user).values_list("id", flat=True)))
+        posts_ids_to_exclude = posts_ids_to_exclude.union(
+            set(admin_feeds_to_exclude(result, user).values_list("id", flat=True))
+        )
+        posts_ids_to_exclude = posts_ids_to_exclude.union(
+            set(posts_not_shared_with_job_family(result, user).values_list("id", flat=True))
+        )
         posts_ids_not_to_exclude = assigned_nomination_post_ids(user)
         posts_ids_to_exclude = posts_ids_to_exclude - set(posts_ids_not_to_exclude)
 
@@ -382,7 +395,6 @@ class PostViewSet(viewsets.ModelViewSet):
             post_ids = set(result.values_list('id', flat=True))
             result = Post.objects.filter(id__in=post_ids)
         result = get_related_objects_qs(result)
-
         result = PostFilter(self.request.GET, queryset=result).qs
         result = result.order_by('-priority', '-modified_on', '-created_on')
         return result
@@ -391,8 +403,15 @@ class PostViewSet(viewsets.ModelViewSet):
     def create_poll(self, request, *args, **kwargs):
         context = {'request': request}
         user = self.request.user
+        if not user.is_staff:
+            raise ValidationError(_("You are not authorised to create the poll"))
         payload = self.request.data
         data = {k: v for k, v in payload.items()}
+        if user.organization not in user.get_affiliated_orgs():
+            raise serializers.ValidationError(_(
+                "User is not allowed to create post for different organization"
+            ))
+
         question = data.get('title', None)
         if not question:
             raise ValidationError(_('Question(title) is required to create a poll'))
@@ -688,9 +707,11 @@ class PostViewSet(viewsets.ModelViewSet):
 
     @detail_route(methods=["GET"], permission_classes=(IsOptionsOrAuthenticated,))
     def post_appreciations(self, request, *args, **kwargs):
+        user = self.request.user
         post_id = self.kwargs.get("pk", None)
         recent = request.query_params.get("recent", None)
         reaction_type = request.query_params.get("reaction_type", None)
+        # Q(organizations__in=user.get_affiliated_orgs()) | Q(organizations__isnull=True)
         post = Post.objects.get(id=post_id)
         post_likes = post.postliked_set.all().order_by("-id")
         all_reaction_count = post_likes.count()
@@ -1225,8 +1246,8 @@ class UserFeedViewSet(viewsets.ModelViewSet):
                 filter_appreciations = self.filter_appreciations(feeds)
         feeds = PostFilter(self.request.GET, queryset=feeds).qs
         if filter_appreciations.exists():
-            feeds = (feeds | filter_appreciations).distinct()
-        page = self.paginate_queryset(feeds)
+            feeds = (feeds | filter_appreciations)
+        page = self.paginate_queryset(feeds.distinct())
         serializer = GreetingSerializer if greeting else OrganizationRecognitionSerializer
         serializer = serializer(page, context={"request": request}, many=True)
         return self.get_paginated_response(serializer.data)
