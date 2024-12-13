@@ -1028,7 +1028,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             feeds = posts.filter(post_type__in=[POST_TYPE.USER_CREATED_APPRECIATION,
                                                 POST_TYPE.USER_CREATED_NOMINATION])
 
-        feeds = check_and_filter_on_certificate_hold_time(feeds, user)
+        feeds, _ = check_and_filter_on_certificate_hold_time(feeds, user)
 
         filter_appreciations = self.filter_appreciations(feeds)
         feeds = PostFilter(self.request.GET, queryset=feeds, user=user).qs
