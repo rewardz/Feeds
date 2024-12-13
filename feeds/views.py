@@ -3,16 +3,12 @@ from __future__ import division, print_function, unicode_literals
 from json import loads
 from django.conf import settings
 from django.db import transaction
-from django.db.models import (
-    Case, IntegerField, Q, Count, When, F, ExpressionWrapper, DurationField
-)
+from django.db.models import Case, IntegerField, Q, Count, When
 from django.http import Http404
 from django.utils.module_loading import import_string
 from django.utils.translation import ugettext as _
 from feeds.utils import admin_feeds_to_exclude
 
-from django.utils import timezone
-from datetime import datetime, timedelta
 from rest_framework import permissions, viewsets, serializers, status, views, filters
 from rest_framework.decorators import api_view, detail_route, list_route, permission_classes
 from rest_framework.exceptions import ValidationError, NotFound
@@ -42,6 +38,7 @@ from .utils import (
     get_current_month_end_date, get_absolute_url, posts_not_visible_to_user,
     get_job_families, get_related_objects_qs, org_reco_api_query, post_api_query, posts_not_shared_with_self_department,
     posts_not_shared_with_job_family, assigned_nomination_post_ids, posts_shared_with_org_department, fetch_feeds,
+    check_and_filter_on_certificate_hold_time
 )
 
 CustomUser = import_string(settings.CUSTOM_USER_MODEL)
@@ -1031,15 +1028,7 @@ class UserFeedViewSet(viewsets.ModelViewSet):
             feeds = posts.filter(post_type__in=[POST_TYPE.USER_CREATED_APPRECIATION,
                                                 POST_TYPE.USER_CREATED_NOMINATION])
 
-        now_dateTime = timezone.now()
-        hold_certificate_time = int(organization.hold_certificate_time)
-        setting_last_modification = organization.get_hold_certificate_time_last_modification
-
-        if hold_certificate_time != 0 and setting_last_modification:
-            feeds = feeds.annotate(
-                now_dateTime=ExpressionWrapper(F('created_on') + timedelta(minutes=hold_certificate_time), output_field=DurationField())
-            )
-            feeds = feeds.filter(created_on__gt=setting_last_modification, now_dateTime__lte=now_dateTime)
+        feeds = check_and_filter_on_certificate_hold_time(feeds, user)
 
         filter_appreciations = self.filter_appreciations(feeds)
         feeds = PostFilter(self.request.GET, queryset=feeds, user=user).qs
