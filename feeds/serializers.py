@@ -26,6 +26,8 @@ Question = import_string(settings.QUESTION_MODEL)
 Answer = import_string(settings.ANSWER_MODEL)
 NominationCategory = import_string(settings.NOMINATION_CATEGORY_MODEL)
 Nominations = import_string(settings.NOMINATIONS_MODEL)
+NominationHistory = import_string(settings.NOMINATION_HISTORY_MODEL)
+NOMINATION_STATUS = import_string(settings.NOMINATION_STATUS)
 TrophyBadge = import_string(settings.TROPHY_BADGE_MODEL)
 UserStrength = import_string(settings.USER_STRENGTH_MODEL)
 NOMINATION_STATUS_COLOR_CODE = import_string(settings.NOMINATION_STATUS_COLOR_CODE)
@@ -1037,6 +1039,7 @@ class GreetingSerializerBase(serializers.ModelSerializer):
     ecard = ECardSerializer(read_only=True)
     images_with_ecard = serializers.SerializerMethodField()
     greeting_info = serializers.SerializerMethodField()
+    can_download = serializers.SerializerMethodField()
 
     def __init__(self, *args, **kwargs):
         super(GreetingSerializerBase, self).__init__(*args, **kwargs)
@@ -1057,6 +1060,27 @@ class GreetingSerializerBase(serializers.ModelSerializer):
     def get_is_admin(self, instance):
         return self.user.is_staff
 
+    def get_can_download(self, instance):
+        can_download = False
+        reviewer_user = []
+        nomination = instance.nomination
+        badge_reviewer_level = nomination.badge.reviewer_level
+
+        if instance.created_by == self.user or self.user.is_staff:
+            return True
+
+        if nomination and nomination.nom_status == NOMINATION_STATUS.approved:
+            nomination_history = NominationHistory.objects.filter(
+                nomination=nomination, status=NOMINATION_STATUS.approved
+            )
+            if nomination_history:
+                max_reviewer_level = max(nomination_history.values_list('reviewer_level', flat=True))
+                reviewer_user = nomination_history.values_list('reviewer__email', flat=True)
+                if max_reviewer_level >= badge_reviewer_level and self.user.email in reviewer_user:
+                    return True
+
+        return can_download
+
     @staticmethod
     def get_feed_type(instance):
         return get_feed_type(instance)
@@ -1074,7 +1098,7 @@ class GreetingSerializerBase(serializers.ModelSerializer):
         fields = (
             "id", "created_by", "created_on", "organizations", "created_by_user_info", "title", "description",
             "post_type", "priority", "shared_with", "is_owner", "is_admin", "feed_type",
-            "gif", "ecard", "images_with_ecard", "greeting_info"
+            "gif", "ecard", "images_with_ecard", "greeting_info", "can_download"
         )
 
 
