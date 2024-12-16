@@ -1064,12 +1064,12 @@ class GreetingSerializerBase(serializers.ModelSerializer):
         can_download = False
         reviewer_user = []
         nomination = instance.nomination
-        badge_reviewer_level = nomination.badge.reviewer_level
 
         if instance.created_by == self.user or self.user.is_staff:
             return True
 
         if nomination and nomination.nom_status == NOMINATION_STATUS.approved:
+            badge_reviewer_level = nomination.badge.reviewer_level
             nomination_history = NominationHistory.objects.filter(
                 nomination=nomination, status=NOMINATION_STATUS.approved
             )
