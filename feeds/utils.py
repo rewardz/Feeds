@@ -610,7 +610,7 @@ def push_notification(sender, message, recipient, object_type=None, object_id=No
         return False
 
 
-def extract_tagged_users(match_string):
+def extract_tagged_users(match_string, organization=None):
     pattern = "<tag.*?>(.*?)<\\/tag>"
     matches = []
     user_ids = []
@@ -632,8 +632,13 @@ def extract_tagged_users(match_string):
             try:
                 user = USERMODEL.objects.get(email=email)
                 user_ids.append(user.id)
-            except Exception:
+            except USERMODEL.DoesNotExist:
                 continue
+            except USERMODEL.MultipleObjectsReturned:
+                users = USERMODEL.objects.filter(email=email, organization=organization)
+                if users.exists():
+                    user = users.first()
+                    user_ids.append(user.id)
         else:
             user_ids.append(user_id)
     return user_ids
