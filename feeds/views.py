@@ -707,11 +707,12 @@ class PostViewSet(viewsets.ModelViewSet):
     @detail_route(methods=["GET"], permission_classes=(IsOptionsOrAuthenticated,))
     def post_appreciations(self, request, *args, **kwargs):
         user = self.request.user
+        organization = user.organization
         post_id = self.kwargs.get("pk", None)
         recent = request.query_params.get("recent", None)
         reaction_type = request.query_params.get("reaction_type", None)
         # Q(organizations__in=user.get_affiliated_orgs()) | Q(organizations__isnull=True)
-        post = Post.objects.get(id=post_id)
+        post = self.get_post_by_id(user, organization, False, is_appreciation_post(post_id), post_id, Q(id=post_id))
         post_likes = post.postliked_set.all().order_by("-id")
         all_reaction_count = post_likes.count()
         if recent:
