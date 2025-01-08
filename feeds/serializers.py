@@ -385,7 +385,7 @@ class NominationsSerializer(DynamicFieldsModelSerializer):
             return ""
 
     def get_question(self, instance):
-        questions = instance.question.all()
+        questions = instance.question.all().order_by("id")
         serializer = QuestionSerializer(instance=questions, many=True, context={'nomination_id': instance.id})
         return serializer.data
 
