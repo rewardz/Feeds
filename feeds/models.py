@@ -27,6 +27,8 @@ Transaction = import_string(settings.TRANSACTION_MODEL)
 Nominations = import_string(settings.NOMINATIONS_MODEL)
 RepeatedEvent = import_string(settings.REPEATED_EVENT_MODEL)
 UserJobFamily = import_string(settings.USER_JOB_FAMILY)
+DELETE_PUSH_NOTIFICATION = import_string(settings.DELETE_PUSH_NOTIFICATION)
+POST_NOTIFICATION_OBJECT_TYPE = import_string(settings.POST_NOTIFICATION_OBJECT_TYPE)
 
 
 def post_upload_to_path(instance, filename):
@@ -263,6 +265,9 @@ class Post(UserInfo):
             self.mark_delete = True
             self.modified_by = user
             self.save()
+            DELETE_PUSH_NOTIFICATION(getattr(self, "id"), [
+                POST_NOTIFICATION_OBJECT_TYPE.birthday, POST_NOTIFICATION_OBJECT_TYPE.anniversary
+            ])
         except Post.DoesNotExist:
             raise ValidationError(_("Post does not exist"))
 
@@ -360,6 +365,14 @@ class Post(UserInfo):
         """
         kwargs.update({"post": self})
         return Images.objects.filter(**kwargs)
+
+
+    def delete(self, *args, **kwargs):
+        DELETE_PUSH_NOTIFICATION(getattr(self, "id"), [
+            POST_NOTIFICATION_OBJECT_TYPE.birthday, POST_NOTIFICATION_OBJECT_TYPE.anniversary
+        ])
+        super(Post, self).delete(*args, **kwargs)
+
 
     def __unicode__(self):
         return self.title if self.title else str(self.pk)
