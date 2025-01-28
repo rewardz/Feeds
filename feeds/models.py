@@ -266,7 +266,8 @@ class Post(UserInfo):
             self.modified_by = user
             self.save()
             DELETE_PUSH_NOTIFICATION(getattr(self, "id"), [
-                POST_NOTIFICATION_OBJECT_TYPE.birthday, POST_NOTIFICATION_OBJECT_TYPE.anniversary
+                POST_NOTIFICATION_OBJECT_TYPE.birthday, POST_NOTIFICATION_OBJECT_TYPE.anniversary,
+                POST_NOTIFICATION_OBJECT_TYPE.nomination
             ])
         except Post.DoesNotExist:
             raise ValidationError(_("Post does not exist"))
@@ -369,7 +370,8 @@ class Post(UserInfo):
 
     def delete(self, *args, **kwargs):
         DELETE_PUSH_NOTIFICATION(getattr(self, "id"), [
-            POST_NOTIFICATION_OBJECT_TYPE.birthday, POST_NOTIFICATION_OBJECT_TYPE.anniversary
+            POST_NOTIFICATION_OBJECT_TYPE.birthday, POST_NOTIFICATION_OBJECT_TYPE.anniversary,
+            POST_NOTIFICATION_OBJECT_TYPE.nomination
         ])
         super(Post, self).delete(*args, **kwargs)
 
