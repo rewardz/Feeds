@@ -267,7 +267,7 @@ class Post(UserInfo):
             self.save()
             DELETE_PUSH_NOTIFICATION(getattr(self, "id"), [
                 POST_NOTIFICATION_OBJECT_TYPE.birthday, POST_NOTIFICATION_OBJECT_TYPE.anniversary,
-                POST_NOTIFICATION_OBJECT_TYPE.nomination
+                POST_NOTIFICATION_OBJECT_TYPE.nomination, POST_NOTIFICATION_OBJECT_TYPE.feedback
             ])
         except Post.DoesNotExist:
             raise ValidationError(_("Post does not exist"))
@@ -367,11 +367,10 @@ class Post(UserInfo):
         kwargs.update({"post": self})
         return Images.objects.filter(**kwargs)
 
-
     def delete(self, *args, **kwargs):
         DELETE_PUSH_NOTIFICATION(getattr(self, "id"), [
             POST_NOTIFICATION_OBJECT_TYPE.birthday, POST_NOTIFICATION_OBJECT_TYPE.anniversary,
-            POST_NOTIFICATION_OBJECT_TYPE.nomination
+            POST_NOTIFICATION_OBJECT_TYPE.nomination, POST_NOTIFICATION_OBJECT_TYPE.feedback
         ])
         super(Post, self).delete(*args, **kwargs)
 
