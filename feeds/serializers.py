@@ -222,7 +222,7 @@ class PollSerializer(serializers.ModelSerializer):
         model = Post
         fields = (
             'id', 'question', 'answers', 'is_poll_active', 'poll_remaining_time',
-            'user_has_voted', 'total_votes', 'active_days',)
+            'user_has_voted', 'total_votes', 'active_days', "source_language")
 
     def get_question(self, instance):
         return instance.title
@@ -473,6 +473,7 @@ class PostSerializer(DynamicFieldsModelSerializer):
     job_families = serializers.SerializerMethodField()
     created_on = serializers.SerializerMethodField()
     modified_on = serializers.SerializerMethodField()
+    can_download_certificate = serializers.SerializerMethodField()
 
     class Meta:
         model = Post
@@ -485,7 +486,8 @@ class PostSerializer(DynamicFieldsModelSerializer):
             "is_owner", "can_edit", "can_delete", "has_appreciated",
             "appreciation_count", "comments_count", "tagged_users", "is_admin", "tags", "reaction_type", "nomination",
             "feed_type", "user_strength", "user", "user_reaction_type", "gif", "ecard", "points", "time_left",
-            "images_with_ecard", "departments", "organization", "department", "job_families"
+            "images_with_ecard", "departments", "organization", "department", "job_families", "source_language",
+            "can_download_certificate"
         )
 
     def get_organization(self, instance):
@@ -657,6 +659,27 @@ class PostSerializer(DynamicFieldsModelSerializer):
     @staticmethod
     def get_images_with_ecard(instance):
         return get_images_with_ecard(instance)
+    
+    def get_can_download_certificate(self, instance):
+        can_download_certificate = False
+        reviewer_user = []
+        nomination = instance.nomination
+
+        if instance.created_by == self.user or self.user.is_staff:
+            return True
+
+        if nomination and nomination.nom_status == NOMINATION_STATUS.approved:
+            badge_reviewer_level = nomination.badge.reviewer_level
+            nomination_history = NominationHistory.objects.filter(
+                nomination=nomination, status=NOMINATION_STATUS.approved
+            )
+            if nomination_history:
+                max_reviewer_level = max(nomination_history.values_list('reviewer_level', flat=True))
+                reviewer_user = nomination_history.values_list('reviewer__email', flat=True)
+                if max_reviewer_level >= badge_reviewer_level and self.user.email in reviewer_user:
+                    return True
+
+        return can_download_certificate
 
 
 class CommentsLikedSerializer(serializers.ModelSerializer):
@@ -714,7 +737,7 @@ class PostDetailSerializer(PostSerializer):
             "gif", "ecard", "points", "user_reaction_type", "images_with_ecard", "reaction_type", "category",
             "category_name", "sub_category", "sub_category_name", "organization_name", "display_status",
             "department_name", "departments", "can_download", "is_download_choice_needed", "greeting_info",
-            "job_families"
+            "job_families", "source_language", "can_download_certificate"
         )
 
     @staticmethod
@@ -816,7 +839,8 @@ class PostFeedSerializer(PostSerializer):
             "is_owner", "can_edit", "can_delete", "has_appreciated",
             "appreciation_count", "comments_count", "tagged_users", "is_admin", "tags", "reaction_type", "nomination",
             "feed_type", "user_strength", "user", "user_reaction_type", "gif", "ecard", "points", "time_left",
-            "images_with_ecard", "greeting_info", "departments", "job_families"
+            "images_with_ecard", "greeting_info", "departments", "job_families", "source_language",
+            "can_download_certificate"
         )
 
 
@@ -831,9 +855,12 @@ class CommentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Comment
-        fields = ("id", "content", "created_by", "created_on", "modified_by",
-                  "modified_on", "post", "commented_by_user_info", "reaction_types",
-                  "liked_count", "liked_by", "has_liked", "tagged_users", "images", "documents")
+        fields = (
+            "id", "content", "created_by", "created_on", "modified_by",
+            "modified_on", "post", "commented_by_user_info", "reaction_types",
+            "liked_count", "liked_by", "has_liked", "tagged_users", "images",
+            "documents", "source_language"
+        )
 
     def get_images(self, instance):
         """
@@ -898,8 +925,11 @@ class CommentCreateSerializer(CommentSerializer):
 
     class Meta:
         model = Comment
-        fields = ("id", "count", "content", "created_by", "created_on",
-                  "modified_by", "post", "commented_by_user_info", "images", "documents")
+        fields = (
+            "id", "count", "content", "created_by", "created_on",
+            "modified_by", "post", "commented_by_user_info",
+            "images", "documents", "source_language"
+        )
 
     def get_count(self, instance):
         return Comment.objects.filter(post=instance.post).count()
@@ -915,6 +945,7 @@ class CommentDetailSerializer(CommentSerializer):
             "id", "content", "created_by", "created_on", "modified_by",
             "modified_on", "post", "commented_by_user_info",
             "liked_count", "liked_by", "has_liked", "tagged_users",
+            "source_language"
         )
 
     def update(self, instance, validated_data):
@@ -1039,7 +1070,7 @@ class GreetingSerializerBase(serializers.ModelSerializer):
     ecard = ECardSerializer(read_only=True)
     images_with_ecard = serializers.SerializerMethodField()
     greeting_info = serializers.SerializerMethodField()
-    can_download = serializers.SerializerMethodField()
+    can_download_certificate = serializers.SerializerMethodField()
 
     def __init__(self, *args, **kwargs):
         super(GreetingSerializerBase, self).__init__(*args, **kwargs)
@@ -1060,8 +1091,8 @@ class GreetingSerializerBase(serializers.ModelSerializer):
     def get_is_admin(self, instance):
         return self.user.is_staff
 
-    def get_can_download(self, instance):
-        can_download = False
+    def get_can_download_certificate(self, instance):
+        can_download_certificate = False
         reviewer_user = []
         nomination = instance.nomination
 
@@ -1079,7 +1110,7 @@ class GreetingSerializerBase(serializers.ModelSerializer):
                 if max_reviewer_level >= badge_reviewer_level and self.user.email in reviewer_user:
                     return True
 
-        return can_download
+        return can_download_certificate
 
     @staticmethod
     def get_feed_type(instance):
@@ -1098,7 +1129,8 @@ class GreetingSerializerBase(serializers.ModelSerializer):
         fields = (
             "id", "created_by", "created_on", "organizations", "created_by_user_info", "title", "description",
             "post_type", "priority", "shared_with", "is_owner", "is_admin", "feed_type",
-            "gif", "ecard", "images_with_ecard", "greeting_info", "can_download"
+            "gif", "ecard", "images_with_ecard", "greeting_info", "source_language",
+            "can_download_certificate"
         )
 
 
@@ -1173,7 +1205,8 @@ class OrganizationRecognitionSerializer(GreetingSerializerBase):
         fields = GreetingSerializerBase.Meta.fields + (
             "modified_by", "modified_on", "poll_info", "active_days", "priority", "prior_till", "can_edit",
             "can_delete", "has_appreciated", "appreciation_count", "comments_count", "reaction_type", "nomination",
-            "user_strength", "user", "user_reaction_type", "points", "departments", "job_families"
+            "user_strength", "user", "user_reaction_type", "points", "departments", "job_families",
+            "source_language"
         )
 
 
