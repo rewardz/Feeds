@@ -661,11 +661,13 @@ class PostSerializer(DynamicFieldsModelSerializer):
         return get_images_with_ecard(instance)
     
     def get_can_download_certificate(self, instance):
+        request = self.context.get('request', None)
+        user = request.user
         can_download_certificate = False
         reviewer_user = []
         nomination = instance.nomination
 
-        if instance.created_by == self.user or self.user.is_staff:
+        if instance.created_by == user or user.is_staff:
             return True
 
         if nomination and nomination.nom_status == NOMINATION_STATUS.approved:
