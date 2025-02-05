@@ -678,7 +678,7 @@ class PostSerializer(DynamicFieldsModelSerializer):
             if nomination_history:
                 max_reviewer_level = max(nomination_history.values_list('reviewer_level', flat=True))
                 reviewer_user = nomination_history.values_list('reviewer__email', flat=True)
-                if max_reviewer_level >= badge_reviewer_level and self.user.email in reviewer_user:
+                if max_reviewer_level >= badge_reviewer_level and user.email in reviewer_user:
                     return True
 
         return can_download_certificate
