@@ -38,6 +38,7 @@ from .utils import (
     get_current_month_end_date, get_absolute_url, posts_not_visible_to_user,
     get_job_families, get_related_objects_qs, org_reco_api_query, post_api_query, posts_not_shared_with_self_department,
     posts_not_shared_with_job_family, assigned_nomination_post_ids, posts_shared_with_org_department, fetch_feeds,
+    check_and_filter_on_certificate_hold_time
 )
 
 CustomUser = import_string(settings.CUSTOM_USER_MODEL)
@@ -1027,6 +1028,10 @@ class UserFeedViewSet(viewsets.ModelViewSet):
         else:
             feeds = posts.filter(post_type__in=[POST_TYPE.USER_CREATED_APPRECIATION,
                                                 POST_TYPE.USER_CREATED_NOMINATION])
+            
+        if feed_flag in ["received", "given"]:
+            feeds, _ = check_and_filter_on_certificate_hold_time(feeds, user)
+
         filter_appreciations = self.filter_appreciations(feeds)
         feeds = PostFilter(self.request.GET, queryset=feeds, user=user).qs
         feeds = (feeds | filter_appreciations).distinct()

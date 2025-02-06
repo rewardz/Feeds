@@ -1,8 +1,10 @@
 from __future__ import division, print_function, unicode_literals
 
+import pytz
 from django.conf import settings
 from django.utils.module_loading import import_string
 from django.db.models import Count
+from datetime import datetime, timedelta
 
 from rest_framework import serializers
 
@@ -24,6 +26,8 @@ Question = import_string(settings.QUESTION_MODEL)
 Answer = import_string(settings.ANSWER_MODEL)
 NominationCategory = import_string(settings.NOMINATION_CATEGORY_MODEL)
 Nominations = import_string(settings.NOMINATIONS_MODEL)
+NominationHistory = import_string(settings.NOMINATION_HISTORY_MODEL)
+NOMINATION_STATUS = import_string(settings.NOMINATION_STATUS)
 TrophyBadge = import_string(settings.TROPHY_BADGE_MODEL)
 UserStrength = import_string(settings.USER_STRENGTH_MODEL)
 NOMINATION_STATUS_COLOR_CODE = import_string(settings.NOMINATION_STATUS_COLOR_CODE)
@@ -32,6 +36,7 @@ ORGANIZATION_SETTINGS_MODEL = import_string(settings.ORGANIZATION_SETTINGS_MODEL
 MULTI_ORG_POST_ENABLE_FLAG = settings.MULTI_ORG_POST_ENABLE_FLAG
 RepeatedEventSerializer = import_string(settings.REPEATED_EVENT_SERIALIZER)
 
+utc = pytz.UTC
 
 def get_user_detail(user_id):
     try:
@@ -468,6 +473,7 @@ class PostSerializer(DynamicFieldsModelSerializer):
     job_families = serializers.SerializerMethodField()
     created_on = serializers.SerializerMethodField()
     modified_on = serializers.SerializerMethodField()
+    can_download_certificate = serializers.SerializerMethodField()
 
     class Meta:
         model = Post
@@ -480,7 +486,8 @@ class PostSerializer(DynamicFieldsModelSerializer):
             "is_owner", "can_edit", "can_delete", "has_appreciated",
             "appreciation_count", "comments_count", "tagged_users", "is_admin", "tags", "reaction_type", "nomination",
             "feed_type", "user_strength", "user", "user_reaction_type", "gif", "ecard", "points", "time_left",
-            "images_with_ecard", "departments", "organization", "department", "job_families", "source_language"
+            "images_with_ecard", "departments", "organization", "department", "job_families", "source_language",
+            "can_download_certificate"
         )
 
     def get_organization(self, instance):
@@ -652,6 +659,29 @@ class PostSerializer(DynamicFieldsModelSerializer):
     @staticmethod
     def get_images_with_ecard(instance):
         return get_images_with_ecard(instance)
+    
+    def get_can_download_certificate(self, instance):
+        request = self.context.get('request', None)
+        user = request.user
+        can_download_certificate = False
+        reviewer_user = []
+        nomination = instance.nomination
+
+        if instance.created_by == user or user.is_staff:
+            return True
+
+        if nomination and nomination.nom_status == NOMINATION_STATUS.approved:
+            badge_reviewer_level = nomination.badge.reviewer_level
+            nomination_history = NominationHistory.objects.filter(
+                nomination=nomination, status=NOMINATION_STATUS.approved
+            )
+            if nomination_history:
+                max_reviewer_level = max(nomination_history.values_list('reviewer_level', flat=True))
+                reviewer_user = nomination_history.values_list('reviewer__email', flat=True)
+                if max_reviewer_level >= badge_reviewer_level and user.email in reviewer_user:
+                    return True
+
+        return can_download_certificate
 
 
 class CommentsLikedSerializer(serializers.ModelSerializer):
@@ -709,7 +739,7 @@ class PostDetailSerializer(PostSerializer):
             "gif", "ecard", "points", "user_reaction_type", "images_with_ecard", "reaction_type", "category",
             "category_name", "sub_category", "sub_category_name", "organization_name", "display_status",
             "department_name", "departments", "can_download", "is_download_choice_needed", "greeting_info",
-            "job_families", "source_language"
+            "job_families", "source_language", "can_download_certificate"
         )
 
     @staticmethod
@@ -811,7 +841,8 @@ class PostFeedSerializer(PostSerializer):
             "is_owner", "can_edit", "can_delete", "has_appreciated",
             "appreciation_count", "comments_count", "tagged_users", "is_admin", "tags", "reaction_type", "nomination",
             "feed_type", "user_strength", "user", "user_reaction_type", "gif", "ecard", "points", "time_left",
-            "images_with_ecard", "greeting_info", "departments", "job_families", "source_language"
+            "images_with_ecard", "greeting_info", "departments", "job_families", "source_language",
+            "can_download_certificate"
         )
 
 
@@ -1041,6 +1072,7 @@ class GreetingSerializerBase(serializers.ModelSerializer):
     ecard = ECardSerializer(read_only=True)
     images_with_ecard = serializers.SerializerMethodField()
     greeting_info = serializers.SerializerMethodField()
+    can_download_certificate = serializers.SerializerMethodField()
 
     def __init__(self, *args, **kwargs):
         super(GreetingSerializerBase, self).__init__(*args, **kwargs)
@@ -1061,6 +1093,27 @@ class GreetingSerializerBase(serializers.ModelSerializer):
     def get_is_admin(self, instance):
         return self.user.is_staff
 
+    def get_can_download_certificate(self, instance):
+        can_download_certificate = False
+        reviewer_user = []
+        nomination = instance.nomination
+
+        if instance.created_by == self.user or self.user.is_staff:
+            return True
+
+        if nomination and nomination.nom_status == NOMINATION_STATUS.approved:
+            badge_reviewer_level = nomination.badge.reviewer_level
+            nomination_history = NominationHistory.objects.filter(
+                nomination=nomination, status=NOMINATION_STATUS.approved
+            )
+            if nomination_history:
+                max_reviewer_level = max(nomination_history.values_list('reviewer_level', flat=True))
+                reviewer_user = nomination_history.values_list('reviewer__email', flat=True)
+                if max_reviewer_level >= badge_reviewer_level and self.user.email in reviewer_user:
+                    return True
+
+        return can_download_certificate
+
     @staticmethod
     def get_feed_type(instance):
         return get_feed_type(instance)
@@ -1078,7 +1131,8 @@ class GreetingSerializerBase(serializers.ModelSerializer):
         fields = (
             "id", "created_by", "created_on", "organizations", "created_by_user_info", "title", "description",
             "post_type", "priority", "shared_with", "is_owner", "is_admin", "feed_type",
-            "gif", "ecard", "images_with_ecard", "greeting_info", "source_language"
+            "gif", "ecard", "images_with_ecard", "greeting_info", "source_language",
+            "can_download_certificate"
         )
 
 
