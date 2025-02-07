@@ -930,7 +930,7 @@ class CommentDetailSerializer(CommentSerializer):
     def update(self, instance, validated_data):
         content = validated_data.get('content', None)
         if content:
-            tag_users = extract_tagged_users(content)
+            tag_users = extract_tagged_users(content, instance.created_by.organization)
             if tag_users:
                 tag_users_to_comment(instance, tag_users)
         return super(CommentDetailSerializer, self).update(instance, validated_data)
