@@ -483,6 +483,14 @@ class PostSerializer(DynamicFieldsModelSerializer):
             "images_with_ecard", "departments", "organization", "department", "job_families", "source_language"
         )
 
+    def validate_priority(self, priority):
+        request = self.context.get('request', None)
+        user = getattr(request, 'user', None)
+        is_superuser = user and (user.is_staff or user.is_superuser)
+        if priority and not is_superuser:
+            return False
+        return priority
+
     def get_organization(self, instance):
         organization = instance.organizations.first()
         return organization.id if organization else organization
